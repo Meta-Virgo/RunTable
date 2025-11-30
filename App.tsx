@@ -41,6 +41,7 @@ const App: React.FC = () => {
     const [showStoryModal, setShowStoryModal] = useState(false);
     const [showStatusModal, setShowStatusModal] = useState(false);
     const [editingChar, setEditingChar] = useState<Character | null>(null);
+    const [addingRole, setAddingRole] = useState<string>('调查员'); // New state to track which role we are adding
     const [statusTargetId, setStatusTargetId] = useState<string | null>(null);
 
     // Responsive Check
@@ -224,7 +225,11 @@ const App: React.FC = () => {
                         moduleInfo={moduleInfo}
                         characters={characters}
                         onEditModule={() => setShowModuleModal(true)}
-                        onAddChar={(role) => { setEditingChar(null); setShowCharModal(true); }}
+                        onAddChar={(role) => { 
+                            setEditingChar(null); 
+                            setAddingRole(role); 
+                            setShowCharModal(true); 
+                        }}
                         onEditChar={(char) => { setEditingChar(char); setShowCharModal(true); }}
                     />
                 )}
@@ -241,7 +246,7 @@ const App: React.FC = () => {
 
              {showCharModal && (
                  <CharacterModal 
-                    initialData={editingChar || INITIAL_CHAR_STATE}
+                    initialData={editingChar || { ...INITIAL_CHAR_STATE, role: addingRole }}
                     isEditing={!!editingChar}
                     onSave={handleSaveCharacter}
                     onDelete={handleDeleteCharacter}
