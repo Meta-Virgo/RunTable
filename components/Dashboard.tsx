@@ -1,5 +1,5 @@
-import React from 'react';
-import { Edit2, UserPlus, Users, Swords, User, UserCog, Heart, Zap, Brain } from 'lucide-react';
+import React, { useState } from 'react';
+import { Edit2, UserPlus, Users, Swords, User, UserCog, Heart, Zap, Brain, AlertTriangle } from 'lucide-react';
 import { Button, StatBadge, cn } from './UI';
 import { ModuleInfo, Character } from '../types';
 
@@ -9,9 +9,11 @@ interface DashboardProps {
   onEditModule: () => void;
   onAddChar: (role: string) => void;
   onEditChar: (char: Character) => void;
+  onResetData: () => void;
 }
 
-export const Dashboard: React.FC<DashboardProps> = ({ moduleInfo, characters, onEditModule, onAddChar, onEditChar }) => {
+export const Dashboard: React.FC<DashboardProps> = ({ moduleInfo, characters, onEditModule, onAddChar, onEditChar, onResetData }) => {
+  const [resetConfirm, setResetConfirm] = useState(false);
   const pcCharacters = characters.filter(c => c.role === '调查员');
   const npcCharacters = characters.filter(c => ['NPC', '怪物'].includes(c.role));
 
@@ -90,6 +92,32 @@ export const Dashboard: React.FC<DashboardProps> = ({ moduleInfo, characters, on
                    ); 
                  })}
                </div>
+           </section>
+
+           {/* Danger Zone */}
+           <section className="pt-8 border-t border-white/5">
+                <h2 className="text-xl md:text-2xl font-bold text-red-400 flex items-center gap-3 mb-4">
+                    <AlertTriangle /> 危险区域
+                </h2>
+                <div className="glass-panel bg-red-900/10 border-red-500/20 p-6 md:p-8 rounded-2xl flex flex-col md:flex-row justify-between items-center gap-6">
+                    <div className="flex-1">
+                        <h3 className="text-lg font-bold text-white mb-2">重置所有数据</h3>
+                        <p className="text-slate-400 text-sm leading-relaxed">这将不可逆地清除所有角色、模组设定以及聊天记录。数据一旦清除无法恢复，请谨慎操作。</p>
+                    </div>
+                    <div className="flex items-center gap-4 shrink-0">
+                        {resetConfirm ? (
+                            <>
+                                <div className="flex flex-col items-end gap-1">
+                                    <Button onClick={() => { onResetData(); setResetConfirm(false); }} variant="dangerActive" icon={AlertTriangle} size="lg">确认清空</Button>
+                                    <span className="text-[10px] text-red-400 font-bold uppercase tracking-wider animate-pulse">此操作不可撤销</span>
+                                </div>
+                                <Button onClick={() => setResetConfirm(false)} variant="ghost">取消</Button>
+                            </>
+                        ) : (
+                            <Button onClick={() => setResetConfirm(true)} variant="danger" icon={AlertTriangle} size="lg">清空所有数据</Button>
+                        )}
+                    </div>
+                </div>
            </section>
         </div>
     </div>

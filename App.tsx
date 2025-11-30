@@ -140,6 +140,22 @@ const App: React.FC = () => {
         setStatusTargetId(null);
     };
 
+    const handleResetData = () => {
+        setCharacters([]);
+        setLogs([{
+            id: Date.now(),
+            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            charId: 'pc',
+            charName: '系统',
+            charRole: 'Keeper',
+            type: 'system',
+            content: '终端数据已完全重置。'
+        }]);
+        setModuleInfo({ title: '新模组', description: '', notes: '' });
+        setActiveCharId('pc');
+        if (isMobile) setSidebarOpen(false);
+    };
+
     // --- File I/O ---
     const handleSaveFile = () => {
         const data: AppData = { version: '4.0', timestamp: Date.now(), moduleInfo, characters, logs };
@@ -231,6 +247,7 @@ const App: React.FC = () => {
                             setShowCharModal(true); 
                         }}
                         onEditChar={(char) => { setEditingChar(char); setShowCharModal(true); }}
+                        onResetData={handleResetData}
                     />
                 )}
              </main>
