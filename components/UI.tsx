@@ -84,7 +84,7 @@ export const NumberStepper: React.FC<NumberStepperProps> = ({ value, onChange, m
             <button type="button" onClick={handleDecrement} className="w-9 h-full hover:bg-slate-800 text-slate-400 hover:text-white transition-colors flex items-center justify-center shrink-0 active:bg-slate-700"><Minus size={16} /></button>
             <input 
               type="number" 
-              className="flex-1 w-full bg-transparent text-center text-base font-bold text-white font-mono focus:outline-none appearance-none m-0 px-0 h-full min-w-[2rem]" 
+              className="flex-1 w-full bg-transparent text-center text-base font-bold text-white font-mono focus:outline-none appearance-none m-0 px-0 h-full min-w-[2rem] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none" 
               value={value} 
               onChange={(e) => { const val = e.target.value; if (val === '') onChange(0); else onChange(parseInt(val)); }} 
               onBlur={() => { let val = Number(value); if (isNaN(val)) val = min; if (val < min) val = min; if (val > max) val = max; onChange(val); }} 
