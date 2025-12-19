@@ -44,7 +44,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ moduleInfo, characters, on
                        <div className="p-3 bg-purple-500/10 rounded-xl text-purple-400 border border-purple-500/20"><User size={24} className="md:w-8 md:h-8" /></div>
                        <div className="flex-1 min-w-0">
                          <div className="font-bold text-white text-lg truncate group-hover:text-purple-400 transition-colors">{inv.name}</div>
-                         <div className="text-xs text-slate-400 mt-1">{inv.job || "无业"} · {inv.ageSex || "未知"}</div>
+                         <div className="text-xs text-slate-400 mt-1">{inv.job || "无业"} · {(inv.age || inv.sex) ? `${inv.age} ${inv.sex}` : "未知"}</div>
                        </div>
                      </div>
                      <div className="space-y-3 mb-4 md:mb-6">

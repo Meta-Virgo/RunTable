@@ -13,9 +13,9 @@ import { Menu, LogOut } from 'lucide-react';
 
 // --- Constants ---
 const INITIAL_CHAR_STATE: Character = { 
-    id: '', name: '', role: '调查员', type: 'investigator', job: '', ageSex: '', 
+    id: '', name: '', role: '调查员', type: 'investigator', job: '', age: '', sex: '', 
     str: 50, con: 50, siz: 50, dex: 50, app: 50, int: 50, pow: 50, edu: 50, luck: 50, 
-    hp: 10, san: 50, mp: 10, notes: '' 
+    hp: 10, san: 50, mp: 10, notes: '', backstory: '', skills: {}
 };
 
 const EMPTY_MODULE_INFO: ModuleInfo = { title: '', description: '', notes: '' };
@@ -33,6 +33,7 @@ const App: React.FC = () => {
     const [characters, setCharacters] = useState<Character[]>([]);
     const [logs, setLogs] = useState<Log[]>([]);
     const [moduleInfo, setModuleInfo] = useState<ModuleInfo>(EMPTY_MODULE_INFO);
+    const [roomPassword, setRoomPassword] = useState('');
     
     const [activeCharId, setActiveCharId] = useState('pc');
     const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -255,8 +256,11 @@ const App: React.FC = () => {
                          type: newChar.type,
                          role: newChar.role || (newChar.type === 'investigator' ? '调查员' : (newChar.type === 'monster' ? '怪物' : 'NPC')),
                          job: newChar.info?.job || '',
-                         ageSex: newChar.info?.ageSex || '',
+                         age: newChar.info?.age || '',
+                         sex: newChar.info?.sex || '',
                          notes: newChar.info?.notes || '',
+                         backstory: newChar.info?.backstory || '',
+                         skills: newChar.info?.skills || newChar.stats?.skills || {},
                          str: newChar.stats?.str || 50,
                          con: newChar.stats?.con || 50,
                          siz: newChar.stats?.siz || 50,
@@ -294,8 +298,11 @@ const App: React.FC = () => {
                                 type: newChar.type,
                                 role: newChar.role || (newChar.type === 'investigator' ? '调查员' : (newChar.type === 'monster' ? '怪物' : 'NPC')),
                                 job: newChar.info?.job || '',
-                                ageSex: newChar.info?.ageSex || '',
+                                age: newChar.info?.age || '',
+                                sex: newChar.info?.sex || '',
                                 notes: newChar.info?.notes || '',
+                                backstory: newChar.info?.backstory || '',
+                                skills: newChar.info?.skills || newChar.stats?.skills || {},
                                 str: newChar.stats?.str || 50,
                                 con: newChar.stats?.con || 50,
                                 siz: newChar.stats?.siz || 50,
@@ -324,8 +331,11 @@ const App: React.FC = () => {
                          type: newChar.type,
                          role: newChar.role || (newChar.type === 'investigator' ? '调查员' : (newChar.type === 'monster' ? '怪物' : 'NPC')),
                          job: newChar.info?.job || '',
-                         ageSex: newChar.info?.ageSex || '',
+                         age: newChar.info?.age || '',
+                         sex: newChar.info?.sex || '',
                          notes: newChar.info?.notes || '',
+                         backstory: newChar.info?.backstory || '',
+                         skills: newChar.info?.skills || newChar.stats?.skills || {},
                          str: newChar.stats?.str || 50,
                          con: newChar.stats?.con || 50,
                          siz: newChar.stats?.siz || 50,
@@ -415,6 +425,7 @@ const App: React.FC = () => {
 
             // Set basic room info
             setModuleInfo({ title: room.title, description: room.description || '', notes: '' });
+            setRoomPassword(room.password || '');
             setCurrentRoomId(roomId);
             setActiveCharId(charId);
             setIsKP(userIsKP);
@@ -443,8 +454,11 @@ const App: React.FC = () => {
                     ...c,
                     role: c.role || '调查员',
                     job: c.info?.job || '',
-                    ageSex: c.info?.ageSex || '',
+                    age: c.info?.age || '',
+                    sex: c.info?.sex || '',
                     notes: c.info?.notes || '',
+                    backstory: c.info?.backstory || '',
+                    skills: c.info?.skills || c.stats?.skills || {},
                     str: c.stats?.str || 50,
                     con: c.stats?.con || 50,
                     siz: c.stats?.siz || 50,
@@ -514,7 +528,7 @@ const App: React.FC = () => {
     };
 
     // 新增 isSecret 参数
-    const rollDice = (count: number, type: number, isSecret: boolean = false) => {
+    const rollDice = (count: number, type: number, isSecret: boolean = false, checkInfo?: { name: string, target: number }) => {
         let total = 0;
         let details: number[] = [];
         for(let i=0; i<count; i++) {
@@ -523,9 +537,29 @@ const App: React.FC = () => {
           details.push(roll);
         }
         
+        let resultData: any = { count, type, total, details };
+
+        if (checkInfo && count === 1 && type === 100) {
+             resultData.checkName = checkInfo.name;
+             resultData.checkTarget = checkInfo.target;
+             
+             // Result Calculation (CoC 7th Style Simplification)
+             // Critical Success: 1-5
+             // Critical Failure: 96-100
+             if (total <= 5) {
+                 resultData.checkResult = 'critical_success';
+             } else if (total >= 96) { 
+                 resultData.checkResult = 'critical_failure';
+             } else if (total <= checkInfo.target) {
+                 resultData.checkResult = 'success';
+             } else {
+                 resultData.checkResult = 'failure';
+             }
+        }
+
         // 如果是暗骰，使用 'dice_secret' 类型
         const msgType = isSecret ? 'dice_secret' : 'dice';
-        addLog(msgType as any, JSON.stringify({ count, type, total, details }), activeCharId === 'pc' ? 'pc' : activeCharId);
+        addLog(msgType as any, JSON.stringify(resultData), activeCharId === 'pc' ? 'pc' : activeCharId);
     };
 
     const generateStory = () => {
@@ -557,15 +591,19 @@ const App: React.FC = () => {
             
             info: {
                 job: char.job,
-                ageSex: char.ageSex,
-                notes: char.notes
+                age: char.age,
+                sex: char.sex,
+                notes: char.notes,
+                backstory: char.backstory,
+                skills: char.skills || {}
             },
 
             stats: {
                 str: char.str, con: char.con, siz: char.siz, 
                 dex: char.dex, app: char.app, int: char.int, 
                 pow: char.pow, edu: char.edu, luck: char.luck,
-                hp: char.hp, san: char.san, mp: char.mp
+                hp: char.hp, san: char.san, mp: char.mp,
+                skills: char.skills || {}
             }
         };
 
@@ -578,7 +616,43 @@ const App: React.FC = () => {
 
                 if (error) throw error;
                 
-                setCharacters(prev => prev.map(c => c.id === char.id ? { ...char, ...charData } : c));
+                // Refetch to ensure we have the latest DB state (including server-side defaults or triggers)
+                const { data: latestChar, error: fetchError } = await supabase
+                    .from('characters')
+                    .select('*')
+                    .eq('id', char.id)
+                    .single();
+                
+                if (latestChar && !fetchError) {
+                     const mappedLatest: Character = {
+                        ...char, // Keep local fields
+                        ...latestChar, // Overwrite with DB fields
+                        // Remap JSONB fields
+                        role: latestChar.role || '调查员',
+                        job: latestChar.info?.job || '',
+                        age: latestChar.info?.age || '',
+                        sex: latestChar.info?.sex || '',
+                        notes: latestChar.info?.notes || '',
+                        backstory: latestChar.info?.backstory || '',
+                        skills: latestChar.info?.skills || latestChar.stats?.skills || {},
+                        str: latestChar.stats?.str || 50,
+                        con: latestChar.stats?.con || 50,
+                        siz: latestChar.stats?.siz || 50,
+                        dex: latestChar.stats?.dex || 50,
+                        app: latestChar.stats?.app || 50,
+                        int: latestChar.stats?.int || 50,
+                        pow: latestChar.stats?.pow || 50,
+                        edu: latestChar.stats?.edu || 50,
+                        luck: latestChar.stats?.luck || 50,
+                        hp: latestChar.stats?.hp || 10,
+                        san: latestChar.stats?.san || 50,
+                        mp: latestChar.stats?.mp || 10,
+                     };
+                     setCharacters(prev => prev.map(c => c.id === char.id ? mappedLatest : c));
+                } else {
+                     // Fallback to local update if fetch fails
+                     setCharacters(prev => prev.map(c => c.id === char.id ? { ...char, ...charData } : c));
+                }
                 // addLog('system', `守秘人 更新了 [${char.name}] 的档案`);
 
             } else {
@@ -596,7 +670,26 @@ const App: React.FC = () => {
                         id: data.id,
                         // 确保从数据库返回的数据中正确读取 type 和 role
                         type: data.type, 
-                        role: data.role
+                        role: data.role,
+                        // Remap JSONB fields from DB response
+                        job: data.info?.job || '',
+                        age: data.info?.age || '',
+                        sex: data.info?.sex || '',
+                        notes: data.info?.notes || '',
+                        backstory: data.info?.backstory || '',
+                        skills: data.info?.skills || data.stats?.skills || {},
+                        str: data.stats?.str || 50,
+                        con: data.stats?.con || 50,
+                        siz: data.stats?.siz || 50,
+                        dex: data.stats?.dex || 50,
+                        app: data.stats?.app || 50,
+                        int: data.stats?.int || 50,
+                        pow: data.stats?.pow || 50,
+                        edu: data.stats?.edu || 50,
+                        luck: data.stats?.luck || 50,
+                        hp: data.stats?.hp || 10,
+                        san: data.stats?.san || 50,
+                        mp: data.stats?.mp || 10,
                     };
                     setCharacters(prev => [...prev, newChar]);
                     // addLog('system', `新角色录入: ${newChar.name} (${newChar.role})`); // 已移除新角色录入提示
@@ -639,7 +732,8 @@ const App: React.FC = () => {
             str: target.str, con: target.con, siz: target.siz,
             dex: target.dex, app: target.app, int: target.int,
             pow: target.pow, edu: target.edu, luck: target.luck,
-            hp: hp, san: san, mp: mp
+            hp: hp, san: san, mp: mp,
+            skills: target.skills || {}
         };
 
         const { error } = await supabase
@@ -698,15 +792,23 @@ const App: React.FC = () => {
         }
 
         // Send system message before leaving
-        const { error: userError, data: user } = await supabase.auth.getUser();
+        const { error: userError, data: { user } } = await supabase.auth.getUser();
         if (user && !userError) {
              let leaveMsg = '';
-             if (activeCharId === 'pc') {
-                 leaveMsg = '守秘人 离开了房间';
+             
+             if (isKP) {
+                 // KP leaving: Always show KP name + (守秘人), regardless of active character
+                 leaveMsg = `${userNickname || '守秘人'} (守秘人) 离开了房间`;
              } else {
-                 const myChar = characters.find(c => c.id === activeCharId);
-                 if (myChar) {
-                     leaveMsg = `${myChar.name} 离开了房间`;
+                 // Player leaving
+                 if (activeCharId === 'pc') {
+                     // Should rarely happen for players, but fallback
+                     leaveMsg = `${userNickname || '玩家'} 离开了房间`;
+                 } else {
+                     const myChar = characters.find(c => c.id === activeCharId);
+                     if (myChar) {
+                         leaveMsg = `${myChar.name} 离开了房间`;
+                     }
                  }
              }
 
@@ -722,7 +824,8 @@ const App: React.FC = () => {
         }
 
         // If active char is not PC/KP, remove room_id from character
-        if (activeCharId !== 'pc') {
+        // FIX: KP's characters (NPC/Monster) should NOT be removed from room when KP leaves
+        if (activeCharId !== 'pc' && !isKP) {
              await supabase.from('characters').update({ room_id: null }).eq('id', activeCharId);
         }
 
@@ -759,7 +862,7 @@ const App: React.FC = () => {
     }
 
     return (
-        <div className="flex h-screen text-slate-200 font-sans selection:bg-indigo-500/30 overflow-hidden bg-[#020617]">
+        <div className="flex h-screen md:h-screen h-[100dvh] text-slate-200 font-sans selection:bg-indigo-500/30 overflow-hidden bg-[#020617]">
              {/* Background Effects */}
              <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none z-0">
                  <div className="absolute top-[-10%] left-[-10%] w-96 h-96 bg-purple-900/20 rounded-full blur-[100px] animate-blob"></div>
@@ -834,8 +937,29 @@ const App: React.FC = () => {
              {/* Modals */}
              {showModuleModal && (
                  <ModuleModal 
-                    info={moduleInfo} 
-                    onChange={setModuleInfo} 
+                    info={moduleInfo}
+                    password={roomPassword}
+                    onSave={async (info, password) => {
+                        if (!currentRoomId) return;
+                        const updates: any = {
+                            title: info.title,
+                            description: info.description
+                        };
+                        if (password !== undefined) updates.password = password;
+
+                        const { error } = await supabase
+                            .from('rooms')
+                            .update(updates)
+                            .eq('id', currentRoomId);
+                        
+                        if (error) {
+                            alert('保存失败: ' + error.message);
+                        } else {
+                            // Local update for immediate feedback (Realtime will also trigger)
+                            setModuleInfo(info);
+                            if (password !== undefined) setRoomPassword(password);
+                        }
+                    }}
                     onClose={() => setShowModuleModal(false)} 
                  />
              )}

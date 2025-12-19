@@ -76,9 +76,14 @@ interface NumberStepperProps {
   step?: number;
   className?: string;
   disabled?: boolean;
+  size?: 'sm' | 'md';
 }
 
-export const NumberStepper: React.FC<NumberStepperProps> = ({ value, onChange, min, max, step = 1, className, disabled }) => {
+export const NumberStepper: React.FC<NumberStepperProps> = ({ value, onChange, min, max, step = 1, className, disabled, size = 'md' }) => {
+  const heightClass = size === 'sm' ? 'h-8' : 'h-10';
+  const buttonWidthClass = size === 'sm' ? 'w-8' : 'w-10';
+  const fontSizeClass = size === 'sm' ? 'text-sm' : 'text-base';
+
   const handleDec = () => {
     if (disabled) return;
     const newVal = value - step;
@@ -98,12 +103,12 @@ export const NumberStepper: React.FC<NumberStepperProps> = ({ value, onChange, m
   };
 
   return (
-    <div className={cn("flex items-center bg-[#020617] rounded-xl border border-slate-700 h-10 shadow-sm group hover:border-slate-500 transition-all", disabled && "opacity-50 cursor-not-allowed", className)}>
+    <div className={cn("flex items-center bg-[#020617] rounded-xl border border-slate-700 shadow-sm group hover:border-slate-500 transition-all", heightClass, disabled && "opacity-50 cursor-not-allowed", className)}>
       <button 
         type="button"
         onClick={handleDec} 
         disabled={disabled || (min !== undefined && value <= min)}
-        className="w-10 h-full flex items-center justify-center text-slate-400 hover:text-white active:bg-slate-800 rounded-l-xl transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+        className={cn(buttonWidthClass, "h-full flex items-center justify-center text-slate-400 hover:text-white active:bg-slate-800 rounded-l-xl transition-colors disabled:opacity-30 disabled:cursor-not-allowed")}
       >
         <Minus size={14} strokeWidth={3} />
       </button>
@@ -122,14 +127,14 @@ export const NumberStepper: React.FC<NumberStepperProps> = ({ value, onChange, m
             }}
             onBlur={handleBlur}
             disabled={disabled}
-            className="w-full h-full bg-transparent text-center font-mono font-bold text-white text-base tabular-nums focus:outline-none disabled:cursor-not-allowed appearance-none"
+            className={cn("w-full h-full bg-transparent text-center font-mono font-bold text-white tabular-nums focus:outline-none disabled:cursor-not-allowed appearance-none", fontSizeClass)}
         />
       </div>
       <button 
         type="button"
         onClick={handleInc} 
         disabled={disabled || (max !== undefined && value >= max)}
-        className="w-10 h-full flex items-center justify-center text-slate-400 hover:text-white active:bg-slate-800 rounded-r-xl transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+        className={cn(buttonWidthClass, "h-full flex items-center justify-center text-slate-400 hover:text-white active:bg-slate-800 rounded-r-xl transition-colors disabled:opacity-30 disabled:cursor-not-allowed")}
       >
         <Plus size={14} strokeWidth={3} />
       </button>

@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../supabase';
 import { Room, Character } from '../types';
-import { Button, Input, Textarea} from './UI';
-import { Plus, Search, User, LogOut, Loader2, Play, Users, Edit2 } from 'lucide-react';
+import { Button, Input, Textarea, Modal } from './UI';
+import { Plus, Search, User, LogOut, Loader2, Play, Users, Edit2, BookOpen } from 'lucide-react';
 import { CharacterModal } from './Modals';
 
 interface HomeProps {
@@ -11,9 +11,9 @@ interface HomeProps {
 }
 
 const INITIAL_CHAR_STATE: Character = { 
-    id: '', name: '', role: '调查员', job: '', ageSex: '', 
+    id: '', name: '', role: '调查员', job: '', age: '', sex: '', 
     str: 50, con: 50, siz: 50, dex: 50, app: 50, int: 50, pow: 50, edu: 50, luck: 50, 
-    hp: 10, san: 50, mp: 10, notes: '', type: 'investigator'
+    hp: 10, san: 50, mp: 10, notes: '', type: 'investigator', backstory: '', skills: {}
 };
 
 interface RoomCardProps {
@@ -35,11 +35,40 @@ const RoomCard: React.FC<RoomCardProps> = ({ room, currentUserId, myCharacters, 
         }
     }, [isKP, myCharacters]);
 
+    const [passwordInput, setPasswordInput] = useState('');
+    const [showPasswordInput, setShowPasswordInput] = useState(false);
+
+    const onJoinClick = () => {
+        if (room.password && !isKP) {
+            if (!showPasswordInput) {
+                setShowPasswordInput(true);
+                return;
+            }
+            if (passwordInput !== room.password) {
+                alert("密码错误");
+                return;
+            }
+        }
+        onJoinRoom(room.id, selectedCharId);
+    };
+
     return (
         <div className="bg-slate-800/30 border border-slate-700/50 hover:border-indigo-500/30 rounded-xl p-5 transition-all hover:bg-slate-800/50 group flex flex-col">
             <div className="flex justify-between items-start mb-2">
-                <h3 className="font-bold text-white text-lg line-clamp-1">{room.title}</h3>
-                <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 uppercase">Open</span>
+                <div className="flex-1 min-w-0 mr-2">
+                    <div className="flex items-center gap-2">
+                        <h3 className="font-bold text-white text-lg line-clamp-1">{room.title}</h3>
+                    </div>
+                    {room.password && (
+                        <div className="mt-1">
+                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20 inline-flex items-center gap-1">🔒 私密</span>
+                        </div>
+                    )}
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                    <span className="text-xs text-slate-500 font-mono bg-slate-900/50 px-1.5 py-0.5 rounded border border-white/5">#{room.room_number || '???'}</span>
+                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 uppercase">Open</span>
+                </div>
             </div>
             <p className="text-slate-400 text-sm mb-4 line-clamp-2 flex-1">{room.description || "暂无描述"}</p>
             
@@ -57,7 +86,22 @@ const RoomCard: React.FC<RoomCardProps> = ({ room, currentUserId, myCharacters, 
                         ))}
                     </select>
                 </div>
-                <Button className="w-full" icon={Play} onClick={() => onJoinRoom(room.id, selectedCharId)}>进入房间</Button>
+                
+                {showPasswordInput && (
+                    <div className="animate-fade-in">
+                        <Input 
+                            type="password" 
+                            placeholder="输入房间密码..." 
+                            value={passwordInput} 
+                            onChange={e => setPasswordInput(e.target.value)}
+                            autoFocus
+                        />
+                    </div>
+                )}
+
+                <Button className="w-full" icon={Play} onClick={onJoinClick}>
+                    {showPasswordInput ? "验证并进入" : (room.password && !isKP ? "输入密码进入" : "进入房间")}
+                </Button>
             </div>
         </div>
     );
@@ -73,6 +117,9 @@ export const Home: React.FC<HomeProps> = ({ onJoinRoom, onLogout }) => {
     const [showCreateRoom, setShowCreateRoom] = useState(false);
     const [newRoomTitle, setNewRoomTitle] = useState('');
     const [newRoomDesc, setNewRoomDesc] = useState('');
+    const [newRoomPassword, setNewRoomPassword] = useState('');
+
+    const [editingRoom, setEditingRoom] = useState<Room | null>(null);
 
     // Characters State
     const [myCharacters, setMyCharacters] = useState<Character[]>([]);
@@ -181,7 +228,8 @@ export const Home: React.FC<HomeProps> = ({ onJoinRoom, onLogout }) => {
                 ...c,
                 role: '调查员', // Default role
                 job: c.info?.job || '',
-                ageSex: c.info?.ageSex || '',
+                age: c.info?.age || '',
+                sex: c.info?.sex || '',
                 notes: c.info?.notes || '',
                 str: c.stats?.str || 50,
                 con: c.stats?.con || 50,
@@ -195,6 +243,7 @@ export const Home: React.FC<HomeProps> = ({ onJoinRoom, onLogout }) => {
                 hp: c.stats?.hp || 10,
                 san: c.stats?.san || 50,
                 mp: c.stats?.mp || 10,
+                skills: c.info?.skills || c.stats?.skills || {},
             }));
             setMyCharacters(mappedChars);
         }
@@ -214,18 +263,44 @@ export const Home: React.FC<HomeProps> = ({ onJoinRoom, onLogout }) => {
                 title: newRoomTitle,
                 description: newRoomDesc,
                 kp_id: user.id,
-                status: 'open'
+                status: 'open',
+                password: newRoomPassword || null
             })
             .select()
             .single();
 
         if (data) {
+            setNewRoomTitle('');
+            setNewRoomDesc('');
+            setNewRoomPassword('');
+            setShowCreateRoom(false);
             onJoinRoom(data.id, 'pc'); // Creator joins as KP (pc)
         }
+        setLoading(false);
         if (error) {
             alert('创建房间失败: ' + error.message);
-            setLoading(false);
         }
+    };
+
+    const handleUpdateRoom = async () => {
+        if (!editingRoom || !editingRoom.title.trim()) return;
+        setLoading(true);
+
+        const { error } = await supabase
+            .from('rooms')
+            .update({
+                title: editingRoom.title,
+                description: editingRoom.description,
+                password: editingRoom.password || null
+            })
+            .eq('id', editingRoom.id);
+
+        if (!error) {
+            setEditingRoom(null);
+        } else {
+            alert('更新房间失败: ' + error.message);
+        }
+        setLoading(false);
     };
 
     const handleUpdateProfile = async () => {
@@ -256,13 +331,15 @@ export const Home: React.FC<HomeProps> = ({ onJoinRoom, onLogout }) => {
             type: 'investigator',
             info: {
                 job: char.job,
-                ageSex: char.ageSex,
+                age: char.age,
+                sex: char.sex,
                 notes: char.notes
             },
             stats: {
                 str: char.str, con: char.con, siz: char.siz, dex: char.dex, app: char.app,
                 int: char.int, pow: char.pow, edu: char.edu, luck: char.luck,
-                hp: char.hp, san: char.san, mp: char.mp
+                hp: char.hp, san: char.san, mp: char.mp,
+                skills: char.skills || {}
             }
         };
 
@@ -366,10 +443,13 @@ export const Home: React.FC<HomeProps> = ({ onJoinRoom, onLogout }) => {
                                  <h3 className="text-lg font-bold text-white mb-4">新建跑团房间</h3>
                                  <div className="space-y-4">
                                      <Input label="房间标题" value={newRoomTitle} onChange={e => setNewRoomTitle(e.target.value)} placeholder="例如：印斯茅斯之影" />
-                                     <Textarea label="简介 (可选)" value={newRoomDesc} onChange={e => setNewRoomDesc(e.target.value)} placeholder="简单的模组介绍或招募要求..." />
-                                     <div className="flex justify-end gap-3 pt-2">
+                                    <Input label="房间密码 (可选)" value={newRoomPassword} onChange={e => setNewRoomPassword(e.target.value)} placeholder="留空则为公开房间" type="password" />
+                                    <Textarea label="简介 (可选)" value={newRoomDesc} onChange={e => setNewRoomDesc(e.target.value)} placeholder="简单的模组介绍或招募要求..." />
+                                     <div className="flex justify-end gap-3 pt-4 border-t border-white/10">
                                          <Button variant="ghost" onClick={() => setShowCreateRoom(false)}>取消</Button>
-                                         <Button onClick={handleCreateRoom} disabled={loading}>{loading ? <Loader2 className="animate-spin" /> : '创建并进入'}</Button>
+                                         <Button onClick={handleCreateRoom} disabled={!newRoomTitle.trim() || loading} icon={loading ? Loader2 : Plus}>
+                                             {loading ? '创建中...' : '立即创建'}
+                                         </Button>
                                      </div>
                                  </div>
                              </div>
@@ -379,12 +459,12 @@ export const Home: React.FC<HomeProps> = ({ onJoinRoom, onLogout }) => {
                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                              {filteredRooms.map(room => (
                                  <RoomCard 
-                                    key={room.id} 
-                                    room={room} 
-                                    currentUserId={currentUserId} 
-                                    myCharacters={myCharacters} 
-                                    onJoinRoom={onJoinRoom} 
-                                 />
+                                   key={room.id} 
+                                   room={room} 
+                                   currentUserId={currentUserId} 
+                                   myCharacters={myCharacters} 
+                                   onJoinRoom={onJoinRoom} 
+                                />
                              ))}
                              {filteredRooms.length === 0 && (
                                  <div className="col-span-full py-12 text-center text-slate-500">
@@ -408,8 +488,8 @@ export const Home: React.FC<HomeProps> = ({ onJoinRoom, onLogout }) => {
                                      <div className="flex justify-between items-start mb-3 pl-3">
                                          <div>
                                              <h3 className="font-bold text-white text-lg">{char.name}</h3>
-                                             <p className="text-xs text-slate-400">{char.ageSex} {char.job}</p>
-                                         </div>
+                                            <p className="text-xs text-slate-400">{char.age} {char.sex} {char.job}</p>
+                                        </div>
                                          <div className="text-right">
                                              <div className="text-xl font-mono font-bold text-indigo-400">{char.hp}<span className="text-xs text-slate-500 ml-1">HP</span></div>
                                              <div className="text-sm font-mono text-slate-500">{char.san} SAN</div>
@@ -491,6 +571,38 @@ export const Home: React.FC<HomeProps> = ({ onJoinRoom, onLogout }) => {
                    </div>
                 )}
              </main>
+
+             {/* Edit Room Modal */}
+             {editingRoom && (
+                <Modal onClose={() => setEditingRoom(null)} title="编辑模组/房间" icon={BookOpen} className="max-w-xl">
+                    <div className="p-6 space-y-4">
+                        <Input 
+                            label="房间标题" 
+                            value={editingRoom.title} 
+                            onChange={e => setEditingRoom({...editingRoom, title: e.target.value})} 
+                        />
+                        <Input 
+                            label="房间密码 (留空公开)" 
+                            value={editingRoom.password || ''} 
+                            onChange={e => setEditingRoom({...editingRoom, password: e.target.value})} 
+                            type="password"
+                            placeholder="留空则为公开房间"
+                        />
+                        <Textarea 
+                            label="简介" 
+                            value={editingRoom.description || ''} 
+                            onChange={e => setEditingRoom({...editingRoom, description: e.target.value})} 
+                            rows={5}
+                        />
+                    </div>
+                    <div className="px-6 py-4 border-t border-white/10 bg-white/5 flex justify-end gap-3">
+                        <Button variant="ghost" onClick={() => setEditingRoom(null)}>取消</Button>
+                        <Button onClick={handleUpdateRoom} disabled={!editingRoom.title.trim() || loading} icon={loading ? Loader2 : Edit2}>
+                            {loading ? '保存中...' : '保存修改'}
+                        </Button>
+                    </div>
+                </Modal>
+             )}
 
              {showCharModal && (
                  <CharacterModal 

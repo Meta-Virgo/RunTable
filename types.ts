@@ -17,6 +17,8 @@ export interface Room {
   title: string;
   description: string | null;
   status: 'open' | 'closed' | 'archived';
+  room_number?: number;
+  password?: string | null;
 }
 
 export interface Character {
@@ -31,12 +33,14 @@ export interface Character {
   theme_color?: string;
   inventory?: string | null;
   
-  info?: Record<string, any>; // For storing job, ageSex, notes, etc.
+  info?: Record<string, any>; // For storing job, age, sex, notes, backstory, skills etc.
   stats?: Record<string, any>; // For storing str, con, siz, etc.
 
   // Frontend compatibility fields (mapped from info/stats)
   job: string;
-  ageSex: string;
+  age: string;
+  sex: string;
+  // ageSex: string; // Deprecated
   str: number;
   con: number;
   siz: number;
@@ -50,6 +54,8 @@ export interface Character {
   san: number;
   mp: number;
   notes: string;
+  backstory: string;
+  skills: Record<string, number>;
   
   // Frontend only
   isOnline?: boolean;
@@ -92,6 +98,9 @@ export interface DiceRollResult {
   type: number;
   total: number;
   details: number[];
+  checkName?: string;
+  checkTarget?: number;
+  checkResult?: 'critical_success' | 'success' | 'failure' | 'critical_failure';
 }
 
 export interface AppData {
