@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { BookOpen, UserPlus, User, Activity, Check, Trash2, AlertTriangle, Copy, FileText, Swords, UserCog, X } from 'lucide-react';
+import { BookOpen, UserPlus, User, Activity, Check, Trash2, AlertTriangle, Copy, FileText, X } from 'lucide-react';
 import { Modal, Input, Textarea, Button, NumberStepper, cn } from './UI';
 import { ModuleInfo, Character } from '../types';
 
@@ -23,13 +23,14 @@ export const CharacterModal: React.FC<{
   onDelete?: (id: string) => void; 
   onClose: () => void; 
   isEditing: boolean;
-}> = ({ initialData, onSave, onDelete, onClose, isEditing }) => {
+  readOnly?: boolean;
+}> = ({ initialData, onSave, onDelete, onClose, isEditing, readOnly }) => {
   const [form, setForm] = useState(initialData);
   const [deleteConfirm, setDeleteConfirm] = useState(false);
 
   // Auto calc derived stats for new chars (simplistic logic)
   useEffect(() => {
-    if (!isEditing) {
+    if (!isEditing && !readOnly) {
         const hp = Math.floor((Number(form.con || 0) + Number(form.siz || 0)) / 10);
         const mp = Math.floor(Number(form.pow || 0) / 5); 
         // Only update if they differ to avoid loops, though strict equality check is enough
@@ -37,7 +38,7 @@ export const CharacterModal: React.FC<{
             setForm(prev => ({ ...prev, hp, san: Number(prev.pow || 0), mp }));
         }
     }
-  }, [form.str, form.con, form.siz, form.int, form.pow, isEditing]);
+  }, [form.str, form.con, form.siz, form.int, form.pow, isEditing, readOnly]);
 
   const handleSave = () => {
     if (!form.name.trim()) return;
@@ -46,16 +47,16 @@ export const CharacterModal: React.FC<{
   };
 
   return (
-    <Modal onClose={onClose} title={isEditing ? '编辑档案' : '新角色录入'} icon={UserPlus} className="max-w-4xl">
+    <Modal onClose={onClose} title={readOnly ? '查看档案' : (isEditing ? '编辑档案' : '新角色录入')} icon={readOnly ? FileText : UserPlus} className="max-w-4xl">
        <div className="p-6 md:p-8 space-y-6 md:space-y-8 overflow-y-auto custom-scrollbar flex-1">
          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
            <div className="md:col-span-2 bg-slate-900/40 p-5 rounded-2xl border border-white/5 flex flex-col h-full">
                <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-4 flex items-center gap-2"><User size={14}/> 基础信息</h4>
                <div className="grid grid-cols-2 gap-4 flex-1">
-                   <div className="col-span-2"><Input label="姓名" value={form.name} onChange={e => setForm({...form, name: e.target.value})} /></div>
-                   <Input label="职业/种族" value={form.job} onChange={e => setForm({...form, job: e.target.value})} />
-                   <Input label="年龄/性别" value={form.ageSex} onChange={e => setForm({...form, ageSex: e.target.value})} />
-                   {['NPC', '怪物'].includes(initialData.role) && (
+                   <div className="col-span-2"><Input label="姓名" value={form.name} onChange={e => setForm({...form, name: e.target.value})} disabled={readOnly} /></div>
+                   <Input label="职业/种族" value={form.job} onChange={e => setForm({...form, job: e.target.value})} disabled={readOnly} />
+                   <Input label="年龄/性别" value={form.ageSex} onChange={e => setForm({...form, ageSex: e.target.value})} disabled={readOnly} />
+                   {['NPC', '怪物'].includes(initialData.role) && !readOnly && (
                       <div className="col-span-2 pt-2">
                           <div className="flex p-1 bg-slate-950/50 rounded-xl border border-white/5 w-full">
                               {['NPC', '怪物'].map(r => (
@@ -76,7 +77,7 @@ export const CharacterModal: React.FC<{
                   ].map(stat => (
                       <div key={stat.key} className="flex flex-col gap-1 p-3 bg-slate-950 rounded-xl border border-white/5">
                           <label className={cn("font-bold text-sm mb-1", stat.color)}>{stat.label}</label>
-                          <NumberStepper value={form[stat.key] as number} onChange={(val) => setForm({...form, [stat.key]: val})} className="w-full"/>
+                          <NumberStepper value={form[stat.key] as number} onChange={(val) => setForm({...form, [stat.key]: val})} className="w-full" disabled={readOnly}/>
                       </div>
                   ))}
               </div>
@@ -89,16 +90,16 @@ export const CharacterModal: React.FC<{
                   {['str','con','siz','dex','app','int','pow','edu','luck'].map(attr => (
                       <div key={attr} className="flex flex-col group items-center p-2 bg-slate-950/30 rounded-xl border border-white/5">
                           <label className="text-[10px] text-slate-500 uppercase font-bold mb-2 group-hover:text-indigo-400 transition-colors w-full text-left ml-1">{attr}</label>
-                          <NumberStepper value={form[attr as keyof Character] as number} onChange={(val) => setForm({...form, [attr]: val})} min={0} max={99} className="w-full"/>
+                          <NumberStepper value={form[attr as keyof Character] as number} onChange={(val) => setForm({...form, [attr]: val})} min={0} max={99} className="w-full" disabled={readOnly}/>
                       </div>
                   ))}
               </div>
          </div>
 
-         <Textarea label="详细备注 / 物品 / 法术" value={form.notes} onChange={e => setForm({...form, notes: e.target.value})} rows={5}/>
+         <Textarea label="详细备注 / 物品 / 法术" value={form.notes} onChange={e => setForm({...form, notes: e.target.value})} rows={5} disabled={readOnly}/>
       </div>
       <div className="px-6 md:px-8 py-4 md:py-6 border-t border-white/10 bg-white/5 flex flex-col md:flex-row justify-between items-center gap-4 shrink-0">
-          {isEditing && onDelete ? (
+          {!readOnly && isEditing && onDelete ? (
             <div className="flex items-center gap-2 w-full md:w-auto justify-center md:justify-start">
               {deleteConfirm ? (
                 <>
@@ -111,9 +112,15 @@ export const CharacterModal: React.FC<{
               )}
             </div>
           ) : <div className="hidden md:block"></div>}
-          <div className="flex gap-4 w-full md:w-auto">
-            <Button onClick={onClose} variant="secondary" className="flex-1 md:flex-none">取消</Button>
-            <Button onClick={handleSave} variant="primary" icon={Check} size="lg" className="flex-1 md:flex-none">保存档案</Button>
+          <div className="flex gap-4 w-full md:w-auto justify-end">
+            {readOnly ? (
+                <Button onClick={onClose} variant="secondary" className="w-full md:w-auto">关闭</Button>
+            ) : (
+                <>
+                    <Button onClick={onClose} variant="secondary" className="flex-1 md:flex-none">取消</Button>
+                    <Button onClick={handleSave} variant="primary" icon={Check} size="lg" className="flex-1 md:flex-none">保存档案</Button>
+                </>
+            )}
           </div>
       </div>
     </Modal>
@@ -128,10 +135,10 @@ export const StatusModal: React.FC<{ char: Character; onSave: (hp: number, san: 
         <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={onClose}></div>
         <div className="glass-panel rounded-3xl w-full max-w-md relative z-10 overflow-hidden animate-slide-up bg-[#0f172a]">
             <div className="p-6 border-b border-white/10 bg-slate-900/50 text-center"><h3 className="font-bold text-white text-lg">快速状态调整: {char.name}</h3><p className="text-xs text-slate-500 mt-1">直接修改数值，系统会自动记录变动</p></div>
-            <div className="p-8 grid grid-cols-1 sm:grid-cols-3 gap-6">{[{ label: 'HP', color: 'text-red-400', key: 'hp' }, { label: 'SAN', color: 'text-emerald-400', key: 'san' }, { label: 'MP', color: 'text-blue-400', key: 'mp' }].map(item => (
+            <div className="p-8 grid grid-cols-1 sm:grid-cols-3 gap-6">{[{ label: 'HP', color: 'text-red-400', key: 'hp', min: -10 }, { label: 'SAN', color: 'text-emerald-400', key: 'san', min: 0 }, { label: 'MP', color: 'text-blue-400', key: 'mp', min: 0 }].map(item => (
               <div key={item.key} className="space-y-2 text-center">
                 <label className={cn("text-xs font-bold uppercase tracking-wider", item.color)}>{item.label}</label>
-                <NumberStepper value={s[item.key as keyof typeof s]} onChange={(val) => setS({...s, [item.key]: val})} className="w-full"/>
+                <NumberStepper value={s[item.key as keyof typeof s]} onChange={(val) => setS({...s, [item.key]: val})} min={item.min} className="w-full"/>
               </div>
             ))}</div>
             <div className="p-6 bg-slate-900/50 flex justify-center border-t border-white/10">

@@ -73,25 +73,68 @@ interface NumberStepperProps {
   onChange: (val: number) => void;
   min?: number;
   max?: number;
+  step?: number;
   className?: string;
+  disabled?: boolean;
 }
 
-export const NumberStepper: React.FC<NumberStepperProps> = ({ value, onChange, min = 0, max = 999, className }) => {
-    const handleDecrement = () => onChange(Math.max(min, Number(value || 0) - 1));
-    const handleIncrement = () => onChange(Math.min(max, Number(value || 0) + 1));
-    return (
-        <div className={cn("flex items-center bg-[#020617] border border-slate-700 rounded-xl h-10 overflow-hidden shadow-sm", className)}>
-            <button type="button" onClick={handleDecrement} className="w-9 h-full hover:bg-slate-800 text-slate-400 hover:text-white transition-colors flex items-center justify-center shrink-0 active:bg-slate-700"><Minus size={16} /></button>
-            <input 
-              type="number" 
-              className="flex-1 w-full bg-transparent text-center text-base font-bold text-white font-mono focus:outline-none appearance-none m-0 px-0 h-full min-w-[2rem] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none" 
-              value={value} 
-              onChange={(e) => { const val = e.target.value; if (val === '') onChange(0); else onChange(parseInt(val)); }} 
-              onBlur={() => { let val = Number(value); if (isNaN(val)) val = min; if (val < min) val = min; if (val > max) val = max; onChange(val); }} 
-            />
-             <button type="button" onClick={handleIncrement} className="w-9 h-full hover:bg-slate-800 text-slate-400 hover:text-white transition-colors flex items-center justify-center shrink-0 active:bg-slate-700"><Plus size={16} /></button>
-        </div>
-    );
+export const NumberStepper: React.FC<NumberStepperProps> = ({ value, onChange, min, max, step = 1, className, disabled }) => {
+  const handleDec = () => {
+    if (disabled) return;
+    const newVal = value - step;
+    if (min !== undefined && newVal < min) return;
+    onChange(newVal);
+  };
+  const handleInc = () => {
+    if (disabled) return;
+    const newVal = value + step;
+    if (max !== undefined && newVal > max) return;
+    onChange(newVal);
+  };
+
+  const handleBlur = () => {
+    if (disabled) return;
+    if (min !== undefined && value < min) onChange(min);
+  };
+
+  return (
+    <div className={cn("flex items-center bg-[#020617] rounded-xl border border-slate-700 h-10 shadow-sm group hover:border-slate-500 transition-all", disabled && "opacity-50 cursor-not-allowed", className)}>
+      <button 
+        type="button"
+        onClick={handleDec} 
+        disabled={disabled || (min !== undefined && value <= min)}
+        className="w-10 h-full flex items-center justify-center text-slate-400 hover:text-white active:bg-slate-800 rounded-l-xl transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+      >
+        <Minus size={14} strokeWidth={3} />
+      </button>
+      <div className="flex-1 h-full border-x border-slate-800 flex items-center justify-center bg-slate-900/50 min-w-[3rem]">
+        <input
+            type="number"
+            value={value}
+            onChange={(e) => {
+                if (disabled) return;
+                const val = e.target.value === '' ? 0 : parseInt(e.target.value, 10);
+                if (!isNaN(val)) {
+                    // Check max only on input to prevent typing too large numbers, but allow min violations temporarily for typing
+                    if (max !== undefined && val > max) onChange(max);
+                    else onChange(val);
+                }
+            }}
+            onBlur={handleBlur}
+            disabled={disabled}
+            className="w-full h-full bg-transparent text-center font-mono font-bold text-white text-base tabular-nums focus:outline-none disabled:cursor-not-allowed appearance-none"
+        />
+      </div>
+      <button 
+        type="button"
+        onClick={handleInc} 
+        disabled={disabled || (max !== undefined && value >= max)}
+        className="w-10 h-full flex items-center justify-center text-slate-400 hover:text-white active:bg-slate-800 rounded-r-xl transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+      >
+        <Plus size={14} strokeWidth={3} />
+      </button>
+    </div>
+  );
 };
 
 // --- Modal ---
@@ -133,15 +176,15 @@ export const ProgressBar: React.FC<{ value: number; max?: number; colorClass: st
 };
 
 // --- StatBadge ---
-export const StatBadge: React.FC<{ label: string; value: number; max?: number; color: 'red' | 'emerald' | 'blue' | 'amber' | 'slate'; icon?: LucideIcon }> = ({ label, value, max = 100, color = "indigo", icon: Icon }) => {
-    const colorMap = {
+export const StatBadge: React.FC<{ label: string; value: number; max?: number; color: 'red' | 'emerald' | 'blue' | 'amber' | 'slate'; icon?: LucideIcon }> = ({ label, value, max = 100, color = "slate", icon: Icon }) => {
+    const colorMap: { [K in 'red' | 'emerald' | 'blue' | 'amber' | 'slate']: { text: string; bg: string; track: string } } = {
         red: { text: "text-red-400", bg: "bg-red-500", track: "bg-red-950/40" },
         emerald: { text: "text-emerald-400", bg: "bg-emerald-500", track: "bg-emerald-950/40" },
         blue: { text: "text-blue-400", bg: "bg-blue-500", track: "bg-blue-950/40" },
         amber: { text: "text-amber-400", bg: "bg-amber-500", track: "bg-amber-950/40" },
         slate: { text: "text-slate-400", bg: "bg-slate-500", track: "bg-slate-800/40" },
     };
-    const c = colorMap[color] || colorMap.slate;
+    const c = colorMap[color];
     return (
         <div className="flex flex-col min-w-[3.5rem] gap-1.5">
             <div className="flex items-end justify-between px-0.5">

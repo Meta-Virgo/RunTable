@@ -13,13 +13,18 @@ interface SidebarProps {
   characters: Character[];
   onOpenStatusEdit: (charId: string) => void;
   isMobile: boolean;
+  isKP: boolean;
+  kpOnline?: boolean;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({ 
-  isOpen, setIsOpen, view, setView, activeCharId, setActiveCharId, characters, onOpenStatusEdit, isMobile 
+  isOpen, setIsOpen, view, setView, activeCharId, setActiveCharId, characters, onOpenStatusEdit, isMobile, isKP, kpOnline = false 
 }) => {
   const pcCharacters = characters.filter(c => c.role === '调查员');
   const npcCharacters = characters.filter(c => ['NPC', '怪物'].includes(c.role));
+  
+  // Filter visible characters: KP sees all, PC sees only Investigators
+  const visibleCharacters = isKP ? [...pcCharacters, ...npcCharacters] : pcCharacters;
 
   const getCharIcon = (role: string, size = 18) => {
     if (role === 'Keeper') return <Crown size={size} />;
@@ -34,8 +39,50 @@ export const Sidebar: React.FC<SidebarProps> = ({
   };
 
   const handleCharClick = (id: string) => {
-    setActiveCharId(id);
+    if (isKP) {
+        // KP can switch to Keeper ('pc') or NPC/Monster
+        // KP cannot switch to Investigator
+        const char = characters.find(c => c.id === id);
+        if (id === 'pc' || (char && ['NPC', '怪物'].includes(char.role))) {
+             setActiveCharId(id);
+        }
+    } else {
+        // Players cannot switch characters
+    }
+    
     if (isMobile) setIsOpen(false);
+  };
+
+  const renderCharacterItem = (char: Character, isClickable: boolean, showOnline: boolean) => {
+    const isMonster = char.role === '怪物'; 
+    const isNPC = char.role === 'NPC';
+    const activeBorder = isMonster ? 'border-rose-500/30' : (isNPC ? 'border-cyan-500/30' : 'border-purple-500/30');
+    const activeBg = isMonster ? 'from-rose-500/20' : (isNPC ? 'from-cyan-500/20' : 'from-purple-500/20');
+    const iconBg = isMonster 
+      ? (activeCharId === char.id ? "bg-rose-600 text-white" : "bg-slate-800 text-slate-400 group-hover:bg-rose-900/50 group-hover:text-rose-400") 
+      : (isNPC 
+        ? (activeCharId === char.id ? "bg-cyan-600 text-white" : "bg-slate-800 text-slate-400 group-hover:bg-cyan-900/50 group-hover:text-cyan-400") 
+        : (activeCharId === char.id ? "bg-purple-600 text-white" : "bg-slate-800 text-slate-400 group-hover:bg-purple-900/50 group-hover:text-purple-400"));
+    
+    const isOnline = char.isOnline;
+
+    return (
+        <div key={char.id} onClick={() => isClickable && handleCharClick(char.id)} className={cn("relative group flex items-center gap-3 p-2 rounded-xl transition-all duration-300 border", activeCharId === char.id ? `bg-gradient-to-r ${activeBg} to-transparent ${activeBorder}` : "bg-transparent border-transparent hover:bg-white/5", !isOpen && "justify-center", isClickable ? "cursor-pointer" : "cursor-default", (showOnline && !isOnline) && "opacity-50 grayscale")}>
+            <div className={cn("p-2 rounded-lg shrink-0 transition-colors relative", iconBg)}>
+                {getCharIcon(char.role, 18)}
+                {showOnline && isOnline && <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-emerald-500 border-2 border-slate-900 rounded-full"></div>}
+            </div>
+            {isOpen && <div className="flex-1 overflow-hidden animate-fade-in"><div className={cn("font-bold text-sm truncate transition-colors", activeCharId === char.id ? "text-white" : "text-slate-300")}>{char.name}</div><div className="flex items-center gap-2 mt-0.5"><span className="text-[10px] text-slate-500">{char.job || char.role}</span></div></div>}
+            {isOpen && isKP && (
+              <button 
+                onClick={(e) => { e.stopPropagation(); onOpenStatusEdit(char.id); }} 
+                className="absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded-lg text-slate-500 hover:text-white hover:bg-slate-700 opacity-0 group-hover:opacity-100 transition-all cursor-pointer"
+              >
+                <Activity size={14} />
+              </button>
+            )}
+        </div>
+    );
   };
 
   return (
@@ -49,6 +96,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         "md:relative", 
         isOpen ? "w-72 translate-x-0" : "w-72 -translate-x-full md:w-20 md:translate-x-0"
       )}>
+        {/* Header Section */}
         <div className="min-h-[5rem] h-auto pt-safe flex items-center justify-center px-4 border-b border-white/5 bg-slate-900/30 backdrop-blur-md">
           <div className="flex items-center gap-3 text-indigo-400 overflow-hidden w-full justify-center">
             <div className="bg-gradient-to-br from-indigo-500 to-purple-600 p-2.5 rounded-xl text-white shrink-0 shadow-lg shadow-indigo-500/20">
@@ -63,10 +111,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </div>
         </div>
 
+        {/* Navigation */}
         <div className="p-3 space-y-2">
             {[
               { id: 'main', icon: MessageSquare, label: '现场 & 通讯' }, 
-              { id: 'setup', icon: Users, label: '角色 & 模组' }
+              { id: 'setup', icon: Users, label: isKP ? '角色 & 模组' : '调查员名册' }
             ].map(nav => (
                 <button 
                   key={nav.id} 
@@ -84,46 +133,57 @@ export const Sidebar: React.FC<SidebarProps> = ({
             ))}
         </div>
 
+        {/* Character/Role Lists */}
         <div className="flex-1 overflow-y-auto custom-scrollbar px-3 pb-4 space-y-6">
-             {/* Current Role */}
-             <div className="flex flex-col gap-2">
-                {isOpen && <div className="text-xs font-bold text-slate-500 uppercase tracking-wider px-1">当前扮演</div>}
-                <div onClick={() => handleCharClick('pc')} className={cn("relative group flex items-center gap-3 p-2 rounded-xl cursor-pointer transition-all duration-300 border", activeCharId === 'pc' ? "bg-gradient-to-r from-indigo-500/20 to-transparent border-indigo-500/30 shadow-[inset_2px_0_0_0_#6366f1]" : "bg-transparent border-transparent hover:bg-white/5", !isOpen && "justify-center")}>
-                   <div className={cn("p-2 rounded-lg shrink-0 transition-colors", activeCharId === 'pc' ? "bg-indigo-500 text-white" : "bg-slate-800 text-slate-400 group-hover:bg-slate-700")}><Crown size={18} /></div>
-                   {isOpen && <div className="overflow-hidden animate-fade-in"><div className={cn("font-bold text-sm truncate", activeCharId === 'pc' ? "text-white" : "text-slate-300")}>守秘人</div><div className="text-[10px] text-slate-500 truncate">Game Master</div></div>}
-                   {activeCharId === 'pc' && isOpen && <div className="absolute right-2 w-1.5 h-1.5 rounded-full bg-indigo-400 shadow-[0_0_10px_#6366f1]"></div>}
-                </div>
-             </div>
              
-             {/* Character Lists */}
-             <div className="space-y-2">
-                {isOpen && <div className="text-xs font-bold text-slate-500 uppercase tracking-wider px-1 flex justify-between"><span>角色列表</span><span className="text-[10px] bg-slate-800 px-1.5 rounded text-slate-400">{pcCharacters.length + npcCharacters.length}</span></div>}
-                {[...pcCharacters, ...npcCharacters].map(char => {
-                    const isMonster = char.role === '怪物'; 
-                    const isNPC = char.role === 'NPC';
-                    const activeBorder = isMonster ? 'border-rose-500/30' : (isNPC ? 'border-cyan-500/30' : 'border-purple-500/30');
-                    const activeBg = isMonster ? 'from-rose-500/20' : (isNPC ? 'from-cyan-500/20' : 'from-purple-500/20');
-                    const iconBg = isMonster 
-                      ? (activeCharId === char.id ? "bg-rose-600 text-white" : "bg-slate-800 text-slate-400 group-hover:bg-rose-900/50 group-hover:text-rose-400") 
-                      : (isNPC 
-                        ? (activeCharId === char.id ? "bg-cyan-600 text-white" : "bg-slate-800 text-slate-400 group-hover:bg-cyan-900/50 group-hover:text-cyan-400") 
-                        : (activeCharId === char.id ? "bg-purple-600 text-white" : "bg-slate-800 text-slate-400 group-hover:bg-purple-900/50 group-hover:text-purple-400"));
-                     return (
-                        <div key={char.id} onClick={() => handleCharClick(char.id)} className={cn("relative group flex items-center gap-3 p-2 rounded-xl cursor-pointer transition-all duration-300 border", activeCharId === char.id ? `bg-gradient-to-r ${activeBg} to-transparent ${activeBorder}` : "bg-transparent border-transparent hover:bg-white/5", !isOpen && "justify-center")}>
-                            <div className={cn("p-2 rounded-lg shrink-0 transition-colors", iconBg)}>{getCharIcon(char.role, 18)}</div>
-                            {isOpen && <div className="flex-1 overflow-hidden animate-fade-in"><div className={cn("font-bold text-sm truncate transition-colors", activeCharId === char.id ? "text-white" : "text-slate-300")}>{char.name}</div><div className="flex items-center gap-2 mt-0.5"><span className="text-[10px] text-slate-500">{char.role}</span></div></div>}
-                            {isOpen && (
-                              <button 
-                                onClick={(e) => { e.stopPropagation(); onOpenStatusEdit(char.id); }} 
-                                className="absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded-lg text-slate-500 hover:text-white hover:bg-slate-700 opacity-0 group-hover:opacity-100 transition-all"
-                              >
-                                <Activity size={14} />
-                              </button>
-                            )}
+             {/* --- KP VIEW --- */}
+             {isKP && (
+                 <>
+                    {/* Role List (Keeper, NPC, Monster) */}
+                    <div className="space-y-2">
+                        {isOpen && <div className="text-xs font-bold text-slate-500 uppercase tracking-wider px-1">角色列表</div>}
+                        
+                        {/* Keeper Item */}
+                        <div onClick={() => handleCharClick('pc')} className={cn("relative group flex items-center gap-3 p-2 rounded-xl cursor-pointer transition-all duration-300 border", activeCharId === 'pc' ? "bg-gradient-to-r from-indigo-500/20 to-transparent border-indigo-500/30 shadow-[inset_2px_0_0_0_#6366f1]" : "bg-transparent border-transparent hover:bg-white/5", !isOpen && "justify-center")}>
+                           <div className={cn("p-2 rounded-lg shrink-0 transition-colors", activeCharId === 'pc' ? "bg-indigo-500 text-white" : "bg-slate-800 text-slate-400 group-hover:bg-slate-700")}><Crown size={18} /></div>
+                           {isOpen && <div className="overflow-hidden animate-fade-in"><div className={cn("font-bold text-sm truncate", activeCharId === 'pc' ? "text-white" : "text-slate-300")}>守秘人</div><div className="text-[10px] text-slate-500 truncate">Game Master</div></div>}
+                           {activeCharId === 'pc' && isOpen && <div className="absolute right-2 w-1.5 h-1.5 rounded-full bg-indigo-400 shadow-[0_0_10px_#6366f1]"></div>}
                         </div>
-                    );
-                })}
-             </div>
+
+                        {/* NPCs & Monsters */}
+                        {npcCharacters.map(char => renderCharacterItem(char, true, false))}
+                    </div>
+
+                    {/* Investigators List (View Only) */}
+                    <div className="space-y-2">
+                        {isOpen && <div className="text-xs font-bold text-slate-500 uppercase tracking-wider px-1 flex justify-between"><span>调查员</span><span className="text-[10px] bg-slate-800 px-1.5 rounded text-slate-400">{pcCharacters.length}</span></div>}
+                        {pcCharacters.map(char => renderCharacterItem(char, false, true))}
+                    </div>
+                 </>
+             )}
+
+             {/* --- PC VIEW --- */}
+             {!isKP && (
+                 <>
+                    {/* Keeper (Static Display) */}
+                    <div className="space-y-2">
+                        <div className={cn("relative group flex items-center gap-3 p-2 rounded-xl border bg-transparent border-transparent", !isOpen && "justify-center", !kpOnline && "opacity-50 grayscale")}>
+                           <div className="p-2 rounded-lg shrink-0 bg-slate-800 text-slate-400 relative">
+                               <Crown size={18} />
+                               {kpOnline && <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-emerald-500 border-2 border-slate-900 rounded-full"></div>}
+                           </div>
+                           {isOpen && <div className="overflow-hidden animate-fade-in"><div className="font-bold text-sm truncate text-slate-300">守秘人</div><div className="text-[10px] text-slate-500 truncate">Game Master</div></div>}
+                        </div>
+                    </div>
+
+                    {/* Investigators List */}
+                    <div className="space-y-2">
+                        {isOpen && <div className="text-xs font-bold text-slate-500 uppercase tracking-wider px-1 flex justify-between"><span>调查员</span><span className="text-[10px] bg-slate-800 px-1.5 rounded text-slate-400">{visibleCharacters.length}</span></div>}
+                        {visibleCharacters.map(char => renderCharacterItem(char, false, true))}
+                    </div>
+                 </>
+             )}
+             
         </div>
         <div className="p-4 border-t border-white/5 hidden md:block">
             <button onClick={() => setIsOpen(!isOpen)} className="w-full flex items-center justify-center p-2 text-slate-500 hover:text-white hover:bg-white/5 rounded-xl transition-colors">{isOpen ? <ChevronLeft size={16} /> : <ChevronRight size={16} />}</button>
