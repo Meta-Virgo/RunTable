@@ -227,127 +227,136 @@ export const ChatArea: React.FC<ChatAreaProps> = ({ logs, activeChar, activeChar
 
       {/* Input Area */}
       <div className="p-2 md:p-6 pt-0 md:pt-2 bg-slate-950/50 md:bg-transparent backdrop-blur-md md:backdrop-blur-none pb-safe">
-        <div className="max-w-4xl mx-auto glass-panel rounded-2xl relative z-20 transition-all focus-within:ring-2 focus-within:ring-indigo-500/30 focus-within:border-indigo-500/50 shadow-2xl flex flex-col">
+        <div className="max-w-4xl mx-auto glass-panel rounded-2xl p-2 md:p-3 relative z-20 transition-all focus-within:ring-2 focus-within:ring-indigo-500/30 focus-within:border-indigo-500/50 shadow-2xl">
 
-            <div className="absolute -top-3 left-4 bg-slate-900 text-slate-300 text-[10px] px-3 py-1 rounded-full border border-slate-700 shadow-lg flex items-center gap-2 font-medium tracking-wide z-30">
+
+            <div className="absolute -top-3 left-4 bg-slate-900 text-slate-300 text-[10px] px-3 py-1 rounded-full border border-slate-700 shadow-lg flex items-center gap-2 font-medium tracking-wide z-10">
               <span className={cn("w-2 h-2 rounded-full animate-pulse", activeCharId === 'pc' ? "bg-indigo-500" : "bg-emerald-500")}></span>
               正在扮演: <span className="text-white font-bold max-w-[100px] truncate">{activeChar.name}</span>
             </div>
+            <textarea 
+              value={inputText} 
+              onChange={(e) => setInputText(e.target.value)} 
+              onKeyDown={handleKeyDown} 
+              placeholder={`以 ${activeChar.name} 的身份发言...`} 
+              className="w-full bg-transparent border-none text-slate-200 placeholder-slate-600 focus:outline-none focus:ring-0 resize-none px-4 py-3 min-h-[3rem] max-h-24 md:max-h-32 custom-scrollbar text-sm md:text-base" 
+            />
+            <div className="flex flex-col md:flex-row justify-between items-center gap-3 md:gap-0 px-1 md:px-2 pt-2 border-t border-white/5 mt-1">
+                <div className="flex items-center gap-2 md:gap-3 w-full md:w-auto overflow-x-auto md:overflow-visible custom-scrollbar justify-start md:justify-start pb-1 md:pb-0">
+                    <div className="flex items-center gap-2 shrink-0">
+                        {canRollCheck && (
+                            <>
+                                <div className="relative shrink-0">
+                                    <button 
+                                        type="button"
+                                        onClick={() => { setShowAttrSelect(!showAttrSelect); setShowSkillSelect(false); setShowDiceSelect(false); }}
+                                        className="flex items-center justify-center px-3 bg-[#020617] border border-slate-700 rounded-xl h-10 shadow-sm hover:border-slate-500 transition-all active:bg-slate-900 group min-w-[3.5rem]"
+                                        title="属性判定"
+                                    >
+                                        <span className="text-sm font-bold text-slate-300 font-mono group-hover:text-white">属性</span>
+                                    </button>
+                                    {showAttrSelect && (
+                                        <>
+                                            <div className="fixed inset-0 z-40" onClick={() => setShowAttrSelect(false)}></div>
+                                            <div className="fixed bottom-24 left-4 bg-slate-900 border border-slate-700 p-2 rounded-xl grid grid-cols-3 gap-1 shadow-xl z-50 animate-scale-in w-64 max-w-[90vw]">
+                                                {ATTRIBUTES.map(attr => {
+                                                    const val = (myChar as any)[attr.key] || 0;
+                                                    return (
+                                                        <button 
+                                                            key={attr.key} 
+                                                            onClick={() => { 
+                                                                onRollDice(1, 100, isSecret, { name: attr.label, target: val }); 
+                                                                setShowAttrSelect(false); 
+                                                            }} 
+                                                            className="flex flex-col items-center p-2 hover:bg-indigo-600 rounded-lg transition-colors group/item"
+                                                        >
+                                                            <span className="text-xs font-bold text-slate-300 group-hover/item:text-white">{attr.label}</span>
+                                                            <span className="text-[10px] text-slate-500 group-hover/item:text-slate-200">{val}</span>
+                                                        </button>
+                                                    );
+                                                })}
+                                            </div>
+                                        </>
+                                    )}
+                                </div>
 
-            {/* Dice Toolbar */}
-            <div className="flex items-center gap-2 overflow-x-auto p-2 border-b border-white/5 no-scrollbar min-h-[3.5rem] pt-3">
-                 <div className="flex items-center gap-2 shrink-0">
-                    {canRollCheck && (
-                        <>
-                            <div className="relative shrink-0">
-                                <button 
-                                    type="button"
-                                    onClick={() => { setShowAttrSelect(!showAttrSelect); setShowSkillSelect(false); setShowDiceSelect(false); }}
-                                    className="flex items-center justify-center px-3 bg-[#020617] border border-slate-700 rounded-xl h-9 shadow-sm hover:border-slate-500 transition-all active:bg-slate-900 group min-w-[3.5rem]"
-                                    title="属性判定"
-                                >
-                                    <span className="text-xs md:text-sm font-bold text-slate-300 font-mono group-hover:text-white">属性</span>
-                                </button>
-                                {showAttrSelect && (
-                                    <div className="absolute top-full left-0 mt-2 bg-slate-900 border border-slate-700 p-2 rounded-xl grid grid-cols-3 gap-1 shadow-xl z-50 animate-scale-in w-64">
-                                        {ATTRIBUTES.map(attr => {
-                                            const val = (myChar as any)[attr.key] || 0;
-                                            return (
-                                                <button 
-                                                    key={attr.key} 
-                                                    onClick={() => { 
-                                                        onRollDice(1, 100, isSecret, { name: attr.label, target: val }); 
-                                                        setShowAttrSelect(false); 
-                                                    }} 
-                                                    className="flex flex-col items-center p-2 hover:bg-indigo-600 rounded-lg transition-colors group/item"
-                                                >
-                                                    <span className="text-xs font-bold text-slate-300 group-hover/item:text-white">{attr.label}</span>
-                                                    <span className="text-[10px] text-slate-500 group-hover/item:text-slate-200">{val}</span>
-                                                </button>
-                                            );
-                                        })}
-                                    </div>
-                                )}
-                            </div>
+                                <div className="relative shrink-0">
+                                    <button 
+                                        type="button"
+                                        onClick={() => { setShowSkillSelect(!showSkillSelect); setShowAttrSelect(false); setShowDiceSelect(false); }}
+                                        className="flex items-center justify-center px-3 bg-[#020617] border border-slate-700 rounded-xl h-10 shadow-sm hover:border-slate-500 transition-all active:bg-slate-900 group min-w-[3.5rem]"
+                                        title="技能判定"
+                                    >
+                                        <span className="text-sm font-bold text-slate-300 font-mono group-hover:text-white">技能</span>
+                                    </button>
+                                    {showSkillSelect && (
+                                        <>
+                                            <div className="fixed inset-0 z-40" onClick={() => setShowSkillSelect(false)}></div>
+                                            <div className="fixed bottom-24 left-4 bg-slate-900 border border-slate-700 p-2 rounded-xl grid grid-cols-2 gap-1 shadow-xl z-50 animate-scale-in w-64 max-w-[90vw] max-h-64 overflow-y-auto custom-scrollbar">
+                                                {Object.keys(myChar?.skills || {}).length === 0 ? (
+                                                    <div className="col-span-2 text-center text-xs text-slate-500 py-2">暂无技能</div>
+                                                ) : (
+                                                    Object.entries(myChar?.skills || {}).map(([name, val]) => (
+                                                        <button 
+                                                            key={name} 
+                                                            onClick={() => { 
+                                                                onRollDice(1, 100, isSecret, { name: name, target: val }); 
+                                                                setShowSkillSelect(false); 
+                                                            }} 
+                                                            className="flex justify-between items-center px-3 py-2 hover:bg-indigo-600 rounded-lg transition-colors text-left group/item"
+                                                        >
+                                                            <span className="text-xs font-bold text-slate-300 group-hover/item:text-white truncate max-w-[80px]">{name}</span>
+                                                            <span className="text-[10px] text-slate-500 group-hover/item:text-slate-200">{val}</span>
+                                                        </button>
+                                                    ))
+                                                )}
+                                            </div>
+                                        </>
+                                    )}
+                                </div>
+                            </>
+                        )}
+                        
+                        <NumberStepper value={diceCount} onChange={setDiceCount} min={1} max={100} className="w-24 md:w-28" />
 
-                            <div className="relative shrink-0">
-                                <button 
-                                    type="button"
-                                    onClick={() => { setShowSkillSelect(!showSkillSelect); setShowAttrSelect(false); setShowDiceSelect(false); }}
-                                    className="flex items-center justify-center px-3 bg-[#020617] border border-slate-700 rounded-xl h-9 shadow-sm hover:border-slate-500 transition-all active:bg-slate-900 group min-w-[3.5rem]"
-                                    title="技能判定"
-                                >
-                                    <span className="text-xs md:text-sm font-bold text-slate-300 font-mono group-hover:text-white">技能</span>
-                                </button>
-                                {showSkillSelect && (
-                                    <div className="absolute top-full left-0 mt-2 bg-slate-900 border border-slate-700 p-2 rounded-xl grid grid-cols-2 gap-1 shadow-xl z-50 animate-scale-in w-64 max-h-64 overflow-y-auto custom-scrollbar">
-                                        {Object.keys(myChar?.skills || {}).length === 0 ? (
-                                            <div className="col-span-2 text-center text-xs text-slate-500 py-2">暂无技能</div>
-                                        ) : (
-                                            Object.entries(myChar?.skills || {}).map(([name, val]) => (
-                                                <button 
-                                                    key={name} 
-                                                    onClick={() => { 
-                                                        onRollDice(1, 100, isSecret, { name: name, target: val }); 
-                                                        setShowSkillSelect(false); 
-                                                    }} 
-                                                    className="flex justify-between items-center px-3 py-2 hover:bg-indigo-600 rounded-lg transition-colors text-left group/item"
-                                                >
-                                                    <span className="text-xs font-bold text-slate-300 group-hover/item:text-white truncate max-w-[80px]">{name}</span>
-                                                    <span className="text-[10px] text-slate-500 group-hover/item:text-slate-200">{val}</span>
-                                                </button>
-                                            ))
-                                        )}
-                                    </div>
-                                )}
-                            </div>
-                        </>
-                    )}
-                    
-                    <NumberStepper value={diceCount} onChange={setDiceCount} min={1} max={100} className="w-20 md:w-24 h-9" />
+                        <div className="relative shrink-0">
+                          <button 
+                              type="button"
+                              onClick={() => setShowDiceSelect(!showDiceSelect)}
+                              className="flex items-center justify-center px-3 bg-[#020617] border border-slate-700 rounded-xl h-10 min-w-[3.5rem] md:min-w-[4.5rem] shadow-sm hover:border-slate-500 transition-all active:bg-slate-900 group"
+                          >
+                              <span className="text-base font-bold text-white font-mono">D{diceType}</span>
+                          </button>
+                           {showDiceSelect && (
+                             <div className="absolute bottom-12 left-0 bg-slate-900 border border-slate-700 p-2 rounded-xl grid grid-cols-3 gap-1 shadow-xl z-50 animate-scale-in w-48">
+                                {[4,6,8,10,12,20,100].map(d => (
+                                  <button key={d} onClick={() => { setDiceType(d); setShowDiceSelect(false); }} className="p-2 hover:bg-indigo-600 rounded-lg text-xs font-bold text-slate-300 hover:text-white transition-colors">D{d}</button>
+                                ))}
+                             </div>
+                           )}
+                        </div>
+                        
+                        {isKP && (
+                            <button 
+                                onClick={() => setIsSecret(!isSecret)} 
+                                className={cn(
+                                    "p-2 md:p-1.5 rounded-xl transition-colors h-10 w-10 flex items-center justify-center border shrink-0",
+                                    isSecret ? "bg-purple-500/20 text-purple-400 border-purple-500/50" : "bg-transparent text-slate-400 border-transparent hover:bg-slate-800 hover:text-indigo-400"
+                                )} 
+                                title={isSecret ? "暗骰模式已开启" : "开启暗骰模式"}
+                            >
+                                {isSecret ? <EyeOff size={20} /> : <Eye size={20} />}
+                            </button>
+                        )}
 
-                    <div className="relative shrink-0">
-                      <button 
-                          type="button"
-                          onClick={() => setShowDiceSelect(!showDiceSelect)}
-                          className="flex items-center justify-center px-3 bg-[#020617] border border-slate-700 rounded-xl h-9 min-w-[3.5rem] md:min-w-[4.5rem] shadow-sm hover:border-slate-500 transition-all active:bg-slate-900 group"
-                      >
-                          <span className="text-sm font-bold text-white font-mono">D{diceType}</span>
-                      </button>
-                       {showDiceSelect && (
-                         <div className="absolute top-full left-0 mt-2 bg-slate-900 border border-slate-700 p-2 rounded-xl grid grid-cols-3 gap-1 shadow-xl z-50 animate-scale-in w-48">
-                            {[4,6,8,10,12,20,100].map(d => (
-                              <button key={d} onClick={() => { setDiceType(d); setShowDiceSelect(false); }} className="p-2 hover:bg-indigo-600 rounded-lg text-xs font-bold text-slate-300 hover:text-white transition-colors">D{d}</button>
-                            ))}
-                         </div>
-                       )}
+                        <button onClick={() => onRollDice(diceCount, diceType, isSecret)} className="p-2 md:p-1.5 hover:bg-slate-800 rounded-xl text-slate-400 hover:text-indigo-400 transition-colors h-10 w-10 flex items-center justify-center border border-transparent hover:border-slate-700 shrink-0" title="投掷"><Dice5 size={20} /></button>
                     </div>
-                    
-                    {isKP && (
-                        <button 
-                            onClick={() => setIsSecret(!isSecret)} 
-                            className={cn(
-                                "p-2 md:p-1.5 rounded-xl transition-colors h-9 w-9 flex items-center justify-center border shrink-0",
-                                isSecret ? "bg-purple-500/20 text-purple-400 border-purple-500/50" : "bg-transparent text-slate-400 border-transparent hover:bg-slate-800 hover:text-indigo-400"
-                            )} 
-                            title={isSecret ? "暗骰模式已开启" : "开启暗骰模式"}
-                        >
-                            {isSecret ? <EyeOff size={18} /> : <Eye size={18} />}
-                        </button>
-                    )}
-
-                    <button onClick={() => onRollDice(diceCount, diceType, isSecret)} className="p-2 md:p-1.5 hover:bg-slate-800 rounded-xl text-slate-400 hover:text-indigo-400 transition-colors h-9 w-9 flex items-center justify-center border border-transparent hover:border-slate-700 shrink-0" title="投掷"><Dice5 size={18} /></button>
-                    
                     {isKP && <button onClick={onShowStory} className="p-2 text-slate-500 hover:text-slate-300 transition-colors hover:bg-white/5 rounded-lg shrink-0" title="战报预览"><FileText size={18} /></button>}
                 </div>
-            </div>
-
-            {/* Chat Input Row */}
-            <div className="flex items-end gap-2 p-2">
-                <div className="relative shrink-0">
+                <div className="flex items-center gap-2 relative w-full md:w-auto justify-end shrink-0">
                     {/* Recipient Popup */}
                     {showRecipientSelect && (
-                        <div className="absolute bottom-full left-0 mb-3 w-52 bg-slate-950/95 backdrop-blur-md border border-slate-800/80 rounded-2xl shadow-2xl z-50 overflow-hidden animate-scale-in flex flex-col p-1 ring-1 ring-white/5">
+                        <div className="absolute bottom-full right-0 mb-3 w-52 bg-slate-950/95 backdrop-blur-md border border-slate-800/80 rounded-2xl shadow-2xl z-50 overflow-hidden animate-scale-in flex flex-col p-1 ring-1 ring-white/5">
                             <div className="px-3 py-2 text-[10px] font-bold text-slate-500 uppercase tracking-wider">发送给</div>
                             <button
                                 onClick={() => { setRecipientId(null); setShowRecipientSelect(false); }}
@@ -396,28 +405,18 @@ export const ChatArea: React.FC<ChatAreaProps> = ({ logs, activeChar, activeChar
                     <button 
                         onClick={() => setShowRecipientSelect(!showRecipientSelect)}
                         className={cn(
-                            "h-10 px-3 rounded-xl border flex items-center gap-2 transition-all font-medium text-xs",
+                            "h-9 px-4 rounded-xl border flex items-center gap-2 transition-all font-medium text-xs",
                             recipientId 
                                 ? "bg-indigo-500/10 border-indigo-500/30 text-indigo-300 hover:bg-indigo-500/20" 
                                 : "bg-slate-900 border-slate-700 text-slate-400 hover:border-slate-500 hover:text-slate-300"
                         )}
                         title="选择发送对象"
                     >
-                        {recipientId ? <Lock size={16} className="opacity-70" /> : <Unlock size={16} className="opacity-70" />}
-                        <span className="max-w-[80px] truncate hidden md:block">{getRecipientLabel()}</span>
+                        {recipientId ? <Lock size={14} className="opacity-70" /> : <Unlock size={14} className="opacity-70" />}
+                        <span className="max-w-[100px] truncate">{getRecipientLabel()}</span>
                     </button>
+                    <Button onClick={handleSend} disabled={!inputText.trim()} size="sm" icon={Send} className="rounded-lg shadow-indigo-500/20 px-4">发送</Button>
                 </div>
-
-                <textarea 
-                  value={inputText} 
-                  onChange={(e) => setInputText(e.target.value)} 
-                  onKeyDown={handleKeyDown} 
-                  placeholder={`以 ${activeChar.name} 的身份发言...`} 
-                  className="flex-1 bg-transparent border-none text-slate-200 placeholder-slate-600 focus:outline-none focus:ring-0 resize-none px-3 py-2 min-h-[2.5rem] max-h-24 md:max-h-32 custom-scrollbar text-sm md:text-base" 
-                  rows={1}
-                />
-                
-                <Button onClick={handleSend} disabled={!inputText.trim()} size="icon" icon={Send} className="rounded-xl shadow-indigo-500/20 h-10 w-10 shrink-0 mb-0" />
             </div>
         </div>
       </div>

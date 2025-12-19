@@ -807,7 +807,7 @@ const App: React.FC = () => {
                  } else {
                      const myChar = characters.find(c => c.id === activeCharId);
                      if (myChar) {
-                         leaveMsg = `${myChar.name} 离开了房间`;
+                         leaveMsg = `${userNickname || '某人'} (${myChar.name}) 离开了房间`;
                      }
                  }
              }
@@ -862,7 +862,7 @@ const App: React.FC = () => {
     }
 
     return (
-        <div className="flex h-screen md:h-screen h-[100dvh] text-slate-200 font-sans selection:bg-indigo-500/30 overflow-hidden bg-[#020617]">
+        <div className="flex h-screen text-slate-200 font-sans selection:bg-indigo-500/30 overflow-hidden bg-[#020617]">
              {/* Background Effects */}
              <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none z-0">
                  <div className="absolute top-[-10%] left-[-10%] w-96 h-96 bg-purple-900/20 rounded-full blur-[100px] animate-blob"></div>
@@ -885,7 +885,7 @@ const App: React.FC = () => {
              />
 
              <main className="flex-1 flex flex-col relative min-w-0 z-10">
-                <header className="min-h-[5rem] h-auto pt-safe flex items-center justify-between px-4 md:px-8 border-b border-white/5 backdrop-blur-sm sticky top-0 z-20 bg-slate-900/80 md:bg-transparent">
+                <header className="h-16 flex items-center justify-between px-4 md:px-8 border-b border-white/5 backdrop-blur-sm sticky top-0 z-20 bg-slate-900/80 md:bg-transparent">
                     <div className="flex items-center gap-3">
                          <button onClick={() => setSidebarOpen(true)} className="p-2 -ml-2 text-slate-400 hover:text-white md:hidden"><Menu size={24} /></button>
                          <div className="flex flex-col justify-center">

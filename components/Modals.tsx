@@ -104,6 +104,20 @@ export const CharacterModal: React.FC<{
   const [importText, setImportText] = useState('');
   const [isAddingSkill, setIsAddingSkill] = useState(false);
   const [newSkillName, setNewSkillName] = useState('');
+  const skillInputRef = React.useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+        if (isAddingSkill && skillInputRef.current && !skillInputRef.current.contains(event.target as Node)) {
+            setIsAddingSkill(false);
+        }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+        document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isAddingSkill]);
 
   // Auto calc derived stats for new chars (simplistic logic)
   useEffect(() => {
@@ -247,20 +261,19 @@ export const CharacterModal: React.FC<{
               </div>
 
               {isAddingSkill && (
-                  <div className="flex gap-2 mb-4 items-end bg-slate-950/50 p-2 rounded-lg border border-white/10 animate-fade-in">
+                  <div ref={skillInputRef} className="flex gap-2 mb-4 items-center bg-slate-950/50 p-2 rounded-lg border border-white/10 animate-fade-in">
                       <Input 
                           value={newSkillName} 
                           onChange={(e) => setNewSkillName(e.target.value)} 
                           placeholder="输入技能名称..." 
-                          className="flex-1"
+                          className="flex-1 min-w-0"
                           autoFocus
                           onKeyDown={(e) => {
                               if (e.key === 'Enter') handleAddSkill();
                               if (e.key === 'Escape') setIsAddingSkill(false);
                           }}
                       />
-                      <Button onClick={handleAddSkill} variant="primary" size="sm" disabled={!newSkillName.trim()}>确定</Button>
-                      <Button onClick={() => setIsAddingSkill(false)} variant="ghost" size="sm">取消</Button>
+                      <Button onClick={handleAddSkill} variant="primary" size="md" className="shrink-0 shadow-none" disabled={!newSkillName.trim()}>确定</Button>
                   </div>
               )}
 
@@ -271,7 +284,7 @@ export const CharacterModal: React.FC<{
                       <div key={name} className="flex flex-col gap-1 p-2 bg-slate-950/30 rounded-lg border border-white/5 relative group">
                           <div className="flex justify-between items-center">
                               <span className="text-xs text-slate-300 font-bold truncate" title={name}>{name}</span>
-                              {!readOnly && <button onClick={() => removeSkill(name)} className="text-slate-600 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"><X size={12}/></button>}
+                              {!readOnly && <button onClick={() => removeSkill(name)} className="text-slate-600 hover:text-red-400 transition-colors"><X size={12}/></button>}
                           </div>
                           <NumberStepper value={val} onChange={(v) => setForm(prev => ({...prev, skills: {...prev.skills, [name]: v}}))} min={0} max={99} size="sm" disabled={readOnly}/>
                       </div>
