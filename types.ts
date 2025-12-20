@@ -1,4 +1,4 @@
-export type Role = 'Investigator' | 'Keeper' | 'NPC' | 'Monster';
+export type Role = "Investigator" | "Keeper" | "NPC" | "Monster";
 
 // Supabase Tables
 
@@ -8,6 +8,8 @@ export interface Profile {
   bio?: string | null;
   user_code?: number;
   created_at: string;
+  is_vip?: boolean;
+  avatar_url?: string | null;
 }
 
 export interface Room {
@@ -16,7 +18,7 @@ export interface Room {
   kp_id: string;
   title: string;
   description: string | null;
-  status: 'open' | 'closed' | 'archived';
+  status: "open" | "closed" | "archived";
   room_number?: number;
   password?: string | null;
 }
@@ -29,10 +31,11 @@ export interface Character {
   room_id?: string | null;
   name: string;
   role: string; // Now a DB column
-  type: 'investigator' | 'npc' | 'monster';
+  type: "investigator" | "npc" | "monster";
   theme_color?: string;
+  avatar_url?: string | null;
   inventory?: string | null;
-  
+
   info?: Record<string, any>; // For storing job, age, sex, notes, backstory, skills etc.
   stats?: Record<string, any>; // For storing str, con, siz, etc.
 
@@ -56,7 +59,7 @@ export interface Character {
   notes: string;
   backstory: string;
   skills: Record<string, number>;
-  
+
   // Frontend only
   isOnline?: boolean;
 }
@@ -68,7 +71,7 @@ export interface Message {
   user_id: string;
   character_id: string | null;
   recipient_id?: string | null; // New field for private messages
-  type: 'text' | 'dice' | 'system' | 'image';
+  type: "text" | "dice" | "system" | "image";
   content: string | null;
   meta: Record<string, any>; // { "cmd": "1d100", "result": 50 }
 }
@@ -81,7 +84,8 @@ export interface Log {
   charId: string;
   charName: string;
   charRole: string;
-  type: 'normal' | 'system' | 'status' | 'dice' | 'dice_secret' | 'image';
+  charAvatar?: string | null;
+  type: "normal" | "system" | "status" | "dice" | "dice_secret" | "image";
   content: string;
   isMine?: boolean;
   recipientId?: string | null; // New field for private messages
@@ -100,7 +104,7 @@ export interface DiceRollResult {
   details: number[];
   checkName?: string;
   checkTarget?: number;
-  checkResult?: 'critical_success' | 'success' | 'failure' | 'critical_failure';
+  checkResult?: "critical_success" | "success" | "failure" | "critical_failure";
 }
 
 export interface AppData {

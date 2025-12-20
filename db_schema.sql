@@ -180,3 +180,5 @@ CREATE TRIGGER before_room_delete
 BEFORE DELETE ON public.rooms 
 FOR EACH ROW 
 EXECUTE PROCEDURE public.cleanup_room_characters();
+
+alter table "public"."profiles" add column "is_vip" boolean not null default false;
