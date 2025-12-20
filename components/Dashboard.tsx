@@ -10,11 +10,13 @@ interface DashboardProps {
   onAddChar: (role: string) => void;
   onEditChar: (char: Character) => void;
   onDeleteRoom: () => void;
+  onClearChat: () => void;
   isKP: boolean;
 }
 
-export const Dashboard: React.FC<DashboardProps> = ({ moduleInfo, characters, onEditModule, onAddChar, onEditChar, onDeleteRoom, isKP }) => {
+export const Dashboard: React.FC<DashboardProps> = ({ moduleInfo, characters, onEditModule, onAddChar, onEditChar, onDeleteRoom, onClearChat, isKP }) => {
   const [resetConfirm, setResetConfirm] = useState(false);
+  const [clearChatConfirm, setClearChatConfirm] = useState(false);
   const pcCharacters = characters.filter(c => c.role === '调查员');
   const npcCharacters = characters.filter(c => ['NPC', '怪物'].includes(c.role));
 
@@ -100,10 +102,31 @@ export const Dashboard: React.FC<DashboardProps> = ({ moduleInfo, characters, on
 
            {/* Danger Zone */}
            {isKP && (
-               <section className="pt-8 border-t border-white/5">
+               <section className="pt-8 border-t border-white/5 space-y-6">
                     <h2 className="text-xl md:text-2xl font-bold text-red-400 flex items-center gap-3 mb-4">
                         <AlertTriangle /> 危险区域
                     </h2>
+                    
+                    <div className="glass-panel bg-red-900/10 border-red-500/20 p-6 md:p-8 rounded-2xl flex flex-col md:flex-row justify-between items-center gap-6">
+                        <div className="flex-1">
+                            <h3 className="text-lg font-bold text-white mb-2">清空聊天记录</h3>
+                            <p className="text-slate-400 text-sm leading-relaxed">删除当前房间的所有聊天记录（包括骰子和图片）。此操作不可恢复。</p>
+                        </div>
+                        <div className="flex items-center gap-4 shrink-0">
+                            {clearChatConfirm ? (
+                                <>
+                                    <div className="flex flex-col items-end gap-1">
+                                        <Button onClick={() => { onClearChat(); setClearChatConfirm(false); }} variant="dangerActive" icon={AlertTriangle} size="lg">确认清空</Button>
+                                        <span className="text-[10px] text-red-400 font-bold uppercase tracking-wider animate-pulse">此操作不可撤销</span>
+                                    </div>
+                                    <Button onClick={() => setClearChatConfirm(false)} variant="ghost">取消</Button>
+                                </>
+                            ) : (
+                                <Button onClick={() => setClearChatConfirm(true)} variant="danger" icon={AlertTriangle} size="lg">清空记录</Button>
+                            )}
+                        </div>
+                    </div>
+
                     <div className="glass-panel bg-red-900/10 border-red-500/20 p-6 md:p-8 rounded-2xl flex flex-col md:flex-row justify-between items-center gap-6">
                         <div className="flex-1">
                             <h3 className="text-lg font-bold text-white mb-2">删除房间</h3>

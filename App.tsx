@@ -352,6 +352,16 @@ const App: React.FC = () => {
                     setCharacters(prev => [...prev, mappedChar]);
                 }
             })
+            // Listen for Message Deletion
+            .on('postgres_changes', { 
+                event: 'DELETE', 
+                schema: 'public', 
+                table: 'messages', 
+                filter: `room_id=eq.${currentRoomId}` 
+            }, (payload) => {
+                const deletedId = payload.old.id;
+                setLogs(prev => prev.filter(l => l.id !== deletedId));
+            })
             // Listen for Room Deletion/Update
             .on('postgres_changes', { 
                 event: 'DELETE', 
@@ -719,7 +729,6 @@ const App: React.FC = () => {
             setCharacters(prev => prev.filter(c => c.id !== id));
             if (activeCharId === id) setActiveCharId('pc');
             setShowCharModal(false);
-            addLog('system', `档案已删除`);
         }
     };
 
@@ -772,6 +781,24 @@ const App: React.FC = () => {
              setView('main');
         } else {
             alert('删除房间失败: ' + error.message);
+        }
+    };
+
+    const handleClearChat = async () => {
+        if (!currentRoomId) return;
+        
+        const { error } = await supabase
+            .from('messages')
+            .delete()
+            .eq('room_id', currentRoomId);
+            
+        if (error) {
+            console.error("清空聊天记录失败:", error);
+            alert("清空聊天记录失败: " + error.message);
+        } else {
+            // Locally clear logs immediately for better UX
+            setLogs([]);
+            addLog('system', '守秘人已清空聊天记录');
         }
     };
 
@@ -904,7 +931,7 @@ const App: React.FC = () => {
                         activeChar={activeChar}
                         activeCharId={activeCharId}
                         characters={derivedCharacters}
-                        onSend={(text, recipientId) => addLog('normal', text, undefined, recipientId)}
+                        onSend={(text, recipientId, type) => addLog(type || 'normal', text, undefined, recipientId)}
                         onRollDice={rollDice}
                         onShowStory={() => setShowStoryModal(true)}
                         isKP={isKP}
@@ -929,6 +956,7 @@ const App: React.FC = () => {
                         }}
                         onEditChar={(char) => { setEditingChar(char); setShowCharModal(true); }}
                         onDeleteRoom={handleDeleteRoom}
+                        onClearChat={handleClearChat}
                         isKP={isKP}
                     />
                 )}

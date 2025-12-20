@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState } from 'react';
-import { BookOpen, Activity, Info, Dice5, Send, FileText, User, Swords, UserCog, Crown, Eye, EyeOff } from 'lucide-react';
+import { BookOpen, Activity, Info, Dice5, Send, FileText, User, Swords, UserCog, Crown, Eye, EyeOff, Image as ImageIcon, X } from 'lucide-react';
 import { cn, Button, NumberStepper } from './UI';
 import { Log, Character } from '../types';
 import { Lock, Unlock } from 'lucide-react';
@@ -9,7 +9,7 @@ interface ChatAreaProps {
   activeChar: { name: string; role: string };
   activeCharId: string;
   characters: Character[];
-  onSend: (text: string, recipientId?: string | null) => void;
+  onSend: (text: string, recipientId?: string | null, type?: Log['type']) => void;
   onRollDice: (count: number, type: number, isSecret: boolean, checkInfo?: { name: string, target: number }) => void;
   onShowStory: () => void;
   isKP: boolean;
@@ -43,11 +43,49 @@ export const ChatArea: React.FC<ChatAreaProps> = ({ logs, activeChar, activeChar
   const [isSecret, setIsSecret] = useState(false);
   const [recipientId, setRecipientId] = useState<string | null>(null);
   const [showRecipientSelect, setShowRecipientSelect] = useState(false);
+  const [pendingImage, setPendingImage] = useState<{ dataUrl: string; name: string } | null>(null);
   
   const [showAttrSelect, setShowAttrSelect] = useState(false);
   const [showSkillSelect, setShowSkillSelect] = useState(false);
 
   const logsEndRef = useRef<HTMLDivElement>(null);
+
+  const processFile = (file: File) => {
+    if (!file.type.startsWith('image/')) return;
+    
+    // Check file size (e.g. limit to 2MB to avoid DB issues)
+    if (file.size > 2 * 1024 * 1024) {
+      alert("图片大小不能超过 2MB");
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const result = e.target?.result as string;
+      if (result) {
+        setPendingImage({ dataUrl: result, name: file.name });
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handlePaste = (e: React.ClipboardEvent) => {
+    const items = e.clipboardData.items;
+    for (let i = 0; i < items.length; i++) {
+      if (items[i].type.indexOf('image') !== -1) {
+        const file = items[i].getAsFile();
+        if (file) processFile(file);
+      }
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    const files = e.dataTransfer.files;
+    if (files.length > 0) {
+      processFile(files[0]);
+    }
+  };
 
   const myChar = characters.find(c => c.id === activeCharId);
   const canRollCheck = !!myChar;
@@ -64,6 +102,10 @@ export const ChatArea: React.FC<ChatAreaProps> = ({ logs, activeChar, activeChar
   };
 
   const handleSend = () => {
+    if (pendingImage) {
+      onSend(pendingImage.dataUrl, recipientId, 'image');
+      setPendingImage(null);
+    }
     if (!inputText.trim()) return;
     onSend(inputText, recipientId);
     setInputText('');
@@ -216,7 +258,28 @@ export const ChatArea: React.FC<ChatAreaProps> = ({ logs, activeChar, activeChar
                             <span className="text-[10px] text-slate-500 font-mono">{log.timestamp}</span>
                         </div>
                         <div className={cn("px-4 py-2 md:px-5 md:py-3 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap shadow-md border backdrop-blur-sm relative", bubbleColor, alignRight ? "rounded-tr-none" : "rounded-tl-none")}>
-                            {log.content}
+                            {log.type === 'image' ? (
+                                <img 
+                                    src={log.content} 
+                                    alt="sent image" 
+                                    className="max-w-full rounded-lg cursor-pointer max-h-[300px] object-contain hover:opacity-90 transition-opacity" 
+                                    onClick={() => {
+                                        const w = window.open();
+                                        if(w) {
+                                            w.document.write(`<img src="${log.content}" style="max-width: 100%; height: auto;" />`);
+                                            w.document.title = "Image Preview";
+                                            w.document.body.style.margin = "0";
+                                            w.document.body.style.backgroundColor = "#0f172a";
+                                            w.document.body.style.display = "flex";
+                                            w.document.body.style.justifyContent = "center";
+                                            w.document.body.style.alignItems = "center";
+                                            w.document.body.style.minHeight = "100vh";
+                                        }
+                                    }} 
+                                />
+                            ) : (
+                                log.content
+                            )}
                         </div>
                     </div>
                 </div>
@@ -234,10 +297,23 @@ export const ChatArea: React.FC<ChatAreaProps> = ({ logs, activeChar, activeChar
               <span className={cn("w-2 h-2 rounded-full animate-pulse", activeCharId === 'pc' ? "bg-indigo-500" : "bg-emerald-500")}></span>
               正在扮演: <span className="text-white font-bold max-w-[100px] truncate">{activeChar.name}</span>
             </div>
+            {pendingImage && (
+              <div className="mx-4 mt-2 flex items-center gap-2 bg-slate-800/80 border border-slate-700 p-2 rounded-lg w-fit animate-fade-in relative z-20">
+                  <div className="w-8 h-8 rounded bg-slate-900 flex items-center justify-center shrink-0 border border-slate-700">
+                    <ImageIcon size={14} className="text-indigo-400" />
+                  </div>
+                  <span className="text-xs text-slate-300 truncate max-w-[150px] font-mono">{pendingImage.name}</span>
+                  <button onClick={() => setPendingImage(null)} className="ml-1 p-1 text-slate-500 hover:text-rose-400 transition-colors rounded hover:bg-white/5">
+                      <X size={14} />
+                  </button>
+              </div>
+            )}
             <textarea 
               value={inputText} 
               onChange={(e) => setInputText(e.target.value)} 
               onKeyDown={handleKeyDown} 
+              onPaste={handlePaste}
+              onDrop={handleDrop}
               placeholder={`以 ${activeChar.name} 的身份发言...`} 
               className="w-full bg-transparent border-none text-slate-200 placeholder-slate-600 focus:outline-none focus:ring-0 resize-none px-4 py-3 min-h-[3rem] max-h-24 md:max-h-32 custom-scrollbar text-sm md:text-base" 
             />
@@ -415,7 +491,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({ logs, activeChar, activeChar
                         {recipientId ? <Lock size={14} className="opacity-70" /> : <Unlock size={14} className="opacity-70" />}
                         <span className="max-w-[100px] truncate">{getRecipientLabel()}</span>
                     </button>
-                    <Button onClick={handleSend} disabled={!inputText.trim()} size="sm" icon={Send} className="rounded-lg shadow-indigo-500/20 px-4">发送</Button>
+                    <Button onClick={handleSend} disabled={!inputText.trim() && !pendingImage} size="sm" icon={Send} className="rounded-lg shadow-indigo-500/20 px-4">发送</Button>
                 </div>
             </div>
         </div>

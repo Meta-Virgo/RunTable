@@ -68,7 +68,7 @@ export interface Message {
   user_id: string;
   character_id: string | null;
   recipient_id?: string | null; // New field for private messages
-  type: 'text' | 'dice' | 'system';
+  type: 'text' | 'dice' | 'system' | 'image';
   content: string | null;
   meta: Record<string, any>; // { "cmd": "1d100", "result": 50 }
 }
@@ -81,7 +81,7 @@ export interface Log {
   charId: string;
   charName: string;
   charRole: string;
-  type: 'normal' | 'system' | 'status' | 'dice' | 'dice_secret';
+  type: 'normal' | 'system' | 'status' | 'dice' | 'dice_secret' | 'image';
   content: string;
   isMine?: boolean;
   recipientId?: string | null; // New field for private messages

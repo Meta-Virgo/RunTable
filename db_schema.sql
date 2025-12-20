@@ -130,6 +130,11 @@ CREATE POLICY "Messages visibility" ON public.messages FOR SELECT USING (
 
 CREATE POLICY "Authenticated users can insert messages" ON public.messages FOR INSERT TO authenticated WITH CHECK (auth.uid() = user_id); 
 
+-- 允许 KP 删除其房间内的消息
+CREATE POLICY "KP can delete room messages" ON public.messages FOR DELETE USING (
+    auth.uid() IN (SELECT kp_id FROM public.rooms WHERE id = room_id)
+);
+
 -- ========================================================= 
 -- 7. 设置 Realtime (实时监听) 
 -- ========================================================= 
