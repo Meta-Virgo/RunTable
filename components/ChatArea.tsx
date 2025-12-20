@@ -398,17 +398,20 @@ export const ChatArea: React.FC<ChatAreaProps> = ({ logs, activeChar, activeChar
                         <div className="relative shrink-0">
                           <button 
                               type="button"
-                              onClick={() => setShowDiceSelect(!showDiceSelect)}
+                              onClick={() => { setShowDiceSelect(!showDiceSelect); setShowAttrSelect(false); setShowSkillSelect(false); }}
                               className="flex items-center justify-center px-3 bg-[#020617] border border-slate-700 rounded-xl h-10 min-w-[3.5rem] md:min-w-[4.5rem] shadow-sm hover:border-slate-500 transition-all active:bg-slate-900 group"
                           >
                               <span className="text-base font-bold text-white font-mono">D{diceType}</span>
                           </button>
                            {showDiceSelect && (
-                             <div className="absolute bottom-12 left-0 bg-slate-900 border border-slate-700 p-2 rounded-xl grid grid-cols-3 gap-1 shadow-xl z-50 animate-scale-in w-48">
-                                {[4,6,8,10,12,20,100].map(d => (
-                                  <button key={d} onClick={() => { setDiceType(d); setShowDiceSelect(false); }} className="p-2 hover:bg-indigo-600 rounded-lg text-xs font-bold text-slate-300 hover:text-white transition-colors">D{d}</button>
-                                ))}
-                             </div>
+                             <>
+                                <div className="fixed inset-0 z-40" onClick={() => setShowDiceSelect(false)}></div>
+                                <div className="fixed bottom-24 right-4 md:absolute md:bottom-12 md:left-auto md:right-0 md:translate-x-0 bg-slate-900 border border-slate-700 p-2 rounded-xl grid grid-cols-3 gap-1 shadow-xl z-50 animate-scale-in w-64 max-w-[90vw]">
+                                    {[2,3,4,6,8,10,12,20,100].map(d => (
+                                      <button key={d} onClick={() => { setDiceType(d); setShowDiceSelect(false); }} className="p-2 hover:bg-indigo-600 rounded-lg text-xs font-bold text-slate-300 hover:text-white transition-colors">D{d}</button>
+                                    ))}
+                                </div>
+                             </>
                            )}
                         </div>
                         

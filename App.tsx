@@ -583,7 +583,14 @@ const App: React.FC = () => {
                 } catch(e) { return `> [${log.charName}] ${log.content}`; }
             }
             if (['system', 'status'].includes(log.type)) return `> [${log.charName}] ${log.content}`;
-            return `**${log.charName}**: ${log.content}`;
+            
+            if (log.type === 'image') {
+                return `${log.charName}: [图片]`;
+            }
+
+            // Remove markdown symbols like **
+            const cleanContent = log.content.replace(/\*\*/g, "");
+            return `${log.charName}: ${cleanContent}`;
         }).join('\n\n');
     };
 
@@ -593,7 +600,8 @@ const App: React.FC = () => {
 
         const charData = {
             room_id: currentRoomId,
-            user_id: session.user.id, 
+            // 如果是编辑现有角色，保留原 user_id；否则使用当前用户 ID
+            user_id: editingChar ? editingChar.user_id : session.user.id, 
             name: char.name,
             role: char.role, 
             // 确保 type 被正确设置，如果 char.type 为空则使用默认值
@@ -912,7 +920,7 @@ const App: React.FC = () => {
              />
 
              <main className="flex-1 flex flex-col relative min-w-0 z-10">
-                <header className="h-16 flex items-center justify-between px-4 md:px-8 border-b border-white/5 backdrop-blur-sm sticky top-0 z-20 bg-slate-900/80 md:bg-transparent">
+                <header className="min-h-[4rem] h-auto pt-safe flex items-center justify-between px-4 md:px-8 border-b border-white/5 backdrop-blur-sm sticky top-0 z-20 bg-slate-900/80 md:bg-transparent">
                     <div className="flex items-center gap-3">
                          <button onClick={() => setSidebarOpen(true)} className="p-2 -ml-2 text-slate-400 hover:text-white md:hidden"><Menu size={24} /></button>
                          <div className="flex flex-col justify-center">

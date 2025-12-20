@@ -16,7 +16,7 @@
 
 ## ✨ Features
 
-- **🎲 Real-time Dice Rolling**: Integrated dice roller supporting various die types (d4, d6, d8, d10, d12, d20, d100) with support for secret rolls visible only to the Keeper.
+- **🎲 Real-time Dice Rolling**: Integrated dice roller supporting various die types (d2, d3, d4, d6, d8, d10, d12, d20, d100) with support for secret rolls visible only to the Keeper.
 - **💬 Immersive Chat System**:
   - Real-time public room chat.
   - Private messaging (whisper) between players and the Keeper.
@@ -120,7 +120,7 @@ This project is intended for educational and personal use.
 
 ## ✨ 功能特性
 
-- **🎲 实时投骰系统**: 内置多种骰子类型 (d4, d6, d8, d10, d12, d20, d100)，支持仅 KP 可见的暗投功能。
+- **🎲 实时投骰系统**: 内置多种骰子类型 (d2, d3, d4, d6, d8, d10, d12, d20, d100)，支持仅 KP 可见的暗投功能。
 - **💬 沉浸式聊天**:
   - 实时公共频道聊天。
   - 玩家与 KP 之间的私聊（耳语）功能。
