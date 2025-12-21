@@ -490,8 +490,9 @@ const App: React.FC = () => {
           filter: `id=eq.${currentRoomId}`,
         },
         () => {
+          // Room deleted by owner (or someone else), just cleanup locally
           alert("房间已被房主解散");
-          handleLeaveRoom();
+          doLeaveCleanup();
         }
       )
       .on(
