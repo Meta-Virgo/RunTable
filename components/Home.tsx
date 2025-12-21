@@ -262,7 +262,7 @@ export const Home: React.FC<HomeProps> = ({ onJoinRoom, onLogout }) => {
                 const exists = prev.find((r) => r.id === updatedRoom.id);
                 if (exists)
                   return prev.map((r) =>
-                    r.id === updatedRoom.id ? updatedRoom : r
+                    r.id === updatedRoom.id ? { ...r, ...updatedRoom } : r
                   );
                 return [updatedRoom, ...prev];
               });

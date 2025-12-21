@@ -89,6 +89,11 @@ export interface Log {
   content: string;
   isMine?: boolean;
   recipientId?: string | null; // New field for private messages
+  quote?: {
+    id: string;
+    content: string;
+    charName: string;
+  };
 }
 
 export interface ModuleInfo {

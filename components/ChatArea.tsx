@@ -15,6 +15,7 @@ import {
   Image as ImageIcon,
   X,
   Trash2,
+  Quote,
 } from "lucide-react";
 import { cn, Button, NumberStepper } from "./UI";
 import { Log, Character, ModuleInfo } from "../types";
@@ -30,7 +31,8 @@ interface ChatAreaProps {
   onSend: (
     text: string,
     recipientId?: string | null,
-    type?: Log["type"]
+    type?: Log["type"],
+    quote?: { id: string; content: string; charName: string }
   ) => void;
   onRollDice: (
     count: number,
@@ -88,6 +90,11 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   const [pendingImage, setPendingImage] = useState<{
     dataUrl: string;
     name: string;
+  } | null>(null);
+  const [quoteMessage, setQuoteMessage] = useState<{
+    id: string;
+    content: string;
+    charName: string;
   } | null>(null);
 
   const [showAttrSelect, setShowAttrSelect] = useState(false);
@@ -190,8 +197,9 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
       setPendingImage(null);
     }
     if (!inputText.trim()) return;
-    onSend(inputText, recipientId);
+    onSend(inputText, recipientId, "normal", quoteMessage || undefined);
     setInputText("");
+    setQuoteMessage(null);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -508,6 +516,16 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                       alignRight ? "rounded-tr-none" : "rounded-tl-none"
                     )}
                   >
+                    {log.quote && (
+                      <div className="mb-2 p-2 rounded bg-black/20 border-l-2 border-white/30 text-xs text-white/70 select-none">
+                        <div className="font-bold mb-0.5 opacity-80">
+                          {log.quote.charName}:
+                        </div>
+                        <div className="line-clamp-2 italic">
+                          {log.quote.content}
+                        </div>
+                      </div>
+                    )}
                     {log.type === "image" ? (
                       <img
                         src={log.content}
@@ -533,15 +551,36 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                       log.content
                     )}
                   </div>
-                  {log.isMine && (
+                  <div
+                    className={cn(
+                      "flex items-center gap-1 opacity-0 group-hover/bubble:opacity-100 transition-opacity",
+                      alignRight ? "flex-row-reverse" : "flex-row"
+                    )}
+                  >
                     <button
-                      onClick={() => onDeleteMessage(log.id)}
-                      className="p-1.5 text-slate-500 hover:text-red-400 transition-all opacity-0 group-hover/bubble:opacity-100"
-                      title="撤回"
+                      onClick={() =>
+                        setQuoteMessage({
+                          id: log.id,
+                          content:
+                            log.type === "image" ? "[图片]" : log.content,
+                          charName: log.charName,
+                        })
+                      }
+                      className="p-1.5 text-slate-500 hover:text-indigo-400 transition-all"
+                      title="引用"
                     >
-                      <Trash2 size={14} />
+                      <Quote size={14} />
                     </button>
-                  )}
+                    {log.isMine && (
+                      <button
+                        onClick={() => onDeleteMessage(log.id)}
+                        className="p-1.5 text-slate-500 hover:text-red-400 transition-all"
+                        title="撤回"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
@@ -576,6 +615,24 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
               <button
                 onClick={() => setPendingImage(null)}
                 className="ml-1 p-1 text-slate-500 hover:text-rose-400 transition-colors rounded hover:bg-white/5"
+              >
+                <X size={14} />
+              </button>
+            </div>
+          )}
+          {quoteMessage && (
+            <div className="mx-4 mt-2 flex items-center gap-2 bg-slate-800/80 border-l-4 border-indigo-500 p-2 rounded-r-lg w-fit animate-fade-in relative z-20 max-w-[80%]">
+              <div className="flex flex-col overflow-hidden">
+                <span className="text-xs font-bold text-indigo-400">
+                  回复 {quoteMessage.charName}:
+                </span>
+                <span className="text-xs text-slate-300 truncate font-mono opacity-80">
+                  {quoteMessage.content}
+                </span>
+              </div>
+              <button
+                onClick={() => setQuoteMessage(null)}
+                className="ml-2 p-1 text-slate-500 hover:text-rose-400 transition-colors rounded hover:bg-white/5 shrink-0"
               >
                 <X size={14} />
               </button>
@@ -730,7 +787,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                         className="fixed inset-0 z-40"
                         onClick={() => setShowDiceSelect(false)}
                       ></div>
-                      <div className="absolute bottom-full right-0 mb-2 bg-slate-900 border border-slate-700 p-2 rounded-xl grid grid-cols-3 gap-1 shadow-xl z-50 animate-scale-in w-48">
+                      <div className="fixed bottom-24 right-4 md:absolute md:bottom-full md:right-0 md:mb-2 bg-slate-900 border border-slate-700 p-2 rounded-xl grid grid-cols-3 gap-1 shadow-xl z-50 animate-scale-in w-48">
                         {[2, 3, 4, 6, 8, 10, 12, 20, 100].map((d) => (
                           <button
                             key={d}

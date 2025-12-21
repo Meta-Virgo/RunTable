@@ -172,6 +172,41 @@ const App: React.FC = () => {
   useEffect(() => {
     if (!currentRoomId || !session?.user) return;
 
+    // Fetch characters (Add this to ensure characters are loaded on restore/join)
+    const fetchCharacters = async () => {
+      const { data: chars } = await supabase
+        .from("characters")
+        .select("*")
+        .eq("room_id", currentRoomId);
+      if (chars) {
+        const mappedChars = chars.map((c) => ({
+          ...c,
+          role: c.role || "调查员",
+          avatar_url: c.avatar_url,
+          job: c.info?.job || "",
+          age: c.info?.age || "",
+          sex: c.info?.sex || "",
+          notes: c.info?.notes || "",
+          backstory: c.info?.backstory || "",
+          skills: c.info?.skills || c.stats?.skills || {},
+          str: c.stats?.str || 50,
+          con: c.stats?.con || 50,
+          siz: c.stats?.siz || 50,
+          dex: c.stats?.dex || 50,
+          app: c.stats?.app || 50,
+          int: c.stats?.int || 50,
+          pow: c.stats?.pow || 50,
+          edu: c.stats?.edu || 50,
+          luck: c.stats?.luck || 50,
+          hp: c.stats?.hp || 10,
+          san: c.stats?.san || 50,
+          mp: c.stats?.mp || 10,
+        }));
+        setCharacters(mappedChars);
+      }
+    };
+    fetchCharacters();
+
     // Fetch history
     const fetchMessages = async () => {
       // 1. Get Messages with Join Query (一次性拿到角色名和昵称)
@@ -312,6 +347,7 @@ const App: React.FC = () => {
             type: msg.type as Log["type"],
             content: msg.content,
             isMine: msg.user_id === session.user.id,
+            quote: msg.meta?.quote,
           };
 
           setLogs((prev) => {
@@ -390,38 +426,76 @@ const App: React.FC = () => {
             setCharacters((prev) =>
               prev.map((c) => {
                 if (c.id === newChar.id) {
+                  // Handle potential partial updates and JSON parsing
+                  const safeInfo =
+                    typeof newChar.info === "string"
+                      ? JSON.parse(newChar.info)
+                      : newChar.info || c.info || {};
+
+                  const safeStats =
+                    typeof newChar.stats === "string"
+                      ? JSON.parse(newChar.stats)
+                      : newChar.stats || c.stats || {};
+
                   return {
                     ...c,
-                    name: newChar.name,
-                    type: newChar.type,
-                    avatar_url: newChar.avatar_url,
+                    name: newChar.name !== undefined ? newChar.name : c.name,
+                    type: newChar.type !== undefined ? newChar.type : c.type,
+                    avatar_url:
+                      newChar.avatar_url !== undefined
+                        ? newChar.avatar_url
+                        : c.avatar_url,
                     role:
-                      newChar.role ||
-                      (newChar.type === "investigator"
-                        ? "调查员"
-                        : newChar.type === "monster"
-                        ? "怪物"
-                        : "NPC"),
-                    job: newChar.info?.job || "",
-                    age: newChar.info?.age || "",
-                    sex: newChar.info?.sex || "",
-                    notes: newChar.info?.notes || "",
-                    backstory: newChar.info?.backstory || "",
-                    skills: newChar.info?.skills || newChar.stats?.skills || {},
-                    str: newChar.stats?.str || 50,
-                    con: newChar.stats?.con || 50,
-                    siz: newChar.stats?.siz || 50,
-                    dex: newChar.stats?.dex || 50,
-                    app: newChar.stats?.app || 50,
-                    int: newChar.stats?.int || 50,
-                    pow: newChar.stats?.pow || 50,
-                    edu: newChar.stats?.edu || 50,
-                    luck: newChar.stats?.luck || 50,
-                    hp: newChar.stats?.hp || 10,
-                    san: newChar.stats?.san || 50,
-                    mp: newChar.stats?.mp || 10,
-                    room_id: newChar.room_id,
-                    user_id: newChar.user_id,
+                      newChar.role !== undefined
+                        ? newChar.role
+                        : newChar.type !== undefined
+                        ? newChar.type === "investigator"
+                          ? "调查员"
+                          : newChar.type === "monster"
+                          ? "怪物"
+                          : "NPC"
+                        : c.role,
+
+                    // Update mapped fields from info
+                    job: safeInfo.job !== undefined ? safeInfo.job : c.job,
+                    age: safeInfo.age !== undefined ? safeInfo.age : c.age,
+                    sex: safeInfo.sex !== undefined ? safeInfo.sex : c.sex,
+                    notes:
+                      safeInfo.notes !== undefined ? safeInfo.notes : c.notes,
+                    backstory:
+                      safeInfo.backstory !== undefined
+                        ? safeInfo.backstory
+                        : c.backstory,
+                    skills:
+                      safeInfo.skills || safeStats.skills || c.skills || {},
+
+                    // Update mapped fields from stats
+                    str: safeStats.str !== undefined ? safeStats.str : c.str,
+                    con: safeStats.con !== undefined ? safeStats.con : c.con,
+                    siz: safeStats.siz !== undefined ? safeStats.siz : c.siz,
+                    dex: safeStats.dex !== undefined ? safeStats.dex : c.dex,
+                    app: safeStats.app !== undefined ? safeStats.app : c.app,
+                    int: safeStats.int !== undefined ? safeStats.int : c.int,
+                    pow: safeStats.pow !== undefined ? safeStats.pow : c.pow,
+                    edu: safeStats.edu !== undefined ? safeStats.edu : c.edu,
+                    luck:
+                      safeStats.luck !== undefined ? safeStats.luck : c.luck,
+                    hp: safeStats.hp !== undefined ? safeStats.hp : c.hp,
+                    san: safeStats.san !== undefined ? safeStats.san : c.san,
+                    mp: safeStats.mp !== undefined ? safeStats.mp : c.mp,
+
+                    room_id:
+                      newChar.room_id !== undefined
+                        ? newChar.room_id
+                        : c.room_id,
+                    user_id:
+                      newChar.user_id !== undefined
+                        ? newChar.user_id
+                        : c.user_id,
+
+                    // Preserve raw objects for future reference
+                    info: safeInfo,
+                    stats: safeStats,
                   };
                 }
                 return c;
@@ -507,8 +581,11 @@ const App: React.FC = () => {
           const newRoom = payload.new as any;
           setModuleInfo((prev) => ({
             ...prev,
-            title: newRoom.title,
-            description: newRoom.description,
+            title: newRoom.title !== undefined ? newRoom.title : prev.title,
+            description:
+              newRoom.description !== undefined
+                ? newRoom.description
+                : prev.description,
           }));
         }
       )
@@ -598,14 +675,26 @@ const App: React.FC = () => {
 
       // If joining as character, update character's room_id
       if (charId !== "pc" && user) {
-        const { error } = await supabase
+        const { data: updatedChar, error } = await supabase
           .from("characters")
           .update({
             room_id: roomId,
             user_id: user.id,
           })
-          .eq("id", charId);
-        if (error) console.error("Failed to update character room:", error);
+          .eq("id", charId)
+          .select();
+
+        if (error) {
+          console.error("Failed to update character room:", error);
+          alert("加入房间失败：无法更新角色信息");
+          return;
+        }
+
+        if (!updatedChar || updatedChar.length === 0) {
+          console.error("Character update returned no rows. ID:", charId);
+          alert("加入房间失败：找不到该角色或无权操作");
+          return;
+        }
       }
 
       // Load Characters in Room
@@ -678,7 +767,8 @@ const App: React.FC = () => {
     type: Log["type"],
     content: string,
     customCharId?: string,
-    recipientId?: string | null
+    recipientId?: string | null,
+    meta?: Record<string, any>
   ) => {
     if (!content.trim() || !currentRoomId || !session?.user) return;
 
@@ -694,6 +784,7 @@ const App: React.FC = () => {
       type: type,
       content: content,
       recipient_id: recipientId || null,
+      meta: meta || {},
     });
 
     if (error) {
@@ -1061,12 +1152,23 @@ const App: React.FC = () => {
 
   const handleSignOut = async () => {
     try {
-      await supabase.auth.signOut();
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
     } catch (error) {
       console.warn("Logout error (safe to ignore):", error);
+      // Fallback: Manually clear session from local storage if network request fails
+      // This ensures the user is logged out locally even if the server request was aborted
+      Object.keys(localStorage).forEach((key) => {
+        if (key.startsWith("sb-") && key.endsWith("-auth-token")) {
+          localStorage.removeItem(key);
+        }
+      });
+    } finally {
+      // Force state reset
+      setSession(null);
+      setCurrentRoomId(null);
+      window.history.replaceState(null, "", window.location.pathname);
     }
-    setCurrentRoomId(null);
-    window.history.replaceState(null, "", window.location.pathname);
   };
 
   const handleLeaveRoom = async () => {
@@ -1225,8 +1327,14 @@ const App: React.FC = () => {
             activeCharId={activeCharId}
             characters={derivedCharacters}
             moduleInfo={moduleInfo}
-            onSend={(text, recipientId, type) =>
-              addLog(type || "normal", text, undefined, recipientId)
+            onSend={(text, recipientId, type, quote) =>
+              addLog(
+                type || "normal",
+                text,
+                undefined,
+                recipientId,
+                quote ? { quote } : undefined
+              )
             }
             onRollDice={rollDice}
             onShowStory={() => setShowStoryModal(true)}
