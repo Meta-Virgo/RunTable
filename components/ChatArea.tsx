@@ -99,6 +99,28 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
 
   const [showAttrSelect, setShowAttrSelect] = useState(false);
   const [showSkillSelect, setShowSkillSelect] = useState(false);
+  const [activeMessageId, setActiveMessageId] = useState<string | null>(null);
+  const longPressTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  const handleTouchStart = (id: string) => {
+    longPressTimerRef.current = setTimeout(() => {
+      setActiveMessageId(id);
+    }, 500);
+  };
+
+  const handleTouchEnd = () => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+  };
+
+  const handleTouchMove = () => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+  };
 
   // AI State
   const [showAIModal, setShowAIModal] = useState(false);
@@ -200,6 +222,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
     onSend(inputText, recipientId, "normal", quoteMessage || undefined);
     setInputText("");
     setQuoteMessage(null);
+    setActiveMessageId(null);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -511,10 +534,13 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                 >
                   <div
                     className={cn(
-                      "px-4 py-2 md:px-5 md:py-3 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap shadow-md border backdrop-blur-sm relative",
+                      "px-4 py-2 md:px-5 md:py-3 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap shadow-md border backdrop-blur-sm relative select-none md:select-text",
                       bubbleColor,
                       alignRight ? "rounded-tr-none" : "rounded-tl-none"
                     )}
+                    onTouchStart={() => handleTouchStart(log.id)}
+                    onTouchEnd={handleTouchEnd}
+                    onTouchMove={handleTouchMove}
                   >
                     {log.quote && (
                       <div className="mb-2 p-2 rounded bg-black/20 border-l-2 border-white/30 text-xs text-white/70 select-none">
@@ -553,19 +579,23 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                   </div>
                   <div
                     className={cn(
-                      "flex items-center gap-1 opacity-0 group-hover/bubble:opacity-100 transition-opacity",
+                      "flex items-center gap-1 transition-opacity",
+                      activeMessageId === log.id
+                        ? "opacity-100"
+                        : "opacity-0 group-hover/bubble:opacity-100",
                       alignRight ? "flex-row-reverse" : "flex-row"
                     )}
                   >
                     <button
-                      onClick={() =>
+                      onClick={() => {
                         setQuoteMessage({
                           id: log.id,
                           content:
                             log.type === "image" ? "[图片]" : log.content,
                           charName: log.charName,
-                        })
-                      }
+                        });
+                        setActiveMessageId(null);
+                      }}
                       className="p-1.5 text-slate-500 hover:text-indigo-400 transition-all"
                       title="引用"
                     >
@@ -573,7 +603,10 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                     </button>
                     {log.isMine && (
                       <button
-                        onClick={() => onDeleteMessage(log.id)}
+                        onClick={() => {
+                          onDeleteMessage(log.id);
+                          setActiveMessageId(null);
+                        }}
                         className="p-1.5 text-slate-500 hover:text-red-400 transition-all"
                         title="撤回"
                       >

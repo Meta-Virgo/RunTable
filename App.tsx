@@ -272,6 +272,7 @@ const App: React.FC = () => {
             content: msg.content,
             isMine: msg.user_id === session.user.id,
             recipientId: msg.recipient_id,
+            quote: msg.meta?.quote,
           };
         });
         setLogs(formattedLogs);
