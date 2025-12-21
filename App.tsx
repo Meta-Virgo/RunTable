@@ -748,30 +748,56 @@ const App: React.FC = () => {
   const generateStory = () => {
     if (logs.length === 0) return "暂无记录。";
     return logs
+      .filter((log) => {
+        // 过滤掉不必要的系统消息
+        if (log.type === "system") {
+          if (log.content.includes("已清空聊天记录")) return false;
+          if (log.content.includes("进入了房间")) return false;
+          if (log.content.includes("离开了房间")) return false;
+        }
+        return true;
+      })
       .map((log) => {
+        // Handle name display: replace nickname with "守秘人" if role is Keeper
+        const displayName = log.charRole === "Keeper" ? "守秘人" : log.charName;
+
         if (log.type === "dice" || log.type === "dice_secret") {
           try {
             const d = JSON.parse(log.content);
             const prefix = log.type === "dice_secret" ? "(暗骰) " : "";
-            return `> [${log.charName}] ${prefix}投掷了 ${d.count}D${
+            return `> [${displayName}] ${prefix}投掷了 ${d.count}D${
               d.type || 6
             }: ${d.total} [${d.details.join(", ")}]`;
           } catch (e) {
-            return `> [${log.charName}] ${log.content}`;
+            return `> [${displayName}] ${log.content}`;
           }
         }
         if (["system", "status"].includes(log.type))
-          return `> [${log.charName}] ${log.content}`;
+          return `> [${displayName}] ${log.content}`;
 
         if (log.type === "image") {
-          return `${log.charName}: [图片]`;
+          return `${displayName}: [图片]`;
         }
 
         // Remove markdown symbols like **
         const cleanContent = log.content.replace(/\*\*/g, "");
-        return `${log.charName}: ${cleanContent}`;
+        return `${displayName}: ${cleanContent}`;
       })
       .join("\n\n");
+  };
+
+  const handleDeleteMessage = async (messageId: string) => {
+    const { error } = await supabase
+      .from("messages")
+      .delete()
+      .eq("id", messageId);
+    if (error) {
+      console.error("撤回消息失败:", error);
+      alert("撤回消息失败: " + error.message);
+    } else {
+      // 本地删除 (Realtime 会处理，但本地删除更流畅)
+      setLogs((prev) => prev.filter((log) => log.id !== messageId));
+    }
   };
 
   // --- CRUD ---
@@ -1161,7 +1187,7 @@ const App: React.FC = () => {
       />
 
       <main className="flex-1 flex flex-col relative min-w-0 z-10">
-        <header className="min-h-[4rem] h-auto pt-safe flex items-center justify-between px-4 md:px-8 border-b border-white/5 backdrop-blur-sm sticky top-0 z-20 bg-slate-900/80 md:bg-transparent">
+        <header className="h-16 shrink-0 pt-safe flex items-center justify-between px-4 md:px-8 border-b border-white/5 backdrop-blur-sm sticky top-0 z-20 bg-slate-900/80 md:bg-transparent">
           <div className="flex items-center gap-3">
             <button
               onClick={() => setSidebarOpen(true)}
@@ -1203,6 +1229,7 @@ const App: React.FC = () => {
             }
             onRollDice={rollDice}
             onShowStory={() => setShowStoryModal(true)}
+            onDeleteMessage={handleDeleteMessage}
             isKP={isKP}
             kpId={kpId}
             isVip={isVip}

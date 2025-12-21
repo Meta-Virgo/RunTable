@@ -20,7 +20,10 @@
 - **💬 Immersive Chat System**:
   - Real-time public room chat.
   - Private messaging (whisper) between players and the Keeper.
+  - **↩️ Message Recall**: Recall your own messages if you make a mistake.
+  - **📸 Rich Media**: Support for sending images to enhance visual storytelling.
   - Rich text support for descriptive storytelling.
+- **🤖 AI Assistant**: Integrated DeepSeek AI helper for Keepers to generate descriptions and plot elements (VIP feature).
 - **📝 Comprehensive Character Sheets**:
   - Manage Basic Info (Name, Role, Theme Color).
   - Track Statistics (STR, DEX, INT, etc.) automatically.

@@ -187,7 +187,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       )}
       <aside
         className={cn(
-          "glass-panel border-r-0 border-y-0 border-l-0 flex flex-col transition-all duration-300 ease-in-out z-40 shrink-0",
+          "glass-panel !border-0 flex flex-col transition-all duration-300 ease-in-out z-40 shrink-0",
           "fixed inset-y-0 left-0 h-full",
           "md:relative",
           isOpen
@@ -196,7 +196,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         )}
       >
         {/* Header Section */}
-        <div className="min-h-[5rem] h-auto pt-safe flex items-center justify-center px-4 border-b border-white/5 bg-slate-900/30 backdrop-blur-md">
+        <div className="h-16 shrink-0 pt-safe flex items-center justify-center px-4 border-b border-white/5 bg-slate-900/30 backdrop-blur-md">
           <div className="flex items-center gap-3 text-indigo-400 overflow-hidden w-full justify-center">
             <div className="bg-gradient-to-br from-indigo-500 to-purple-600 p-2.5 rounded-xl text-white shrink-0 shadow-lg shadow-indigo-500/20">
               <Dice5 size={24} />

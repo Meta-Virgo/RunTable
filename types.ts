@@ -79,7 +79,7 @@ export interface Message {
 // Frontend Legacy Types (kept for compatibility during migration)
 
 export interface Log {
-  id: number;
+  id: string;
   timestamp: string;
   charId: string;
   charName: string;

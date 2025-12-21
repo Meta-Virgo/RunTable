@@ -14,6 +14,7 @@ import {
   EyeOff,
   Image as ImageIcon,
   X,
+  Trash2,
 } from "lucide-react";
 import { cn, Button, NumberStepper } from "./UI";
 import { Log, Character, ModuleInfo } from "../types";
@@ -41,6 +42,7 @@ interface ChatAreaProps {
   isKP: boolean;
   kpId: string | null;
   isVip: boolean;
+  onDeleteMessage: (id: string) => void;
 }
 
 const getCharIcon = (role: string, size = 18) => {
@@ -74,6 +76,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   isKP,
   kpId,
   isVip,
+  onDeleteMessage,
 }) => {
   const [inputText, setInputText] = useState("");
   const [diceCount, setDiceCount] = useState(1);
@@ -411,6 +414,15 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                       </div>
                     </div>
                   )}
+                  {log.isMine && (
+                    <button
+                      onClick={() => onDeleteMessage(log.id)}
+                      className="p-2 text-slate-600 hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100"
+                      title="撤回"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  )}
                 </div>
               </div>
             );
@@ -485,34 +497,50 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                 </div>
                 <div
                   className={cn(
-                    "px-4 py-2 md:px-5 md:py-3 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap shadow-md border backdrop-blur-sm relative",
-                    bubbleColor,
-                    alignRight ? "rounded-tr-none" : "rounded-tl-none"
+                    "flex items-center gap-2 group/bubble",
+                    alignRight ? "flex-row-reverse" : "flex-row"
                   )}
                 >
-                  {log.type === "image" ? (
-                    <img
-                      src={log.content}
-                      alt="sent image"
-                      className="max-w-full rounded-lg cursor-pointer max-h-[300px] object-contain hover:opacity-90 transition-opacity"
-                      onClick={() => {
-                        const w = window.open();
-                        if (w) {
-                          w.document.write(
-                            `<img src="${log.content}" style="max-width: 100%; height: auto;" />`
-                          );
-                          w.document.title = "Image Preview";
-                          w.document.body.style.margin = "0";
-                          w.document.body.style.backgroundColor = "#0f172a";
-                          w.document.body.style.display = "flex";
-                          w.document.body.style.justifyContent = "center";
-                          w.document.body.style.alignItems = "center";
-                          w.document.body.style.minHeight = "100vh";
-                        }
-                      }}
-                    />
-                  ) : (
-                    log.content
+                  <div
+                    className={cn(
+                      "px-4 py-2 md:px-5 md:py-3 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap shadow-md border backdrop-blur-sm relative",
+                      bubbleColor,
+                      alignRight ? "rounded-tr-none" : "rounded-tl-none"
+                    )}
+                  >
+                    {log.type === "image" ? (
+                      <img
+                        src={log.content}
+                        alt="sent image"
+                        className="max-w-full rounded-lg cursor-pointer max-h-[300px] object-contain hover:opacity-90 transition-opacity"
+                        onClick={() => {
+                          const w = window.open();
+                          if (w) {
+                            w.document.write(
+                              `<img src="${log.content}" style="max-width: 100%; height: auto;" />`
+                            );
+                            w.document.title = "Image Preview";
+                            w.document.body.style.margin = "0";
+                            w.document.body.style.backgroundColor = "#0f172a";
+                            w.document.body.style.display = "flex";
+                            w.document.body.style.justifyContent = "center";
+                            w.document.body.style.alignItems = "center";
+                            w.document.body.style.minHeight = "100vh";
+                          }
+                        }}
+                      />
+                    ) : (
+                      log.content
+                    )}
+                  </div>
+                  {log.isMine && (
+                    <button
+                      onClick={() => onDeleteMessage(log.id)}
+                      className="p-1.5 text-slate-500 hover:text-red-400 transition-all opacity-0 group-hover/bubble:opacity-100"
+                      title="撤回"
+                    >
+                      <Trash2 size={14} />
+                    </button>
                   )}
                 </div>
               </div>
@@ -702,7 +730,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                         className="fixed inset-0 z-40"
                         onClick={() => setShowDiceSelect(false)}
                       ></div>
-                      <div className="fixed bottom-24 right-4 md:absolute md:bottom-12 md:left-auto md:right-0 md:translate-x-0 bg-slate-900 border border-slate-700 p-2 rounded-xl grid grid-cols-3 gap-1 shadow-xl z-50 animate-scale-in w-64 max-w-[90vw]">
+                      <div className="absolute bottom-full right-0 mb-2 bg-slate-900 border border-slate-700 p-2 rounded-xl grid grid-cols-3 gap-1 shadow-xl z-50 animate-scale-in w-48">
                         {[2, 3, 4, 6, 8, 10, 12, 20, 100].map((d) => (
                           <button
                             key={d}
