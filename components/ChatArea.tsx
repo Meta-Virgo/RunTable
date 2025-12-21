@@ -100,6 +100,8 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   const [showAttrSelect, setShowAttrSelect] = useState(false);
   const [showSkillSelect, setShowSkillSelect] = useState(false);
   const [activeMessageId, setActiveMessageId] = useState<string | null>(null);
+  const [diceMenuStyles, setDiceMenuStyles] = useState<React.CSSProperties>({});
+  const diceButtonRef = useRef<HTMLButtonElement>(null);
   const longPressTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const handleTouchStart = (id: string) => {
@@ -802,8 +804,28 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
 
                 <div className="relative shrink-0">
                   <button
+                    ref={diceButtonRef}
                     type="button"
                     onClick={() => {
+                      if (!showDiceSelect && diceButtonRef.current && typeof window !== 'undefined' && window.innerWidth < 768) {
+                        const rect = diceButtonRef.current.getBoundingClientRect();
+                        const screenW = window.innerWidth;
+                        const menuW = 192; // w-48 is 12rem = 192px
+                        
+                        let left = rect.left;
+                        if (left + menuW > screenW - 8) {
+                          left = screenW - menuW - 8;
+                        }
+                        if (left < 8) left = 8;
+                        
+                        setDiceMenuStyles({
+                          bottom: window.innerHeight - rect.top + 8,
+                          left: left,
+                          right: 'auto',
+                        });
+                      } else if (showDiceSelect) {
+                        setDiceMenuStyles({});
+                      }
                       setShowDiceSelect(!showDiceSelect);
                       setShowAttrSelect(false);
                       setShowSkillSelect(false);
@@ -820,7 +842,10 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                         className="fixed inset-0 z-40"
                         onClick={() => setShowDiceSelect(false)}
                       ></div>
-                      <div className="fixed bottom-24 right-4 md:absolute md:bottom-full md:right-0 md:mb-2 bg-slate-900 border border-slate-700 p-2 rounded-xl grid grid-cols-3 gap-1 shadow-xl z-50 animate-scale-in w-48">
+                      <div 
+                        className="fixed z-50 md:absolute md:bottom-full md:right-0 md:mb-2 md:left-auto md:top-auto md:transform-none bg-slate-900 border border-slate-700 p-2 rounded-xl grid grid-cols-3 gap-1 shadow-xl animate-scale-in w-48"
+                        style={diceMenuStyles}
+                      >
                         {[2, 3, 4, 6, 8, 10, 12, 20, 100].map((d) => (
                           <button
                             key={d}
