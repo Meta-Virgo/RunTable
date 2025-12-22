@@ -751,7 +751,11 @@ export const Home: React.FC<HomeProps> = ({ onJoinRoom, onLogout }) => {
                       icon={Edit2}
                       onClick={() => {
                         setEditNickname(userNickname || "");
-                        setEditBio(userBio || "");
+                        setEditBio(
+                          userBio && userBio !== "NaN" && userBio !== "null"
+                            ? userBio
+                            : ""
+                        );
                         setIsEditingProfile(true);
                       }}
                     >
@@ -789,11 +793,11 @@ export const Home: React.FC<HomeProps> = ({ onJoinRoom, onLogout }) => {
                       UID: {userCode || "---"}
                     </span>
                   </div>
-                  {userBio && (
-                    <p className="text-slate-300 mb-6 max-w-md mx-auto italic">
-                      "{userBio}"
-                    </p>
-                  )}
+                  <p className="text-slate-300 mb-6 max-w-md mx-auto italic">
+                    {userBio && userBio !== "NaN" && userBio !== "null"
+                      ? `"${userBio}"`
+                      : "这个人很神秘，什么都没有写..."}
+                  </p>
 
                   <div className="grid grid-cols-2 gap-4 text-left mt-6">
                     <div className="bg-slate-900/50 p-4 rounded-xl border border-slate-700/30">
