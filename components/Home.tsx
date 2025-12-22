@@ -312,6 +312,7 @@ export const Home: React.FC<HomeProps> = ({ onJoinRoom, onLogout }) => {
         age: c.info?.age || "",
         sex: c.info?.sex || "",
         notes: c.info?.notes || "",
+        backstory: c.info?.backstory || "",
         str: c.stats?.str || 50,
         con: c.stats?.con || 50,
         siz: c.stats?.siz || 50,

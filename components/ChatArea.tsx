@@ -100,7 +100,6 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   const [showAttrSelect, setShowAttrSelect] = useState(false);
   const [showSkillSelect, setShowSkillSelect] = useState(false);
   const [activeMessageId, setActiveMessageId] = useState<string | null>(null);
-  const [diceMenuStyles, setDiceMenuStyles] = useState<React.CSSProperties>({});
   const [menuPosition, setMenuPosition] = useState<React.CSSProperties>({});
   const diceButtonRef = useRef<HTMLButtonElement>(null);
   const attrButtonRef = useRef<HTMLButtonElement>(null);
@@ -278,7 +277,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   return (
     <>
       {/* Logs View */}
-      <div className="flex-1 overflow-y-auto px-3 md:px-8 py-4 pt-4 pb-36 md:pb-48 space-y-6 custom-scrollbar">
+      <div className="flex-1 overflow-y-auto px-3 md:px-8 py-4 pt-4 pb-48 space-y-6 custom-scrollbar">
         {logs.length === 0 && (
           <div className="flex flex-col items-center justify-center h-[60vh] text-slate-600 animate-slide-up">
             <div className="w-24 h-24 bg-gradient-to-tr from-slate-800 to-slate-900 rounded-full flex items-center justify-center mb-6 ring-1 ring-slate-700/50 shadow-2xl">

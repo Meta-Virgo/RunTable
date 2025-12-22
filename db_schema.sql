@@ -135,6 +135,11 @@ CREATE POLICY "KP can delete room messages" ON public.messages FOR DELETE USING 
     auth.uid() IN (SELECT kp_id FROM public.rooms WHERE id = room_id)
 );
 
+-- 允许用户删除自己的消息
+CREATE POLICY "Users can delete own messages" ON public.messages FOR DELETE USING (
+    auth.uid() = user_id
+);
+
 -- ========================================================= 
 -- 7. 设置 Realtime (实时监听) 
 -- ========================================================= 
