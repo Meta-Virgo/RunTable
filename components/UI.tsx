@@ -84,6 +84,14 @@ export const NumberStepper: React.FC<NumberStepperProps> = ({ value, onChange, m
   const buttonWidthClass = size === 'sm' ? 'w-8' : 'w-10';
   const fontSizeClass = size === 'sm' ? 'text-sm' : 'text-base';
 
+  // Local state to handle input display
+  const [inputValue, setInputValue] = React.useState(String(value));
+
+  // Sync local state when prop value changes
+  React.useEffect(() => {
+    setInputValue(String(value));
+  }, [value]);
+
   const handleDec = () => {
     if (disabled) return;
     const newVal = value - step;
@@ -97,8 +105,36 @@ export const NumberStepper: React.FC<NumberStepperProps> = ({ value, onChange, m
     onChange(newVal);
   };
 
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (disabled) return;
+    
+    const newValStr = e.target.value;
+    
+    // Allow empty string, minus sign
+    if (newValStr === '' || newValStr === '-') {
+        setInputValue(newValStr);
+        return;
+    }
+
+    // Validate if it's a valid number format (allow digits and single minus at start)
+    if (!/^-?\d*$/.test(newValStr)) {
+        return;
+    }
+
+    setInputValue(newValStr);
+
+    const val = parseInt(newValStr, 10);
+    if (!isNaN(val)) {
+        // Check max only on input to prevent typing too large numbers, but allow min violations temporarily for typing
+        if (max !== undefined && val > max) onChange(max);
+        else onChange(val);
+    }
+  };
+
   const handleBlur = () => {
     if (disabled) return;
+    // On blur, reset to current valid value (handles empty or just "-" case)
+    setInputValue(String(value));
     if (min !== undefined && value < min) onChange(min);
   };
 
@@ -114,17 +150,11 @@ export const NumberStepper: React.FC<NumberStepperProps> = ({ value, onChange, m
       </button>
       <div className="flex-1 h-full border-x border-slate-800 flex items-center justify-center bg-slate-900/50 min-w-[3rem]">
         <input
-            type="number"
-            value={value}
-            onChange={(e) => {
-                if (disabled) return;
-                const val = e.target.value === '' ? 0 : parseInt(e.target.value, 10);
-                if (!isNaN(val)) {
-                    // Check max only on input to prevent typing too large numbers, but allow min violations temporarily for typing
-                    if (max !== undefined && val > max) onChange(max);
-                    else onChange(val);
-                }
-            }}
+            type="text"
+            inputMode="numeric"
+            value={inputValue}
+            onChange={handleInputChange}
+            onFocus={(e) => e.target.select()}
             onBlur={handleBlur}
             disabled={disabled}
             className={cn("w-full h-full bg-transparent text-center font-mono font-bold text-white tabular-nums focus:outline-none disabled:cursor-not-allowed appearance-none", fontSizeClass)}

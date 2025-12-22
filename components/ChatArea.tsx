@@ -101,8 +101,46 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   const [showSkillSelect, setShowSkillSelect] = useState(false);
   const [activeMessageId, setActiveMessageId] = useState<string | null>(null);
   const [diceMenuStyles, setDiceMenuStyles] = useState<React.CSSProperties>({});
+  const [menuPosition, setMenuPosition] = useState<React.CSSProperties>({});
   const diceButtonRef = useRef<HTMLButtonElement>(null);
+  const attrButtonRef = useRef<HTMLButtonElement>(null);
+  const skillButtonRef = useRef<HTMLButtonElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const longPressTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  const calculateMenuStyles = (
+    ref: React.RefObject<HTMLElement>,
+    width: number
+  ) => {
+    if (!ref.current) return {};
+    const rect = ref.current.getBoundingClientRect();
+    const screenW = window.innerWidth;
+
+    let left = rect.left;
+    // Prevent right overflow
+    if (left + width > screenW - 10) {
+      left = screenW - width - 10;
+    }
+    // Prevent left overflow
+    if (left < 10) left = 10;
+
+    return {
+      position: "fixed" as const,
+      bottom: window.innerHeight - rect.top + 8, // 8px gap above button
+      left: left,
+      zIndex: 9999,
+    };
+  };
+
+  useEffect(() => {
+    if (textareaRef.current) {
+      textareaRef.current.style.height = "auto";
+      textareaRef.current.style.height = `${Math.min(
+        textareaRef.current.scrollHeight,
+        200
+      )}px`;
+    }
+  }, [inputText]);
 
   const handleTouchStart = (id: string) => {
     longPressTimerRef.current = setTimeout(() => {
@@ -240,7 +278,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   return (
     <>
       {/* Logs View */}
-      <div className="flex-1 overflow-y-auto px-3 md:px-8 py-4 md:py-6 space-y-6 custom-scrollbar">
+      <div className="flex-1 overflow-y-auto px-3 md:px-8 py-4 pt-4 pb-36 md:pb-48 space-y-6 custom-scrollbar">
         {logs.length === 0 && (
           <div className="flex flex-col items-center justify-center h-[60vh] text-slate-600 animate-slide-up">
             <div className="w-24 h-24 bg-gradient-to-tr from-slate-800 to-slate-900 rounded-full flex items-center justify-center mb-6 ring-1 ring-slate-700/50 shadow-2xl">
@@ -625,423 +663,439 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
       </div>
 
       {/* Input Area */}
-      <div className="p-2 md:p-6 pt-0 md:pt-2 bg-slate-950/50 md:bg-transparent backdrop-blur-md md:backdrop-blur-none pb-safe">
-        <div className="max-w-4xl mx-auto glass-panel rounded-2xl p-2 md:p-3 relative z-20 transition-all focus-within:ring-2 focus-within:ring-indigo-500/30 focus-within:border-indigo-500/50 shadow-2xl">
-          <div className="absolute -top-3 left-4 bg-slate-900 text-slate-300 text-[10px] px-3 py-1 rounded-full border border-slate-700 shadow-lg flex items-center gap-2 font-medium tracking-wide z-10">
-            <span
-              className={cn(
-                "w-2 h-2 rounded-full animate-pulse",
-                activeCharId === "pc" ? "bg-indigo-500" : "bg-emerald-500"
-              )}
-            ></span>
-            正在扮演:{" "}
-            <span className="text-white font-bold max-w-[100px] truncate">
-              {activeChar.name}
-            </span>
-          </div>
-          {pendingImage && (
-            <div className="mx-4 mt-2 flex items-center gap-2 bg-slate-800/80 border border-slate-700 p-2 rounded-lg w-fit animate-fade-in relative z-20">
-              <div className="w-8 h-8 rounded bg-slate-900 flex items-center justify-center shrink-0 border border-slate-700">
-                <ImageIcon size={14} className="text-indigo-400" />
-              </div>
-              <span className="text-xs text-slate-300 truncate max-w-[150px] font-mono">
-                {pendingImage.name}
+      <div className="absolute bottom-0 left-0 w-full z-50 p-2 md:p-6 pt-0 md:pt-2 bg-slate-950/50 md:bg-transparent backdrop-blur-md md:backdrop-blur-none pb-safe">
+        <div className="max-w-4xl mx-auto rounded-2xl relative z-20 transition-all focus-within:ring-2 focus-within:ring-indigo-500/30 focus-within:border-indigo-500/50 shadow-2xl">
+          <div className="absolute inset-0 glass-panel rounded-2xl z-0 pointer-events-none"></div>
+          <div className="relative z-10 p-2 md:p-3">
+            <div className="absolute -top-3 left-4 bg-slate-900 text-slate-300 text-[10px] px-3 py-1 rounded-full border border-slate-700 shadow-lg flex items-center gap-2 font-medium tracking-wide z-10">
+              <span
+                className={cn(
+                  "w-2 h-2 rounded-full animate-pulse",
+                  activeCharId === "pc" ? "bg-indigo-500" : "bg-emerald-500"
+                )}
+              ></span>
+              正在扮演:{" "}
+              <span className="text-white font-bold max-w-[100px] truncate">
+                {activeChar.name}
               </span>
-              <button
-                onClick={() => setPendingImage(null)}
-                className="ml-1 p-1 text-slate-500 hover:text-rose-400 transition-colors rounded hover:bg-white/5"
-              >
-                <X size={14} />
-              </button>
             </div>
-          )}
-          {quoteMessage && (
-            <div className="mx-4 mt-2 flex items-center gap-2 bg-slate-800/80 border-l-4 border-indigo-500 p-2 rounded-r-lg w-fit animate-fade-in relative z-20 max-w-[80%]">
-              <div className="flex flex-col overflow-hidden">
-                <span className="text-xs font-bold text-indigo-400">
-                  回复 {quoteMessage.charName}:
+            {pendingImage && (
+              <div className="mx-4 mt-2 flex items-center gap-2 bg-slate-800/80 border border-slate-700 p-2 rounded-lg w-fit animate-fade-in relative z-20">
+                <div className="w-8 h-8 rounded bg-slate-900 flex items-center justify-center shrink-0 border border-slate-700">
+                  <ImageIcon size={14} className="text-indigo-400" />
+                </div>
+                <span className="text-xs text-slate-300 truncate max-w-[150px] font-mono">
+                  {pendingImage.name}
                 </span>
-                <span className="text-xs text-slate-300 truncate font-mono opacity-80">
-                  {quoteMessage.content}
-                </span>
+                <button
+                  onClick={() => setPendingImage(null)}
+                  className="ml-1 p-1 text-slate-500 hover:text-rose-400 transition-colors rounded hover:bg-white/5"
+                >
+                  <X size={14} />
+                </button>
               </div>
-              <button
-                onClick={() => setQuoteMessage(null)}
-                className="ml-2 p-1 text-slate-500 hover:text-rose-400 transition-colors rounded hover:bg-white/5 shrink-0"
-              >
-                <X size={14} />
-              </button>
-            </div>
-          )}
-          <textarea
-            value={inputText}
-            onChange={(e) => setInputText(e.target.value)}
-            onKeyDown={handleKeyDown}
-            onPaste={handlePaste}
-            onDrop={handleDrop}
-            placeholder={`以 ${activeChar.name} 的身份发言...`}
-            className="w-full bg-transparent border-none text-slate-200 placeholder-slate-600 focus:outline-none focus:ring-0 resize-none px-4 py-3 min-h-[3rem] max-h-24 md:max-h-32 custom-scrollbar text-sm md:text-base"
-          />
-          <div className="flex flex-col md:flex-row justify-between items-center gap-3 md:gap-0 px-1 md:px-2 pt-2 border-t border-white/5 mt-1">
-            <div className="flex items-center gap-2 md:gap-3 w-full md:w-auto overflow-x-auto md:overflow-visible custom-scrollbar justify-start md:justify-start pb-1 md:pb-0">
-              <div className="flex items-center gap-2 shrink-0">
-                {canRollCheck && (
-                  <>
-                    <div className="relative shrink-0">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setShowAttrSelect(!showAttrSelect);
-                          setShowSkillSelect(false);
-                          setShowDiceSelect(false);
-                        }}
-                        className="flex items-center justify-center px-3 bg-[#020617] border border-slate-700 rounded-xl h-10 shadow-sm hover:border-slate-500 transition-all active:bg-slate-900 group min-w-[3.5rem]"
-                        title="属性判定"
-                      >
-                        <span className="text-sm font-bold text-slate-300 font-mono group-hover:text-white">
-                          属性
-                        </span>
-                      </button>
-                      {showAttrSelect && (
-                        <>
-                          <div
-                            className="fixed inset-0 z-40"
-                            onClick={() => setShowAttrSelect(false)}
-                          ></div>
-                          <div className="fixed bottom-24 left-4 bg-slate-900 border border-slate-700 p-2 rounded-xl grid grid-cols-3 gap-1 shadow-xl z-50 animate-scale-in w-64 max-w-[90vw]">
-                            {ATTRIBUTES.map((attr) => {
-                              const val = (myChar as any)[attr.key] || 0;
-                              return (
-                                <button
-                                  key={attr.key}
-                                  onClick={() => {
-                                    onRollDice(1, 100, isSecret, {
-                                      name: attr.label,
-                                      target: val,
-                                    });
-                                    setShowAttrSelect(false);
-                                  }}
-                                  className="flex flex-col items-center p-2 hover:bg-indigo-600 rounded-lg transition-colors group/item"
-                                >
-                                  <span className="text-xs font-bold text-slate-300 group-hover/item:text-white">
-                                    {attr.label}
-                                  </span>
-                                  <span className="text-[10px] text-slate-500 group-hover/item:text-slate-200">
-                                    {val}
-                                  </span>
-                                </button>
+            )}
+            {quoteMessage && (
+              <div className="mx-4 mt-2 flex items-center gap-2 bg-slate-800/80 border-l-4 border-indigo-500 p-2 rounded-r-lg w-fit animate-fade-in relative z-20 max-w-[80%]">
+                <div className="flex flex-col overflow-hidden">
+                  <span className="text-xs font-bold text-indigo-400">
+                    回复 {quoteMessage.charName}:
+                  </span>
+                  <span className="text-xs text-slate-300 truncate font-mono opacity-80">
+                    {quoteMessage.content}
+                  </span>
+                </div>
+                <button
+                  onClick={() => setQuoteMessage(null)}
+                  className="ml-2 p-1 text-slate-500 hover:text-rose-400 transition-colors rounded hover:bg-white/5 shrink-0"
+                >
+                  <X size={14} />
+                </button>
+              </div>
+            )}
+            <textarea
+              ref={textareaRef}
+              value={inputText}
+              onChange={(e) => setInputText(e.target.value)}
+              onKeyDown={handleKeyDown}
+              onPaste={handlePaste}
+              onDrop={handleDrop}
+              placeholder={`以 ${activeChar.name} 的身份发言...`}
+              rows={1}
+              className="w-full bg-transparent border-none text-slate-200 placeholder-slate-600 focus:outline-none focus:ring-0 resize-none px-4 py-3 min-h-[3rem] max-h-[200px] custom-scrollbar text-sm md:text-base"
+            />
+            <div className="flex flex-col md:flex-row justify-between items-center gap-3 md:gap-0 px-1 md:px-2 pt-2 border-t border-white/5 mt-1">
+              <div className="flex items-center gap-2 md:gap-3 w-full md:w-auto overflow-x-auto md:overflow-visible custom-scrollbar justify-start md:justify-start pb-1 md:pb-0">
+                <div className="flex items-center gap-2 shrink-0">
+                  {canRollCheck && (
+                    <>
+                      <div className="relative shrink-0">
+                        <button
+                          ref={attrButtonRef}
+                          type="button"
+                          onClick={() => {
+                            if (!showAttrSelect) {
+                              setMenuPosition(
+                                calculateMenuStyles(attrButtonRef, 256)
                               );
-                            })}
-                          </div>
-                        </>
-                      )}
-                    </div>
-
-                    <div className="relative shrink-0">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setShowSkillSelect(!showSkillSelect);
-                          setShowAttrSelect(false);
-                          setShowDiceSelect(false);
-                        }}
-                        className="flex items-center justify-center px-3 bg-[#020617] border border-slate-700 rounded-xl h-10 shadow-sm hover:border-slate-500 transition-all active:bg-slate-900 group min-w-[3.5rem]"
-                        title="技能判定"
-                      >
-                        <span className="text-sm font-bold text-slate-300 font-mono group-hover:text-white">
-                          技能
-                        </span>
-                      </button>
-                      {showSkillSelect && (
-                        <>
-                          <div
-                            className="fixed inset-0 z-40"
-                            onClick={() => setShowSkillSelect(false)}
-                          ></div>
-                          <div className="fixed bottom-24 left-4 bg-slate-900 border border-slate-700 p-2 rounded-xl grid grid-cols-2 gap-1 shadow-xl z-50 animate-scale-in w-64 max-w-[90vw] max-h-64 overflow-y-auto custom-scrollbar">
-                            {Object.keys(myChar?.skills || {}).length === 0 ? (
-                              <div className="col-span-2 text-center text-xs text-slate-500 py-2">
-                                暂无技能
-                              </div>
-                            ) : (
-                              Object.entries(myChar?.skills || {}).map(
-                                ([name, val]) => (
+                              setShowAttrSelect(true);
+                              setShowSkillSelect(false);
+                              setShowDiceSelect(false);
+                            } else {
+                              setShowAttrSelect(false);
+                            }
+                          }}
+                          className="flex items-center justify-center px-3 bg-[#020617] border border-slate-700 rounded-xl h-10 shadow-sm hover:border-slate-500 transition-all active:bg-slate-900 group min-w-[3.5rem]"
+                          title="属性判定"
+                        >
+                          <span className="text-sm font-bold text-slate-300 font-mono group-hover:text-white">
+                            属性
+                          </span>
+                        </button>
+                        {showAttrSelect && (
+                          <>
+                            <div
+                              className="fixed inset-0 z-[9990]"
+                              onClick={() => setShowAttrSelect(false)}
+                            ></div>
+                            <div
+                              className="fixed bg-slate-900 border border-slate-700 p-2 rounded-xl grid grid-cols-3 gap-1 shadow-xl z-[9999] animate-scale-in w-64 max-w-[90vw]"
+                              style={menuPosition}
+                            >
+                              {ATTRIBUTES.map((attr) => {
+                                const val = (myChar as any)[attr.key] || 0;
+                                return (
                                   <button
-                                    key={name}
+                                    key={attr.key}
                                     onClick={() => {
                                       onRollDice(1, 100, isSecret, {
-                                        name: name,
+                                        name: attr.label,
                                         target: val,
                                       });
-                                      setShowSkillSelect(false);
+                                      setShowAttrSelect(false);
                                     }}
-                                    className="flex justify-between items-center px-3 py-2 hover:bg-indigo-600 rounded-lg transition-colors text-left group/item"
+                                    className="flex flex-col items-center p-2 hover:bg-indigo-600 rounded-lg transition-colors group/item"
                                   >
-                                    <span className="text-xs font-bold text-slate-300 group-hover/item:text-white truncate max-w-[80px]">
-                                      {name}
+                                    <span className="text-xs font-bold text-slate-300 group-hover/item:text-white">
+                                      {attr.label}
                                     </span>
                                     <span className="text-[10px] text-slate-500 group-hover/item:text-slate-200">
                                       {val}
                                     </span>
                                   </button>
-                                )
-                              )
-                            )}
-                          </div>
-                        </>
-                      )}
-                    </div>
-                  </>
-                )}
+                                );
+                              })}
+                            </div>
+                          </>
+                        )}
+                      </div>
 
-                <NumberStepper
-                  value={diceCount}
-                  onChange={setDiceCount}
-                  min={1}
-                  max={100}
-                  className="w-24 md:w-28"
-                />
-
-                <div className="relative shrink-0">
-                  <button
-                    ref={diceButtonRef}
-                    type="button"
-                    onClick={() => {
-                      if (!showDiceSelect && diceButtonRef.current && typeof window !== 'undefined' && window.innerWidth < 768) {
-                        const rect = diceButtonRef.current.getBoundingClientRect();
-                        const screenW = window.innerWidth;
-                        const menuW = 192; // w-48 is 12rem = 192px
-                        
-                        let left = rect.left;
-                        if (left + menuW > screenW - 8) {
-                          left = screenW - menuW - 8;
-                        }
-                        if (left < 8) left = 8;
-                        
-                        setDiceMenuStyles({
-                          bottom: window.innerHeight - rect.top + 8,
-                          left: left,
-                          right: 'auto',
-                        });
-                      } else if (showDiceSelect) {
-                        setDiceMenuStyles({});
-                      }
-                      setShowDiceSelect(!showDiceSelect);
-                      setShowAttrSelect(false);
-                      setShowSkillSelect(false);
-                    }}
-                    className="flex items-center justify-center px-3 bg-[#020617] border border-slate-700 rounded-xl h-10 min-w-[3.5rem] md:min-w-[4.5rem] shadow-sm hover:border-slate-500 transition-all active:bg-slate-900 group"
-                  >
-                    <span className="text-base font-bold text-white font-mono">
-                      D{diceType}
-                    </span>
-                  </button>
-                  {showDiceSelect && (
-                    <>
-                      <div
-                        className="fixed inset-0 z-40"
-                        onClick={() => setShowDiceSelect(false)}
-                      ></div>
-                      <div 
-                        className="fixed z-50 md:absolute md:bottom-full md:right-0 md:mb-2 md:left-auto md:top-auto md:transform-none bg-slate-900 border border-slate-700 p-2 rounded-xl grid grid-cols-3 gap-1 shadow-xl animate-scale-in w-48"
-                        style={diceMenuStyles}
-                      >
-                        {[2, 3, 4, 6, 8, 10, 12, 20, 100].map((d) => (
-                          <button
-                            key={d}
-                            onClick={() => {
-                              setDiceType(d);
+                      <div className="relative shrink-0">
+                        <button
+                          ref={skillButtonRef}
+                          type="button"
+                          onClick={() => {
+                            if (!showSkillSelect) {
+                              setMenuPosition(
+                                calculateMenuStyles(skillButtonRef, 256)
+                              );
+                              setShowSkillSelect(true);
+                              setShowAttrSelect(false);
                               setShowDiceSelect(false);
-                            }}
-                            className="p-2 hover:bg-indigo-600 rounded-lg text-xs font-bold text-slate-300 hover:text-white transition-colors"
-                          >
-                            D{d}
-                          </button>
-                        ))}
+                            } else {
+                              setShowSkillSelect(false);
+                            }
+                          }}
+                          className="flex items-center justify-center px-3 bg-[#020617] border border-slate-700 rounded-xl h-10 shadow-sm hover:border-slate-500 transition-all active:bg-slate-900 group min-w-[3.5rem]"
+                          title="技能判定"
+                        >
+                          <span className="text-sm font-bold text-slate-300 font-mono group-hover:text-white">
+                            技能
+                          </span>
+                        </button>
+                        {showSkillSelect && (
+                          <>
+                            <div
+                              className="fixed inset-0 z-[9990]"
+                              onClick={() => setShowSkillSelect(false)}
+                            ></div>
+                            <div
+                              className="fixed bg-slate-900 border border-slate-700 p-2 rounded-xl grid grid-cols-2 gap-1 shadow-xl z-[9999] animate-scale-in w-64 max-w-[90vw] max-h-64 overflow-y-auto custom-scrollbar"
+                              style={menuPosition}
+                            >
+                              {Object.keys(myChar?.skills || {}).length ===
+                              0 ? (
+                                <div className="col-span-2 text-center text-xs text-slate-500 py-2">
+                                  暂无技能
+                                </div>
+                              ) : (
+                                Object.entries(myChar?.skills || {}).map(
+                                  ([name, val]) => (
+                                    <button
+                                      key={name}
+                                      onClick={() => {
+                                        onRollDice(1, 100, isSecret, {
+                                          name: name,
+                                          target: val,
+                                        });
+                                        setShowSkillSelect(false);
+                                      }}
+                                      className="flex justify-between items-center px-3 py-2 hover:bg-indigo-600 rounded-lg transition-colors text-left group/item"
+                                    >
+                                      <span className="text-xs font-bold text-slate-300 group-hover/item:text-white truncate max-w-[80px]">
+                                        {name}
+                                      </span>
+                                      <span className="text-[10px] text-slate-500 group-hover/item:text-slate-200">
+                                        {val}
+                                      </span>
+                                    </button>
+                                  )
+                                )
+                              )}
+                            </div>
+                          </>
+                        )}
                       </div>
                     </>
                   )}
-                </div>
 
+                  <NumberStepper
+                    value={diceCount}
+                    onChange={setDiceCount}
+                    min={1}
+                    max={100}
+                    className="w-24 md:w-28"
+                  />
+
+                  <div className="relative shrink-0">
+                    <button
+                      ref={diceButtonRef}
+                      type="button"
+                      onClick={() => {
+                        if (!showDiceSelect) {
+                          setMenuPosition(
+                            calculateMenuStyles(diceButtonRef, 192)
+                          );
+                          setShowDiceSelect(true);
+                          setShowAttrSelect(false);
+                          setShowSkillSelect(false);
+                        } else {
+                          setShowDiceSelect(false);
+                        }
+                      }}
+                      className="flex items-center justify-center px-3 bg-[#020617] border border-slate-700 rounded-xl h-10 min-w-[3.5rem] md:min-w-[4.5rem] shadow-sm hover:border-slate-500 transition-all active:bg-slate-900 group"
+                    >
+                      <span className="text-base font-bold text-white font-mono">
+                        D{diceType}
+                      </span>
+                    </button>
+                    {showDiceSelect && (
+                      <>
+                        <div
+                          className="fixed inset-0 z-[9990]"
+                          onClick={() => setShowDiceSelect(false)}
+                        ></div>
+                        <div
+                          className="fixed bg-slate-900 border border-slate-700 p-2 rounded-xl grid grid-cols-3 gap-1 shadow-xl z-[9999] animate-scale-in w-48"
+                          style={menuPosition}
+                        >
+                          {[2, 3, 4, 6, 8, 10, 12, 20, 100].map((d) => (
+                            <button
+                              key={d}
+                              onClick={() => {
+                                setDiceType(d);
+                                setShowDiceSelect(false);
+                              }}
+                              className="p-2 hover:bg-indigo-600 rounded-lg text-xs font-bold text-slate-300 hover:text-white transition-colors"
+                            >
+                              D{d}
+                            </button>
+                          ))}
+                        </div>
+                      </>
+                    )}
+                  </div>
+
+                  {isKP && (
+                    <button
+                      onClick={() => setIsSecret(!isSecret)}
+                      className={cn(
+                        "p-2 md:p-1.5 rounded-xl transition-colors h-10 w-10 flex items-center justify-center border shrink-0",
+                        isSecret
+                          ? "bg-purple-500/20 text-purple-400 border-purple-500/50"
+                          : "bg-transparent text-slate-400 border-transparent hover:bg-slate-800 hover:text-indigo-400"
+                      )}
+                      title={isSecret ? "暗骰模式已开启" : "开启暗骰模式"}
+                    >
+                      {isSecret ? <EyeOff size={20} /> : <Eye size={20} />}
+                    </button>
+                  )}
+
+                  <button
+                    onClick={() => onRollDice(diceCount, diceType, isSecret)}
+                    className="p-2 md:p-1.5 hover:bg-slate-800 rounded-xl text-slate-400 hover:text-indigo-400 transition-colors h-10 w-10 flex items-center justify-center border border-transparent hover:border-slate-700 shrink-0"
+                    title="投掷"
+                  >
+                    <Dice5 size={20} />
+                  </button>
+                </div>
                 {isKP && (
                   <button
-                    onClick={() => setIsSecret(!isSecret)}
-                    className={cn(
-                      "p-2 md:p-1.5 rounded-xl transition-colors h-10 w-10 flex items-center justify-center border shrink-0",
-                      isSecret
-                        ? "bg-purple-500/20 text-purple-400 border-purple-500/50"
-                        : "bg-transparent text-slate-400 border-transparent hover:bg-slate-800 hover:text-indigo-400"
-                    )}
-                    title={isSecret ? "暗骰模式已开启" : "开启暗骰模式"}
+                    onClick={onShowStory}
+                    className="p-2 text-slate-500 hover:text-slate-300 transition-colors hover:bg-white/5 rounded-lg shrink-0"
+                    title="战报预览"
                   >
-                    {isSecret ? <EyeOff size={20} /> : <Eye size={20} />}
+                    <FileText size={18} />
                   </button>
                 )}
-
-                <button
-                  onClick={() => onRollDice(diceCount, diceType, isSecret)}
-                  className="p-2 md:p-1.5 hover:bg-slate-800 rounded-xl text-slate-400 hover:text-indigo-400 transition-colors h-10 w-10 flex items-center justify-center border border-transparent hover:border-slate-700 shrink-0"
-                  title="投掷"
-                >
-                  <Dice5 size={20} />
-                </button>
-              </div>
-              {isKP && (
-                <button
-                  onClick={onShowStory}
-                  className="p-2 text-slate-500 hover:text-slate-300 transition-colors hover:bg-white/5 rounded-lg shrink-0"
-                  title="战报预览"
-                >
-                  <FileText size={18} />
-                </button>
-              )}
-              {isKP && (
-                <button
-                  onClick={() => setShowAIModal(true)}
-                  className="p-2 text-purple-400 hover:text-purple-300 transition-colors hover:bg-purple-500/10 rounded-lg shrink-0"
-                  title="AI 辅助"
-                >
-                  <Sparkles size={18} />
-                </button>
-              )}
-            </div>
-            <div className="flex items-center gap-2 relative w-full md:w-auto justify-end shrink-0">
-              {/* Recipient Popup */}
-              {showRecipientSelect && (
-                <div className="absolute bottom-full right-0 mb-3 w-52 bg-slate-950/95 backdrop-blur-md border border-slate-800/80 rounded-2xl shadow-2xl z-50 overflow-hidden animate-scale-in flex flex-col p-1 ring-1 ring-white/5">
-                  <div className="px-3 py-2 text-[10px] font-bold text-slate-500 uppercase tracking-wider">
-                    发送给
-                  </div>
+                {isKP && (
                   <button
-                    onClick={() => {
-                      setRecipientId(null);
-                      setShowRecipientSelect(false);
-                    }}
-                    className={cn(
-                      "px-3 py-2.5 text-left text-xs rounded-xl transition-all flex items-center gap-3 group",
-                      !recipientId
-                        ? "bg-indigo-500/10 text-indigo-400"
-                        : "text-slate-400 hover:bg-slate-800/50 hover:text-slate-200"
-                    )}
+                    onClick={() => setShowAIModal(true)}
+                    className="p-2 text-purple-400 hover:text-purple-300 transition-colors hover:bg-purple-500/10 rounded-lg shrink-0"
+                    title="AI 辅助"
                   >
-                    <div
+                    <Sparkles size={18} />
+                  </button>
+                )}
+              </div>
+              <div className="flex items-center gap-2 relative w-full md:w-auto justify-end shrink-0">
+                {/* Recipient Popup */}
+                {showRecipientSelect && (
+                  <div className="absolute bottom-full right-0 mb-3 w-52 bg-slate-950/95 backdrop-blur-md border border-slate-800/80 rounded-2xl shadow-2xl z-50 overflow-hidden animate-scale-in flex flex-col p-1 ring-1 ring-white/5">
+                    <div className="px-3 py-2 text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                      发送给
+                    </div>
+                    <button
+                      onClick={() => {
+                        setRecipientId(null);
+                        setShowRecipientSelect(false);
+                      }}
                       className={cn(
-                        "w-8 h-8 rounded-full flex items-center justify-center transition-colors",
+                        "px-3 py-2.5 text-left text-xs rounded-xl transition-all flex items-center gap-3 group",
                         !recipientId
-                          ? "bg-indigo-500/20 text-indigo-400"
-                          : "bg-slate-800 text-slate-500 group-hover:bg-slate-700"
+                          ? "bg-indigo-500/10 text-indigo-400"
+                          : "text-slate-400 hover:bg-slate-800/50 hover:text-slate-200"
                       )}
                     >
-                      <Unlock size={14} />
-                    </div>
-                    <span className="font-medium">所有人</span>
-                    {!recipientId && (
-                      <div className="ml-auto w-1.5 h-1.5 rounded-full bg-indigo-500"></div>
-                    )}
-                  </button>
-
-                  <div className="h-px bg-slate-800/50 my-1 mx-2" />
-
-                  <div className="max-h-48 overflow-y-auto custom-scrollbar space-y-0.5">
-                    {isKP &&
-                      characters
-                        .filter((c) => c.type === "investigator")
-                        .map((c) => (
-                          <button
-                            key={c.id}
-                            onClick={() => {
-                              setRecipientId(c.user_id || null);
-                              setShowRecipientSelect(false);
-                            }}
-                            className={cn(
-                              "w-full px-3 py-2 text-left text-xs rounded-xl transition-all flex items-center gap-3 group",
-                              recipientId === c.user_id
-                                ? "bg-indigo-500/10 text-indigo-400"
-                                : "text-slate-400 hover:bg-slate-800/50 hover:text-slate-200"
-                            )}
-                          >
-                            <div
-                              className={cn(
-                                "w-8 h-8 rounded-full flex items-center justify-center transition-colors",
-                                recipientId === c.user_id
-                                  ? "bg-indigo-500/20 text-indigo-400"
-                                  : "bg-slate-800 text-slate-500 group-hover:bg-slate-700"
-                              )}
-                            >
-                              <User size={14} />
-                            </div>
-                            <span className="font-medium truncate flex-1">
-                              {c.name}
-                            </span>
-                            {recipientId === c.user_id && (
-                              <div className="ml-auto w-1.5 h-1.5 rounded-full bg-indigo-500"></div>
-                            )}
-                          </button>
-                        ))}
-
-                    {!isKP && kpId && (
-                      <button
-                        onClick={() => {
-                          setRecipientId(kpId);
-                          setShowRecipientSelect(false);
-                        }}
+                      <div
                         className={cn(
-                          "w-full px-3 py-2 text-left text-xs rounded-xl transition-all flex items-center gap-3 group",
-                          recipientId === kpId
-                            ? "bg-indigo-500/10 text-indigo-400"
-                            : "text-slate-400 hover:bg-slate-800/50 hover:text-slate-200"
+                          "w-8 h-8 rounded-full flex items-center justify-center transition-colors",
+                          !recipientId
+                            ? "bg-indigo-500/20 text-indigo-400"
+                            : "bg-slate-800 text-slate-500 group-hover:bg-slate-700"
                         )}
                       >
-                        <div
+                        <Unlock size={14} />
+                      </div>
+                      <span className="font-medium">所有人</span>
+                      {!recipientId && (
+                        <div className="ml-auto w-1.5 h-1.5 rounded-full bg-indigo-500"></div>
+                      )}
+                    </button>
+
+                    <div className="h-px bg-slate-800/50 my-1 mx-2" />
+
+                    <div className="max-h-48 overflow-y-auto custom-scrollbar space-y-0.5">
+                      {isKP &&
+                        characters
+                          .filter((c) => c.type === "investigator")
+                          .map((c) => (
+                            <button
+                              key={c.id}
+                              onClick={() => {
+                                setRecipientId(c.user_id || null);
+                                setShowRecipientSelect(false);
+                              }}
+                              className={cn(
+                                "w-full px-3 py-2 text-left text-xs rounded-xl transition-all flex items-center gap-3 group",
+                                recipientId === c.user_id
+                                  ? "bg-indigo-500/10 text-indigo-400"
+                                  : "text-slate-400 hover:bg-slate-800/50 hover:text-slate-200"
+                              )}
+                            >
+                              <div
+                                className={cn(
+                                  "w-8 h-8 rounded-full flex items-center justify-center transition-colors",
+                                  recipientId === c.user_id
+                                    ? "bg-indigo-500/20 text-indigo-400"
+                                    : "bg-slate-800 text-slate-500 group-hover:bg-slate-700"
+                                )}
+                              >
+                                <User size={14} />
+                              </div>
+                              <span className="font-medium truncate flex-1">
+                                {c.name}
+                              </span>
+                              {recipientId === c.user_id && (
+                                <div className="ml-auto w-1.5 h-1.5 rounded-full bg-indigo-500"></div>
+                              )}
+                            </button>
+                          ))}
+
+                      {!isKP && kpId && (
+                        <button
+                          onClick={() => {
+                            setRecipientId(kpId);
+                            setShowRecipientSelect(false);
+                          }}
                           className={cn(
-                            "w-8 h-8 rounded-full flex items-center justify-center transition-colors",
+                            "w-full px-3 py-2 text-left text-xs rounded-xl transition-all flex items-center gap-3 group",
                             recipientId === kpId
-                              ? "bg-indigo-500/20 text-indigo-400"
-                              : "bg-slate-800 text-slate-500 group-hover:bg-slate-700"
+                              ? "bg-indigo-500/10 text-indigo-400"
+                              : "text-slate-400 hover:bg-slate-800/50 hover:text-slate-200"
                           )}
                         >
-                          <Crown size={14} />
-                        </div>
-                        <span className="font-medium truncate flex-1">
-                          守秘人 (KP)
-                        </span>
-                        {recipientId === kpId && (
-                          <div className="ml-auto w-1.5 h-1.5 rounded-full bg-indigo-500"></div>
-                        )}
-                      </button>
-                    )}
+                          <div
+                            className={cn(
+                              "w-8 h-8 rounded-full flex items-center justify-center transition-colors",
+                              recipientId === kpId
+                                ? "bg-indigo-500/20 text-indigo-400"
+                                : "bg-slate-800 text-slate-500 group-hover:bg-slate-700"
+                            )}
+                          >
+                            <Crown size={14} />
+                          </div>
+                          <span className="font-medium truncate flex-1">
+                            守秘人 (KP)
+                          </span>
+                          {recipientId === kpId && (
+                            <div className="ml-auto w-1.5 h-1.5 rounded-full bg-indigo-500"></div>
+                          )}
+                        </button>
+                      )}
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
 
-              <button
-                onClick={() => setShowRecipientSelect(!showRecipientSelect)}
-                className={cn(
-                  "h-9 px-4 rounded-xl border flex items-center gap-2 transition-all font-medium text-xs",
-                  recipientId
-                    ? "bg-indigo-500/10 border-indigo-500/30 text-indigo-300 hover:bg-indigo-500/20"
-                    : "bg-slate-900 border-slate-700 text-slate-400 hover:border-slate-500 hover:text-slate-300"
-                )}
-                title="选择发送对象"
-              >
-                {recipientId ? (
-                  <Lock size={14} className="opacity-70" />
-                ) : (
-                  <Unlock size={14} className="opacity-70" />
-                )}
-                <span className="max-w-[100px] truncate">
-                  {getRecipientLabel()}
-                </span>
-              </button>
-              <Button
-                onClick={handleSend}
-                disabled={!inputText.trim() && !pendingImage}
-                size="sm"
-                icon={Send}
-                className="rounded-lg shadow-indigo-500/20 px-4"
-              >
-                发送
-              </Button>
+                <button
+                  onClick={() => setShowRecipientSelect(!showRecipientSelect)}
+                  className={cn(
+                    "h-9 px-4 rounded-xl border flex items-center gap-2 transition-all font-medium text-xs",
+                    recipientId
+                      ? "bg-indigo-500/10 border-indigo-500/30 text-indigo-300 hover:bg-indigo-500/20"
+                      : "bg-slate-900 border-slate-700 text-slate-400 hover:border-slate-500 hover:text-slate-300"
+                  )}
+                  title="选择发送对象"
+                >
+                  {recipientId ? (
+                    <Lock size={14} className="opacity-70" />
+                  ) : (
+                    <Unlock size={14} className="opacity-70" />
+                  )}
+                  <span className="max-w-[100px] truncate">
+                    {getRecipientLabel()}
+                  </span>
+                </button>
+                <Button
+                  onClick={handleSend}
+                  disabled={!inputText.trim() && !pendingImage}
+                  size="sm"
+                  icon={Send}
+                  className="rounded-lg shadow-indigo-500/20 px-4"
+                >
+                  发送
+                </Button>
+              </div>
             </div>
           </div>
         </div>
