@@ -109,6 +109,10 @@ CREATE POLICY "Users can create characters" ON public.characters FOR INSERT TO a
 CREATE POLICY "Owner or KP can update characters" ON public.characters FOR UPDATE USING ( 
     auth.uid() = user_id OR 
     auth.uid() IN (SELECT kp_id FROM public.rooms WHERE id = room_id) 
+) WITH CHECK (
+    auth.uid() = user_id OR 
+    auth.uid() IN (SELECT kp_id FROM public.rooms WHERE id = room_id) OR
+    room_id IS NULL
 ); 
 CREATE POLICY "Owner or KP can delete characters" ON public.characters FOR DELETE USING ( 
     auth.uid() = user_id OR 

@@ -10,6 +10,7 @@ import {
   Copy,
   FileText,
   X,
+  LogOut,
 } from "lucide-react";
 import { Modal, Input, Textarea, Button, NumberStepper, cn } from "./UI";
 import { AvatarUpload } from "./AvatarUpload";
@@ -164,12 +165,22 @@ export const CharacterModal: React.FC<{
   initialData: Character;
   onSave: (c: Character) => void;
   onDelete?: (id: string) => void;
+  onRemove?: (id: string) => void;
   onClose: () => void;
   isEditing: boolean;
   readOnly?: boolean;
-}> = ({ initialData, onSave, onDelete, onClose, isEditing, readOnly }) => {
+}> = ({
+  initialData,
+  onSave,
+  onDelete,
+  onRemove,
+  onClose,
+  isEditing,
+  readOnly,
+}) => {
   const [form, setForm] = useState(initialData);
   const [deleteConfirm, setDeleteConfirm] = useState(false);
+  const [removeConfirm, setRemoveConfirm] = useState(false);
   const [showImport, setShowImport] = useState(false);
   const [importText, setImportText] = useState("");
   const [isAddingSkill, setIsAddingSkill] = useState(false);
@@ -548,51 +559,93 @@ export const CharacterModal: React.FC<{
         </div>
       </div>
       <div className="px-6 md:px-8 py-4 md:py-6 border-t border-white/10 bg-white/5 flex flex-col md:flex-row justify-between items-center gap-4 shrink-0">
-        {!readOnly && isEditing && onDelete ? (
+        {!readOnly && isEditing && (
           <div className="flex items-center gap-2 w-full md:w-auto justify-center md:justify-start">
-            {deleteConfirm ? (
-              <>
-                <span className="text-xs text-red-400 font-bold animate-pulse hidden md:inline">
-                  再次点击确认删除
-                </span>
+            {(form.type === "investigator" || form.role === "调查员") &&
+            onRemove ? (
+              removeConfirm ? (
+                <>
+                  <span className="text-xs text-red-400 font-bold animate-pulse hidden md:inline">
+                    再次点击确认移出
+                  </span>
+                  <Button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onRemove(form.id);
+                    }}
+                    variant="dangerActive"
+                    icon={LogOut}
+                    className="w-full md:w-auto"
+                  >
+                    确认移出
+                  </Button>
+                  <Button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setRemoveConfirm(false);
+                    }}
+                    variant="ghost"
+                    size="sm"
+                  >
+                    取消
+                  </Button>
+                </>
+              ) : (
                 <Button
                   onClick={(e) => {
                     e.stopPropagation();
-                    onDelete(form.id);
+                    setRemoveConfirm(true);
                   }}
-                  variant="dangerActive"
-                  icon={AlertTriangle}
+                  variant="danger"
+                  icon={LogOut}
                   className="w-full md:w-auto"
                 >
-                  确认销毁
+                  移出房间
                 </Button>
+              )
+            ) : onDelete ? (
+              deleteConfirm ? (
+                <>
+                  <span className="text-xs text-red-400 font-bold animate-pulse hidden md:inline">
+                    再次点击确认删除
+                  </span>
+                  <Button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onDelete(form.id);
+                    }}
+                    variant="dangerActive"
+                    icon={AlertTriangle}
+                    className="w-full md:w-auto"
+                  >
+                    确认销毁
+                  </Button>
+                  <Button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setDeleteConfirm(false);
+                    }}
+                    variant="ghost"
+                    size="sm"
+                  >
+                    取消
+                  </Button>
+                </>
+              ) : (
                 <Button
                   onClick={(e) => {
                     e.stopPropagation();
-                    setDeleteConfirm(false);
+                    setDeleteConfirm(true);
                   }}
-                  variant="ghost"
-                  size="sm"
+                  variant="danger"
+                  icon={Trash2}
+                  className="w-full md:w-auto"
                 >
-                  取消
+                  删除档案
                 </Button>
-              </>
-            ) : (
-              <Button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setDeleteConfirm(true);
-                }}
-                variant="danger"
-                icon={Trash2}
-                className="w-full md:w-auto"
-              >
-                删除档案
-              </Button>
-            )}
+              )
+            ) : null}
           </div>
-        ) : (
-          <div className="hidden md:block"></div>
         )}
         <div className="flex gap-4 w-full md:w-auto justify-end">
           {readOnly ? (

@@ -296,6 +296,17 @@ const App: React.FC = () => {
         async (payload) => {
           const msg = payload.new;
 
+          // Check for kick signal
+          if (
+            msg.type === "system" &&
+            msg.meta?.type === "kick" &&
+            msg.meta?.userId === session.user.id
+          ) {
+            alert("你已被移出房间");
+            doLeaveCleanup();
+            return;
+          }
+
           // Need to fetch metadata because Realtime payload is raw
           let charName = "守秘人";
           let charRole = "Keeper";
@@ -1054,6 +1065,41 @@ const App: React.FC = () => {
     }
   };
 
+  const handleRemoveCharacter = async (id: string) => {
+    if (!id || !currentRoomId || !session?.user) return;
+
+    const char = characters.find((c) => c.id === id);
+    if (!char) return;
+
+    // 1. Update DB: Set room_id to null
+    const { error } = await supabase
+      .from("characters")
+      .update({ room_id: null })
+      .eq("id", id);
+
+    if (error) {
+      console.error("移出失败:", error);
+      alert("移出失败: " + error.message);
+      return;
+    }
+
+    // 2. Send system message with kick signal
+    if (char.user_id) {
+      await supabase.from("messages").insert({
+        room_id: currentRoomId,
+        user_id: session.user.id,
+        type: "system",
+        content: `守秘人将 [${char.name}] 移出了房间`,
+        meta: { type: "kick", userId: char.user_id },
+      });
+    }
+
+    // 3. Local update
+    setCharacters((prev) => prev.filter((c) => c.id !== id));
+    if (activeCharId === id) setActiveCharId("pc");
+    setShowCharModal(false);
+  };
+
   const handleUpdateStatus = async (hp: number, san: number, mp: number) => {
     if (!statusTargetId) return;
     const target = characters.find((c) => c.id === statusTargetId);
@@ -1415,6 +1461,7 @@ const App: React.FC = () => {
           isEditing={!!editingChar}
           onSave={handleSaveCharacter}
           onDelete={isKP ? handleDeleteCharacter : undefined} // 仅 KP 可删除档案
+          onRemove={isKP ? handleRemoveCharacter : undefined} // KP 可以移出 PC
           onClose={() => setShowCharModal(false)}
           readOnly={!isKP && editingChar?.user_id !== session.user.id} // 增加只读保护
         />
