@@ -38,15 +38,27 @@ export const AvatarUpload: React.FC<AvatarUploadProps> = ({
     if (event.target.files && event.target.files.length > 0) {
       const file = event.target.files[0];
 
-      const reader = new FileReader();
-      reader.addEventListener("load", () =>
-        setImageSrc(reader.result?.toString() || null)
-      );
-      reader.readAsDataURL(file);
+      // Clean up previous object URL if it exists
+      if (imageSrc && imageSrc.startsWith('blob:')) {
+        URL.revokeObjectURL(imageSrc);
+      }
+
+      const url = URL.createObjectURL(file);
+      setImageSrc(url);
+      
       // Reset input value to allow selecting the same file again if needed
       event.target.value = "";
     }
   };
+
+  // Clean up object URL when component unmounts or imageSrc changes
+  React.useEffect(() => {
+    return () => {
+      if (imageSrc && imageSrc.startsWith('blob:')) {
+        URL.revokeObjectURL(imageSrc);
+      }
+    };
+  }, [imageSrc]);
 
   const handleUpload = async () => {
     if (!imageSrc || !croppedAreaPixels) return;
@@ -55,6 +67,7 @@ export const AvatarUpload: React.FC<AvatarUploadProps> = ({
       setUploading(true);
       const croppedBlob = await getCroppedImg(imageSrc, croppedAreaPixels);
       if (!croppedBlob) throw new Error("Could not crop image");
+      if (croppedBlob.size === 0) throw new Error("Cropped image is empty");
 
       const fileExt = "jpg";
       const fileName = `${Math.random().toString(36).substring(2)}.${fileExt}`;

@@ -73,41 +73,40 @@ export default async function getCroppedImg(
     pixelCrop.height
   )
 
-  // set canvas width to final desired crop size - this will clear existing context
-  // The user wants 400x400
-  canvas.width = 400
-  canvas.height = 400
+  // Use a temporary canvas to hold the cropped data
+  const tempCanvas = document.createElement('canvas')
+  tempCanvas.width = pixelCrop.width
+  tempCanvas.height = pixelCrop.height
+  const tempCtx = tempCanvas.getContext('2d')
+  
+  if (!tempCtx) {
+    return null
+  }
+  
+  tempCtx.putImageData(data, 0, 0)
 
-  // paste generated rotate image at the top left corner
-  ctx.putImageData(data, 0, 0)
-  
-  // However, putImageData puts the raw pixels. If we want to RESIZE to 400x400, we should draw it again.
-  // The above putImageData just places the cropped pixels. If pixelCrop.width != 400, it won't be resized.
-  
-  // Let's redo the resize part properly.
-  // 1. Create a canvas for the crop
-  const cropCanvas = document.createElement('canvas')
-  cropCanvas.width = pixelCrop.width
-  cropCanvas.height = pixelCrop.height
-  const cropCtx = cropCanvas.getContext('2d')
-  if(!cropCtx) return null
-  cropCtx.putImageData(data, 0, 0)
-  
-  // 2. Draw the crop canvas onto the main canvas (400x400)
-  // We can reuse the original canvas or create a new one.
+  // Create final canvas for resizing to 400x400
   const finalCanvas = document.createElement('canvas')
   finalCanvas.width = 400
   finalCanvas.height = 400
   const finalCtx = finalCanvas.getContext('2d')
-  if(!finalCtx) return null
   
-  // Draw the cropped image resized to 400x400
-  finalCtx.drawImage(cropCanvas, 0, 0, pixelCrop.width, pixelCrop.height, 0, 0, 400, 400)
+  if (!finalCtx) {
+    return null
+  }
+
+  // Draw the temp canvas onto the final canvas with resizing
+  // This uses the browser's image interpolation which is better than just dropping pixels
+  finalCtx.drawImage(
+    tempCanvas,
+    0, 0, pixelCrop.width, pixelCrop.height, // source
+    0, 0, 400, 400 // destination
+  )
 
   // As a blob
   return new Promise((resolve, reject) => {
     finalCanvas.toBlob((file) => {
       resolve(file)
-    }, 'image/jpeg')
+    }, 'image/jpeg', 0.9)
   })
 }

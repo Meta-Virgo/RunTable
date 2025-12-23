@@ -81,6 +81,7 @@ export interface Message {
 export interface Log {
   id: string;
   timestamp: string;
+  createdAt: string; // ISO String for sorting/pagination
   charId: string;
   charName: string;
   charRole: string;

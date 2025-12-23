@@ -19,6 +19,7 @@ import { AvatarUpload } from "./AvatarUpload";
 interface HomeProps {
   onJoinRoom: (roomId: string, charId: string | "pc") => void;
   onLogout: () => void;
+  onlineUsers: Set<string>;
 }
 
 const INITIAL_CHAR_STATE: Character = {
@@ -160,7 +161,11 @@ const RoomCard: React.FC<RoomCardProps> = ({
   );
 };
 
-export const Home: React.FC<HomeProps> = ({ onJoinRoom, onLogout }) => {
+export const Home: React.FC<HomeProps> = ({
+  onJoinRoom,
+  onLogout,
+  onlineUsers = new Set(),
+}) => {
   const [activeTab, setActiveTab] = useState<
     "rooms" | "characters" | "profile"
   >("rooms");
@@ -169,6 +174,7 @@ export const Home: React.FC<HomeProps> = ({ onJoinRoom, onLogout }) => {
   // Rooms State
   const [rooms, setRooms] = useState<Room[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
+  const [roomFilter, setRoomFilter] = useState<'all' | 'mine' | 'created' | 'kp_online'>('all');
   const [showCreateRoom, setShowCreateRoom] = useState(false);
   const [newRoomTitle, setNewRoomTitle] = useState("");
   const [newRoomDesc, setNewRoomDesc] = useState("");
@@ -279,11 +285,23 @@ export const Home: React.FC<HomeProps> = ({ onJoinRoom, onLogout }) => {
 
   const fetchRooms = async () => {
     setLoading(true);
-    const { data, error } = await supabase
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    let query = supabase
       .from("rooms")
       .select("*")
-      .eq("status", "open")
       .order("created_at", { ascending: false });
+
+    if (user) {
+      // Show open rooms OR rooms created by me
+      query = query.or(`status.eq.open,kp_id.eq.${user.id}`);
+    } else {
+      query = query.eq("status", "open");
+    }
+
+    const { data, error } = await query;
 
     if (data) setRooms(data);
     if (error) console.error("Error fetching rooms:", error);
@@ -480,11 +498,27 @@ export const Home: React.FC<HomeProps> = ({ onJoinRoom, onLogout }) => {
     }
   };
 
-  const filteredRooms = rooms.filter(
-    (r) =>
+  const myRoomIds = new Set(myCharacters.map((c) => c.room_id).filter(Boolean));
+
+  const filteredRooms = rooms.filter((r) => {
+    const matchesSearch =
       r.title.includes(searchQuery) ||
-      (r.description && r.description.includes(searchQuery))
-  );
+      (r.description && r.description.includes(searchQuery));
+
+    if (!matchesSearch) return false;
+
+    if (roomFilter === "mine") {
+      return myRoomIds.has(r.id);
+    }
+    if (roomFilter === "created") {
+      return r.kp_id === currentUserId;
+    }
+    if (roomFilter === "kp_online") {
+      return onlineUsers.has(r.kp_id);
+    }
+
+    return true;
+  });
 
   return (
     <div className="h-[100dvh] overflow-hidden bg-[#020617] text-slate-200 flex flex-col font-sans">
@@ -570,23 +604,47 @@ export const Home: React.FC<HomeProps> = ({ onJoinRoom, onLogout }) => {
         {activeTab === "rooms" ? (
           <div className="space-y-6">
             {/* Room Controls */}
-            <div className="flex flex-col md:flex-row gap-4 justify-between items-center">
-              <div className="relative w-full md:w-96 group">
-                <Search
-                  className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-indigo-400 transition-colors"
-                  size={18}
-                />
-                <input
-                  type="text"
-                  placeholder="搜索房间..."
-                  className="w-full bg-slate-900/50 border border-slate-700/50 rounded-xl pl-10 pr-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 transition-all text-sm"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                />
+            <div className="flex flex-col gap-4">
+              <div className="flex flex-col md:flex-row gap-4 justify-between items-center">
+                <div className="relative w-full md:w-96 group">
+                  <Search
+                    className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-indigo-400 transition-colors"
+                    size={18}
+                  />
+                  <input
+                    type="text"
+                    placeholder="搜索房间..."
+                    className="w-full bg-slate-900/50 border border-slate-700/50 rounded-xl pl-10 pr-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 transition-all text-sm"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                  />
+                </div>
+                <Button icon={Plus} onClick={() => setShowCreateRoom(true)}>
+                  创建房间
+                </Button>
               </div>
-              <Button icon={Plus} onClick={() => setShowCreateRoom(true)}>
-                创建房间
-              </Button>
+
+              {/* Filters */}
+              <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
+                {[
+                  { id: "all", label: "全部" },
+                  { id: "mine", label: "我的角色" },
+                  { id: "created", label: "我的房间" },
+                  { id: "kp_online", label: "KP在线" },
+                ].map((f) => (
+                  <button
+                    key={f.id}
+                    onClick={() => setRoomFilter(f.id as any)}
+                    className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all whitespace-nowrap ${
+                      roomFilter === f.id
+                        ? "bg-indigo-500/20 text-indigo-400 border border-indigo-500/30"
+                        : "bg-slate-800/50 text-slate-400 border border-transparent hover:bg-slate-800 hover:text-slate-300"
+                    }`}
+                  >
+                    {f.label}
+                  </button>
+                ))}
+              </div>
             </div>
 
             {/* Create Room Form (Inline) */}

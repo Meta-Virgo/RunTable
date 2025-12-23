@@ -45,6 +45,9 @@ interface ChatAreaProps {
   kpId: string | null;
   isVip: boolean;
   onDeleteMessage: (id: string) => void;
+  onLoadMore?: () => void;
+  hasMore?: boolean;
+  isLoading?: boolean;
 }
 
 const getCharIcon = (role: string, size = 18) => {
@@ -79,6 +82,9 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   kpId,
   isVip,
   onDeleteMessage,
+  onLoadMore,
+  hasMore = false,
+  isLoading = false,
 }) => {
   const [inputText, setInputText] = useState("");
   const [diceCount, setDiceCount] = useState(1);
@@ -169,6 +175,47 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   const [aiError, setAiError] = useState("");
 
   const logsEndRef = useRef<HTMLDivElement>(null);
+  const logsContainerRef = useRef<HTMLDivElement>(null);
+  const [isAutoScroll, setIsAutoScroll] = useState(true);
+  const [prevScrollHeight, setPrevScrollHeight] = useState(0);
+
+  // Auto scroll to bottom when new logs arrive (if auto scroll is enabled)
+  useEffect(() => {
+    if (isAutoScroll && logsEndRef.current) {
+      logsEndRef.current.scrollIntoView({ behavior: "auto" });
+    }
+  }, [logs, isAutoScroll]);
+
+  // Handle scroll to load more and manage auto-scroll state
+  const handleScroll = () => {
+    if (!logsContainerRef.current) return;
+
+    const { scrollTop, scrollHeight, clientHeight } = logsContainerRef.current;
+
+    // Check if user is near bottom to enable auto-scroll
+    const isNearBottom = scrollHeight - scrollTop - clientHeight < 100;
+    setIsAutoScroll(isNearBottom);
+
+    // Check if user is at top to load more
+    if (scrollTop < 20 && hasMore && onLoadMore && !isLoading) {
+      // Save current scroll height to maintain position after load
+      setPrevScrollHeight(scrollHeight);
+      onLoadMore();
+    }
+  };
+
+  // Restore scroll position after loading more
+  useEffect(() => {
+    if (logsContainerRef.current && prevScrollHeight > 0 && !isLoading) {
+      const newScrollHeight = logsContainerRef.current.scrollHeight;
+      const heightDiff = newScrollHeight - prevScrollHeight;
+      // Only adjust if height actually increased (data loaded)
+      if (heightDiff > 0) {
+        logsContainerRef.current.scrollTop = heightDiff;
+        setPrevScrollHeight(0);
+      }
+    }
+  }, [logs, isLoading]);
 
   const handleAskAI = async () => {
     if (!isVip) {
@@ -242,7 +289,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   const canRollCheck = !!myChar;
 
   useEffect(() => {
-    logsEndRef.current?.scrollIntoView({ behavior: "auto" });
+    // logsEndRef.current?.scrollIntoView({ behavior: "auto" }); // Removed in favor of auto-scroll logic
   }, [logs]);
 
   const getRecipientLabel = () => {
@@ -277,7 +324,24 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   return (
     <>
       {/* Logs View */}
-      <div className="flex-1 overflow-y-auto px-3 md:px-8 py-4 pt-4 pb-48 space-y-6 custom-scrollbar">
+      <div
+        ref={logsContainerRef}
+        onScroll={handleScroll}
+        className="flex-1 overflow-y-auto px-3 md:px-8 py-4 pt-4 pb-48 space-y-6 custom-scrollbar"
+      >
+        {hasMore && (
+          <div className="flex justify-center py-2 shrink-0">
+            {isLoading ? (
+              <span className="text-xs text-indigo-400 flex items-center gap-2">
+                <RefreshCw size={12} className="animate-spin" /> 加载中...
+              </span>
+            ) : (
+              <span className="text-xs text-slate-500 animate-pulse">
+                加载更多历史记录...
+              </span>
+            )}
+          </div>
+        )}
         {logs.length === 0 && (
           <div className="flex flex-col items-center justify-center h-[60vh] text-slate-600 animate-slide-up">
             <div className="w-24 h-24 bg-gradient-to-tr from-slate-800 to-slate-900 rounded-full flex items-center justify-center mb-6 ring-1 ring-slate-700/50 shadow-2xl">

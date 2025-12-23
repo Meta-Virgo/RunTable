@@ -66,8 +66,106 @@ const App: React.FC = () => {
   const [isKP, setIsKP] = useState(false);
   const [kpId, setKpId] = useState<string | null>(null);
   const [onlineUsers, setOnlineUsers] = useState<Set<string>>(new Set());
+  const [globalOnlineUsers, setGlobalOnlineUsers] = useState<Set<string>>(new Set());
   const [userNickname, setUserNickname] = useState<string>("");
   const [isVip, setIsVip] = useState(false);
+
+  // Load More Logs Logic
+  const handleLoadMoreLogs = async () => {
+    if (isLoadingMore || !hasMoreLogs || logs.length === 0 || !currentRoomId) return;
+    
+    // Safety check: ensure logs are sorted by time (oldest first) before picking the first one
+    // This handles edge cases where logs might be out of order
+    const sortedLogs = [...logs].sort((a, b) => 
+        new Date(a.createdAt || a.timestamp).getTime() - new Date(b.createdAt || b.timestamp).getTime()
+    );
+    const oldestLog = sortedLogs[0];
+    
+    if (!oldestLog) return;
+
+    setIsLoadingMore(true);
+    const oldestTime = oldestLog.createdAt;
+    
+    if (!oldestTime) {
+        console.error("Missing createdAt for log:", oldestLog);
+        setIsLoadingMore(false);
+        return;
+    }
+
+    try {
+        const { data: msgs, error: msgError } = await supabase
+            .from("messages")
+            .select(
+            `
+                *,
+                characters ( id, name, type, role, info, theme_color, avatar_url )
+            `
+            )
+            .eq("room_id", currentRoomId)
+            .lt("created_at", oldestTime) // Get messages older than the current oldest
+            .order("created_at", { ascending: false })
+            .limit(PAGE_SIZE);
+
+        if (msgError) throw msgError;
+
+        if (msgs && msgs.length > 0) {
+            msgs.reverse(); // Sort oldest first
+
+            // Fetch Profiles
+            const userIds = Array.from(new Set(msgs.map((m: any) => m.user_id)));
+            const { data: profiles } = await supabase
+                .from("profiles")
+                .select("id, nickname, avatar_url")
+                .in("id", userIds);
+
+            const profileMap = new Map(profiles?.map((p: any) => [p.id, p]) || []);
+
+            const formattedLogs: Log[] = msgs.map((msg: any) => {
+                const charName = msg.characters
+                    ? msg.characters.name
+                    : profileMap.get(msg.user_id)?.nickname || "守秘人";
+                const charAvatar = msg.characters
+                    ? msg.characters.avatar_url
+                    : profileMap.get(msg.user_id)?.avatar_url;
+                
+                let charRole = "Keeper";
+                if (msg.characters) {
+                    charRole = msg.characters.role || (msg.characters.type === "investigator" ? "调查员" : msg.characters.type === "monster" ? "怪物" : "NPC");
+                }
+
+                return {
+                    id: msg.id,
+                    timestamp: new Date(msg.created_at).toLocaleTimeString([], {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                    }),
+                    createdAt: msg.created_at,
+                    charId: msg.character_id || "pc",
+                    charName: charName,
+                    charRole: charRole,
+                    charAvatar: charAvatar,
+                    type: msg.type as Log["type"],
+                    content: msg.content,
+                    isMine: msg.user_id === session?.user?.id,
+                    recipientId: msg.recipient_id,
+                    quote: msg.meta?.quote,
+                };
+            });
+
+            setLogs(prev => [...formattedLogs, ...prev]);
+            
+            if (msgs.length < PAGE_SIZE) {
+                setHasMoreLogs(false);
+            }
+        } else {
+            setHasMoreLogs(false);
+        }
+    } catch (error) {
+        console.error("Error loading more logs:", error);
+    } finally {
+        setIsLoadingMore(false);
+    }
+  };
 
   // Modal State
   const [showModuleModal, setShowModuleModal] = useState(false);
@@ -81,6 +179,11 @@ const App: React.FC = () => {
     "investigator" | "npc" | "monster"
   >("investigator");
   const [statusTargetId, setStatusTargetId] = useState<string | null>(null);
+
+  // Pagination State
+  const [hasMoreLogs, setHasMoreLogs] = useState(true);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const PAGE_SIZE = 50; // Reduced from 500 to 50 for smoother loading
 
   // Characters Ref for Realtime (Refs are needed to access latest state inside listeners)
   const charactersRef = useRef(characters);
@@ -166,6 +269,35 @@ const App: React.FC = () => {
     }
   }, [session, authLoading]);
 
+  // Global Presence
+  useEffect(() => {
+    if (!session?.user) return;
+
+    const channel = supabase.channel('global_presence')
+      .on('presence', { event: 'sync' }, () => {
+         const newState = channel.presenceState();
+         const userIds = new Set<string>();
+         for (const id in newState) {
+           (newState[id] as any[]).forEach(p => {
+             if (p.user_id) userIds.add(p.user_id);
+           });
+         }
+         setGlobalOnlineUsers(userIds);
+      })
+      .subscribe(async (status) => {
+        if (status === 'SUBSCRIBED') {
+          await channel.track({
+            user_id: session.user.id,
+            online_at: new Date().toISOString(),
+          });
+        }
+      });
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [session]);
+
   // =========================================================================
   //  ⚡️ Core Logic: Fetching & Realtime
   // =========================================================================
@@ -219,7 +351,8 @@ const App: React.FC = () => {
                 `
         )
         .eq("room_id", currentRoomId)
-        .order("created_at", { ascending: true });
+        .order("created_at", { ascending: false })
+        .limit(PAGE_SIZE); // Use PAGE_SIZE for consistency
 
       if (msgError) {
         console.error("Error fetching messages:", msgError);
@@ -227,6 +360,9 @@ const App: React.FC = () => {
       }
 
       if (msgs && msgs.length > 0) {
+        // Reverse to show oldest first (since we fetched newest first)
+        msgs.reverse();
+
         // 1.5 Fetch Profiles manually for OOC messages
         const userIds = Array.from(new Set(msgs.map((m: any) => m.user_id)));
         const { data: profiles } = await supabase
@@ -264,6 +400,7 @@ const App: React.FC = () => {
               hour: "2-digit",
               minute: "2-digit",
             }),
+            createdAt: msg.created_at, // Store raw timestamp
             charId: msg.character_id || "pc",
             charName: charName,
             charRole: charRole,
@@ -275,9 +412,14 @@ const App: React.FC = () => {
             quote: msg.meta?.quote,
           };
         });
+
+        // Set hasMore based on count
+        setHasMoreLogs(msgs.length === PAGE_SIZE);
+
         setLogs(formattedLogs);
       } else {
         setLogs([]);
+        setHasMoreLogs(false);
       }
     };
     fetchMessages();
@@ -352,6 +494,7 @@ const App: React.FC = () => {
               hour: "2-digit",
               minute: "2-digit",
             }),
+            createdAt: msg.created_at,
             charId: msg.character_id || "pc",
             charName,
             charRole,
@@ -1136,6 +1279,8 @@ const App: React.FC = () => {
       changes.push(`HP ${hp > target.hp ? "+" : ""}${hp - target.hp}`);
     if (san !== target.san)
       changes.push(`SAN ${san > target.san ? "+" : ""}${san - target.san}`);
+    if (mp !== target.mp)
+      changes.push(`MP ${mp > target.mp ? "+" : ""}${mp - target.mp}`);
 
     if (changes.length > 0) {
       setCharacters((prev) =>
@@ -1261,13 +1406,9 @@ const App: React.FC = () => {
 
     // If active char is not PC/KP, remove room_id from character
     // FIX: KP's characters (NPC/Monster) should NOT be removed from room when KP leaves
-    if (activeCharId !== "pc" && !isKP) {
-      await supabase
-        .from("characters")
-        .update({ room_id: null })
-        .eq("id", activeCharId);
-    }
-
+    // MODIFIED: Per user request, do NOT remove room_id when player leaves. 
+    // It stays bound until they join a new room or are kicked by KP.
+  
     doLeaveCleanup();
   };
 
@@ -1301,7 +1442,13 @@ const App: React.FC = () => {
   }
 
   if (!currentRoomId) {
-    return <Home onJoinRoom={handleJoinRoom} onLogout={handleSignOut} />;
+    return (
+      <Home
+        onJoinRoom={handleJoinRoom}
+        onLogout={handleSignOut}
+        onlineUsers={globalOnlineUsers}
+      />
+    );
   }
 
   return (
@@ -1386,6 +1533,9 @@ const App: React.FC = () => {
             onRollDice={rollDice}
             onShowStory={() => setShowStoryModal(true)}
             onDeleteMessage={handleDeleteMessage}
+            onLoadMore={handleLoadMoreLogs}
+            hasMore={hasMoreLogs}
+            isLoading={isLoadingMore}
             isKP={isKP}
             kpId={kpId}
             isVip={isVip}
