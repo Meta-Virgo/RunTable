@@ -179,6 +179,8 @@ const App: React.FC = () => {
     "investigator" | "npc" | "monster"
   >("investigator");
   const [statusTargetId, setStatusTargetId] = useState<string | null>(null);
+  const [storyContent, setStoryContent] = useState("");
+  const [isGeneratingStory, setIsGeneratingStory] = useState(false);
 
   // Pagination State
   const [hasMoreLogs, setHasMoreLogs] = useState(true);
@@ -992,9 +994,9 @@ const App: React.FC = () => {
     );
   };
 
-  const generateStory = () => {
-    if (logs.length === 0) return "暂无记录。";
-    return logs
+  const generateStory = (sourceLogs: Log[] = logs) => {
+    if (sourceLogs.length === 0) return "暂无记录。";
+    return sourceLogs
       .filter((log) => {
         // 过滤掉不必要的系统消息
         if (log.type === "system") {
@@ -1031,6 +1033,100 @@ const App: React.FC = () => {
         return `${displayName}: ${cleanContent}`;
       })
       .join("\n\n");
+  };
+
+  const handleShowStory = async () => {
+    setShowStoryModal(true);
+    setIsGeneratingStory(true);
+    setStoryContent("");
+
+    try {
+      let allMsgs: any[] = [];
+      let page = 0;
+      const BATCH_SIZE = 1000;
+      let hasMore = true;
+
+      while (hasMore) {
+        const { data, error } = await supabase
+          .from("messages")
+          .select(
+            `
+              *,
+              characters ( id, name, type, role, info, theme_color, avatar_url )
+            `
+          )
+          .eq("room_id", currentRoomId)
+          .order("created_at", { ascending: true })
+          .range(page * BATCH_SIZE, (page + 1) * BATCH_SIZE - 1);
+
+        if (error) throw error;
+
+        if (data && data.length > 0) {
+          allMsgs = [...allMsgs, ...data];
+          if (data.length < BATCH_SIZE) hasMore = false;
+          page++;
+        } else {
+          hasMore = false;
+        }
+      }
+
+      // Fetch Profiles for OOC messages
+      const userIds = Array.from(new Set(allMsgs.map((m: any) => m.user_id)));
+      let profileMap = new Map();
+      if (userIds.length > 0) {
+        const { data: profiles } = await supabase
+          .from("profiles")
+          .select("id, nickname, avatar_url")
+          .in("id", userIds);
+        profileMap = new Map(profiles?.map((p: any) => [p.id, p]) || []);
+      }
+
+      const formattedLogs: Log[] = allMsgs.map((msg: any) => {
+        const charName = msg.characters
+          ? msg.characters.name
+          : profileMap.get(msg.user_id)?.nickname || "守秘人";
+        const charAvatar = msg.characters
+          ? msg.characters.avatar_url
+          : profileMap.get(msg.user_id)?.avatar_url;
+
+        let charRole = "Keeper";
+        if (msg.characters) {
+          charRole =
+            msg.characters.role ||
+            (msg.characters.type === "investigator"
+              ? "调查员"
+              : msg.characters.type === "monster"
+              ? "怪物"
+              : "NPC");
+        }
+
+        return {
+          id: msg.id,
+          timestamp: new Date(msg.created_at).toLocaleTimeString([], {
+            hour: "2-digit",
+            minute: "2-digit",
+          }),
+          createdAt: msg.created_at,
+          charId: msg.character_id || "pc",
+          charName: charName,
+          charRole: charRole,
+          charAvatar: charAvatar,
+          type: msg.type as Log["type"],
+          content: msg.content,
+          isMine: msg.user_id === session?.user?.id,
+          recipientId: msg.recipient_id,
+          quote: msg.meta?.quote,
+        };
+      });
+
+      const story = generateStory(formattedLogs);
+      setStoryContent(story);
+    } catch (e) {
+      console.error("Error generating story:", e);
+      setStoryContent("生成战报失败，请重试。");
+    } finally {
+      setIsGeneratingStory(false);
+    }
   };
 
   const handleDeleteMessage = async (messageId: string) => {
@@ -1531,7 +1627,7 @@ const App: React.FC = () => {
               )
             }
             onRollDice={rollDice}
-            onShowStory={() => setShowStoryModal(true)}
+            onShowStory={handleShowStory}
             onDeleteMessage={handleDeleteMessage}
             onLoadMore={handleLoadMoreLogs}
             hasMore={hasMoreLogs}
@@ -1630,7 +1726,8 @@ const App: React.FC = () => {
 
       {showStoryModal && (
         <StoryModal
-          content={generateStory()}
+          content={storyContent}
+          isLoading={isGeneratingStory}
           onClose={() => setShowStoryModal(false)}
         />
       )}

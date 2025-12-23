@@ -920,6 +920,19 @@ export const Home: React.FC<HomeProps> = ({
                 </div>
               )}
             </div>
+
+            {/* Suggestion Section */}
+            <div className="bg-slate-800/30 border border-slate-700/50 rounded-2xl p-6 text-center">
+              <h3 className="text-sm font-bold text-slate-400 mb-2 uppercase tracking-wider">
+                由衷期待您建议和反馈!
+              </h3>
+              <a
+                href="mailto:may331@foxmail.com"
+                className="text-indigo-400 hover:text-indigo-300 font-mono transition-colors text-lg"
+              >
+                may331@foxmail.com
+              </a>
+            </div>
           </div>
         )}
       </main>

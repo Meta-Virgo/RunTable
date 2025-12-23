@@ -746,10 +746,11 @@ export const StatusModal: React.FC<{
 };
 
 // --- Story Modal ---
-export const StoryModal: React.FC<{ content: string; onClose: () => void }> = ({
-  content,
-  onClose,
-}) => (
+export const StoryModal: React.FC<{
+  content: string;
+  onClose: () => void;
+  isLoading?: boolean;
+}> = ({ content, onClose, isLoading }) => (
   <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
     <div
       className="absolute inset-0 bg-black/90 backdrop-blur-sm"
@@ -762,12 +763,19 @@ export const StoryModal: React.FC<{ content: string; onClose: () => void }> = ({
         </h3>
         <button onClick={onClose}>
           <div className="text-slate-400 hover:text-slate-800 transition-colors">
-            <Trash2 size={24} className="hidden" /> <X size={24} />
+            <X size={24} />
           </div>
         </button>
       </div>
       <div className="flex-1 p-6 md:p-10 overflow-y-auto font-serif text-slate-800 leading-relaxed whitespace-pre-wrap text-base md:text-lg bg-[#fdfdfd]">
-        {content}
+        {isLoading ? (
+          <div className="flex flex-col items-center justify-center h-full text-slate-500 gap-4">
+            <div className="w-8 h-8 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin"></div>
+            <p>正在生成战报，请稍候...</p>
+          </div>
+        ) : (
+          content
+        )}
       </div>
       <div className="p-6 border-t bg-slate-50 flex justify-end">
         <Button
@@ -775,6 +783,7 @@ export const StoryModal: React.FC<{ content: string; onClose: () => void }> = ({
           variant="secondary"
           className="bg-white border-slate-300 text-slate-700 hover:bg-slate-100 shadow-sm"
           icon={Copy}
+          disabled={isLoading}
         >
           复制全文
         </Button>
