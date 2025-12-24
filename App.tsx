@@ -49,7 +49,25 @@ const EMPTY_MODULE_INFO: ModuleInfo = { title: "", description: "", notes: "" };
 
 const App: React.FC = () => {
   // Routing State
-  const [isWelcome, setIsWelcome] = useState(window.location.pathname === '/welcome');
+  // Improved detection for Welcome page (handles trailing slash and Supabase hash params)
+  const [isWelcome, setIsWelcome] = useState(() => {
+    const path = window.location.pathname;
+    const hash = window.location.hash;
+    const search = window.location.search;
+    
+    // 1. Explicit path match
+    if (path.startsWith('/welcome')) return true;
+    
+    // 2. Check for Supabase signup confirmation in hash/search (e.g. #access_token=...&type=signup)
+    // This handles cases where redirect might land on root but preserves auth params
+    if (hash.includes('type=signup') || search.includes('type=signup') || 
+        hash.includes('type=invite') || search.includes('type=invite') ||
+        hash.includes('type=recovery') || search.includes('type=recovery')) {
+      return true;
+    }
+    
+    return false;
+  });
 
   // Auth State
   const [session, setSession] = useState<Session | null>(null);
