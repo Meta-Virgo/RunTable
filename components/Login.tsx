@@ -61,6 +61,9 @@ export const Login: React.FC = () => {
       const { error } = await supabase.auth.signUp({
         email,
         password,
+        options: {
+          emailRedirectTo: 'https://trpgtool.maoyiwei.com/welcome'
+        }
       });
       if (error) throw error;
       alert('注册成功！请检查您的邮箱进行验证。');
