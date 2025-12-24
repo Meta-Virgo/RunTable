@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { Session } from "@supabase/supabase-js";
 import { supabase } from "./supabase";
 import { Login } from "./components/Login";
+import { Welcome } from "./components/Welcome";
 import { Home } from "./components/Home";
 import { Sidebar } from "./components/Sidebar";
 import { ChatArea } from "./components/ChatArea";
@@ -15,6 +16,7 @@ import {
 import { Button } from "./components/UI";
 import { ModuleInfo, Character, Log } from "./types"; // Removed AppData as it might not be used anymore
 import { Menu, LogOut } from "lucide-react";
+import { parseDiceCommand } from "./utils/commandParser";
 
 // --- Constants ---
 const INITIAL_CHAR_STATE: Character = {
@@ -46,6 +48,9 @@ const INITIAL_CHAR_STATE: Character = {
 const EMPTY_MODULE_INFO: ModuleInfo = { title: "", description: "", notes: "" };
 
 const App: React.FC = () => {
+  // Routing State
+  const [isWelcome, setIsWelcome] = useState(window.location.pathname === '/welcome');
+
   // Auth State
   const [session, setSession] = useState<Session | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
@@ -955,7 +960,7 @@ const App: React.FC = () => {
     count: number,
     type: number,
     isSecret: boolean = false,
-    checkInfo?: { name: string; target: number }
+    checkInfo?: { name: string; target?: number }
   ) => {
     let total = 0;
     let details: number[] = [];
@@ -967,21 +972,24 @@ const App: React.FC = () => {
 
     let resultData: any = { count, type, total, details };
 
-    if (checkInfo && count === 1 && type === 100) {
+    if (checkInfo) {
       resultData.checkName = checkInfo.name;
-      resultData.checkTarget = checkInfo.target;
+      
+      if (checkInfo.target !== undefined && count === 1 && type === 100) {
+        resultData.checkTarget = checkInfo.target;
 
-      // Result Calculation (CoC 7th Style Simplification)
-      // Critical Success: 1-5
-      // Critical Failure: 96-100
-      if (total <= 5) {
-        resultData.checkResult = "critical_success";
-      } else if (total >= 96) {
-        resultData.checkResult = "critical_failure";
-      } else if (total <= checkInfo.target) {
-        resultData.checkResult = "success";
-      } else {
-        resultData.checkResult = "failure";
+        // Result Calculation (CoC 7th Style Simplification)
+        // Critical Success: 1-5
+        // Critical Failure: 96-100
+        if (total <= 5) {
+          resultData.checkResult = "critical_success";
+        } else if (total >= 96) {
+          resultData.checkResult = "critical_failure";
+        } else if (total <= checkInfo.target) {
+          resultData.checkResult = "success";
+        } else {
+          resultData.checkResult = "failure";
+        }
       }
     }
 
@@ -992,6 +1000,8 @@ const App: React.FC = () => {
       JSON.stringify(resultData),
       activeCharId === "pc" ? "pc" : activeCharId
     );
+    
+    return total;
   };
 
   const generateStory = (sourceLogs: Log[] = logs) => {
@@ -1459,6 +1469,410 @@ const App: React.FC = () => {
     }
   };
 
+  const ALIAS_MAP: Record<string, string> = {
+    力量: "str",
+    str: "str",
+    体质: "con",
+    con: "con",
+    体型: "siz",
+    siz: "siz",
+    敏捷: "dex",
+    dex: "dex",
+    外貌: "app",
+    app: "app",
+    智力: "int",
+    int: "int",
+    意志: "pow",
+    pow: "pow",
+    教育: "edu",
+    edu: "edu",
+    幸运: "luck",
+    luck: "luck",
+    hp: "hp",
+    HP: "hp",
+    san: "san",
+    SAN: "san",
+    mp: "mp",
+    MP: "mp",
+  };
+
+  const evaluateDiceExpression = (
+    expression: string,
+    char: Character | undefined
+  ): { total: number; details: string[] } => {
+    let evalString = expression.toLowerCase();
+    const detailsParts: string[] = [];
+
+    // 1. Replace stats
+    evalString = evalString.replace(/[a-z\u4e00-\u9fa5]+/g, (match) => {
+      // Ignore 'd' if it is part of dice notation (e.g. 1d100)
+      // Actually, regex logic: if match is 'd' and preceded by digit or followed by digit?
+      // But we handle dice replacement later.
+      // If user writes "3d6", "d" matches here? Yes.
+      // So we must be careful.
+      // Only replace if it matches a known stat OR is a skill.
+      // If not, and it looks like 'd', leave it.
+      
+      if (match === 'd') return 'd'; 
+
+      const key = ALIAS_MAP[match] || match;
+      if (char) {
+        if (char.stats && char.stats[key] !== undefined) {
+           return String(char.stats[key]);
+        }
+        if (char.skills && char.skills[match] !== undefined) {
+           return String(char.skills[match]);
+        }
+      }
+      
+      // If unknown, return 0 (safe fallback) or keep it (risky)
+      // If we keep "sword", eval fails.
+      // We return 0.
+      return "0";
+    });
+
+    // 2. Replace Dice (NdM or dM)
+    evalString = evalString.replace(/(\d*)d(\d+)/g, (match, p1, p2) => {
+      const count = p1 ? parseInt(p1) : 1;
+      const sides = parseInt(p2);
+      let total = 0;
+      const rolls = [];
+      for (let i = 0; i < count; i++) {
+        const r = Math.floor(Math.random() * sides) + 1;
+        total += r;
+        rolls.push(r);
+      }
+      detailsParts.push(`${count}d${sides}[${rolls.join(",")}]`);
+      return String(total);
+    });
+
+    // 3. Eval
+    if (!/^[\d\+\-\*\/\(\)\.\s]+$/.test(evalString)) {
+      return { total: 0, details: ["表达式错误"] };
+    }
+
+    try {
+      // eslint-disable-next-line no-new-func
+      const result = new Function("return " + evalString)();
+      const rounded = Math.round(result * 100) / 100;
+      return { total: rounded, details: detailsParts };
+    } catch (e) {
+      return { total: 0, details: ["计算错误"] };
+    }
+  };
+
+  const updateCharacterStats = async (
+    charId: string,
+    changes: { stat: string; value: number; type: "=" | "+" | "-" }[]
+  ) => {
+    const target = characters.find((c) => c.id === charId);
+    if (!target) return;
+
+    // Use stats object, or fallback to top-level properties if stats is missing/empty
+    const currentStats = target.stats || {
+      str: target.str,
+      con: target.con,
+      siz: target.siz,
+      dex: target.dex,
+      app: target.app,
+      int: target.int,
+      pow: target.pow,
+      edu: target.edu,
+      luck: target.luck,
+      hp: target.hp,
+      san: target.san,
+      mp: target.mp,
+    };
+
+    const newStats: any = { ...currentStats };
+
+    const logChanges: string[] = [];
+
+    changes.forEach((change) => {
+      const key = ALIAS_MAP[change.stat] || change.stat;
+      // We only support updating stats present in the stats object for now
+      if (newStats[key] !== undefined) {
+        let current = newStats[key] || 0;
+        let newValue = change.value;
+        if (change.type === "+") newValue = current + change.value;
+        if (change.type === "-") newValue = current - change.value;
+
+        newStats[key] = newValue;
+        logChanges.push(
+          `${change.stat.toUpperCase()} ${current} -> ${newValue}`
+        );
+      }
+    });
+
+    if (logChanges.length === 0) return;
+
+    const { error } = await supabase
+      .from("characters")
+      .update({ stats: newStats })
+      .eq("id", charId);
+
+    if (!error) {
+      addLog("system", `[${target.name}] 属性变更: ${logChanges.join(", ")}`);
+    }
+  };
+
+  const handleSanityCheck = async (
+    successExpr: string,
+    failureExpr: string,
+    currentSanVal?: number
+  ) => {
+    if (activeCharId === "pc") {
+      addLog("system", "守秘人无法进行理智检定");
+      return;
+    }
+    const char = characters.find((c) => c.id === activeCharId);
+    if (!char) return;
+
+    const currentSan = currentSanVal !== undefined ? currentSanVal : char.san;
+
+    // 1. Roll 1d100
+    const roll = Math.floor(Math.random() * 100) + 1;
+    const isSuccess = roll <= currentSan;
+
+    let checkResult = "failure";
+    if (roll <= 5) checkResult = "critical_success"; // 大成功 1-5
+    else if (roll >= 96) checkResult = "critical_failure"; // 大失败 96-100
+    else if (isSuccess) checkResult = "success";
+
+    // 2. Roll loss
+    const lossExpr = isSuccess ? successExpr : failureExpr;
+    let loss = 0;
+    let lossDetails = "";
+
+    if (/^\d+$/.test(lossExpr)) {
+      loss = parseInt(lossExpr);
+      lossDetails = lossExpr;
+    } else {
+      const match = lossExpr.match(/^(\d+)d(\d+)$/i);
+      if (match) {
+        const count = parseInt(match[1]);
+        const sides = parseInt(match[2]);
+        const details = [];
+        for (let i = 0; i < count; i++) {
+          const r = Math.floor(Math.random() * sides) + 1;
+          loss += r;
+          details.push(r);
+        }
+        lossDetails = `${lossExpr}(${details.join("+")})=${loss}`;
+      } else {
+        // Fallback for unparsed or 0
+        loss = 0;
+        lossDetails = "0";
+      }
+    }
+
+    // Construct Dice Log
+    const resultData = {
+      count: 1,
+      type: 100,
+      total: roll,
+      details: [roll],
+      checkName: "Sanity Check",
+      checkTarget: currentSan,
+      checkResult: checkResult,
+    };
+
+    addLog("dice", JSON.stringify(resultData), activeCharId);
+
+    setTimeout(() => {
+      const resultMsg = isSuccess
+        ? `SC成功! 减少 ${lossDetails} 点理智`
+        : `SC失败! 减少 ${lossDetails} 点理智`;
+
+      const newSan = currentSan - loss;
+      addLog("system", `[${char.name}] ${resultMsg}，当前 SAN: ${newSan}`);
+
+      if (loss > 0) {
+        updateCharacterStats(char.id, [
+          { stat: "san", value: loss, type: "-" },
+        ]);
+      }
+    }, 500);
+  };
+
+  const handleCommand = (
+    cmd: any,
+    originalText: string,
+    recipientId?: string | null
+  ) => {
+    switch (cmd.type) {
+      case "help":
+        addLog(
+          "system",
+          `🎲 指令帮助
+────────────────
+.r  [表达式] [原因]
+    投掷骰子 (例: .r 1d100 侦查)
+
+.rh [表达式] [原因]
+    暗骰 (仅KP可用)
+
+.ra [技能] [修正]
+    技能检定 (例: .ra 侦查 +20)
+
+.sc [成功]/[失败] [当前San]
+    理智检定 (例: .sc 1/1d4)
+
+.st [属性][操作符][值]
+    修改属性 (例: .st hp-1)`,
+          undefined,
+          recipientId
+        );
+        break;
+      case "roll":
+      case "roll_hidden":
+        if (cmd.type === "roll_hidden" && !isKP) {
+          addLog("system", "只有守秘人可以使用暗骰 (.rh)");
+          return;
+        }
+
+        if (cmd.payload.expression) {
+          const char = characters.find((c) => c.id === activeCharId);
+          const { total, details } = evaluateDiceExpression(
+            cmd.payload.expression,
+            char
+          );
+          const resultData = {
+            count: 0,
+            type: 0,
+            total: total,
+            details: details,
+            expression: `${cmd.payload.expression} = ${total}`,
+            checkName: cmd.payload.reason
+          };
+          const msgType = cmd.type === "roll_hidden" ? "dice_secret" : "dice";
+          addLog(
+            msgType as any,
+            JSON.stringify(resultData),
+            activeCharId === "pc" ? "pc" : activeCharId
+          );
+        } else {
+          // Fallback logic shouldn't be reached if parser works correctly
+          rollDice(
+            cmd.payload.count,
+            cmd.payload.sides,
+            cmd.type === "roll_hidden",
+            { name: cmd.payload.reason }
+          );
+        }
+        break;
+      case "check":
+        // Find skill
+        const charToCheck = characters.find((c) => c.id === activeCharId);
+        let checkTarget = 0;
+        let checkName = "";
+
+        if (cmd.payload.targetExpression) {
+          // Case 1: Expression Target (e.g. .ra 3d6+力量)
+          const { total } = evaluateDiceExpression(
+            cmd.payload.targetExpression,
+            charToCheck
+          );
+          checkTarget = total;
+          checkName = cmd.payload.targetExpression;
+        } else if (cmd.payload.skill) {
+          // Case 2: Skill [+ Modifier] (e.g. .ra 力量 +10)
+          const skillName = cmd.payload.skill;
+          let baseVal = 0;
+
+          if (charToCheck) {
+            if (
+              charToCheck.skills &&
+              charToCheck.skills[skillName] !== undefined
+            ) {
+              baseVal = charToCheck.skills[skillName];
+            } else if (charToCheck.stats) {
+              const key = ALIAS_MAP[skillName] || skillName;
+              if (charToCheck.stats[key] !== undefined) {
+                baseVal = charToCheck.stats[key];
+              }
+            }
+          }
+
+          if (cmd.payload.modifier) {
+            const modStr = cmd.payload.modifier;
+            const { total: modVal } = evaluateDiceExpression(
+              modStr,
+              charToCheck
+            );
+
+            // Determine if modifier is relative or absolute
+            // If it starts with + or -, or is an expression like "1d4" (which we treat as additive usually? No, "1d4" usually means +1d4 in this context)
+            // But if user types ".ra 力量 50" (space 50), it means target=50.
+            // If user types ".ra 力量 +50", it means target=base+50.
+            
+            // Check original string for leading operator
+            const isRelative = /^[\+\-\*\/]/.test(modStr.trim());
+            
+            if (isRelative) {
+                // evaluateDiceExpression result includes the sign if expression was "+10" -> eval("+10") -> 10.
+                // But we need to add to base.
+                // Wait, eval("+10") is 10. eval("-10") is -10.
+                // So target = base + modVal is correct for both cases.
+                checkTarget = baseVal + modVal;
+                checkName = `${skillName} ${modStr}`;
+            } else {
+                // Absolute (e.g. "50" or "3d6" without plus)
+                // If user types ".ra 力量 3d6", it likely means target is result of 3d6.
+                checkTarget = modVal;
+                checkName = `${skillName} ${modStr}`;
+            }
+          } else {
+            checkTarget = baseVal;
+            checkName = skillName;
+          }
+        }
+
+        rollDice(1, 100, false, {
+          name: checkName,
+          target: checkTarget,
+        });
+        break;
+      case "sanity":
+        handleSanityCheck(
+          cmd.payload.success,
+          cmd.payload.failure,
+          cmd.payload.value
+        );
+        break;
+      case "set":
+        if (activeCharId !== "pc") {
+          updateCharacterStats(activeCharId, cmd.payload);
+        } else {
+          addLog("system", "守秘人没有属性可以修改");
+        }
+        break;
+      case "error":
+        addLog("system", `指令错误: ${cmd.payload}`);
+        break;
+    }
+  };
+
+  const handleSend = (
+    text: string,
+    recipientId?: string | null,
+    type?: Log["type"],
+    quote?: { id: string; content: string; charName: string }
+  ) => {
+    const command = parseDiceCommand(text);
+    if (command) {
+      handleCommand(command, text, recipientId);
+    } else {
+      addLog(
+        type || "normal",
+        text,
+        undefined,
+        recipientId,
+        quote ? { quote } : undefined
+      );
+    }
+  };
+
   const handleLeaveRoom = async () => {
     if (!currentRoomId || !session?.user) {
       doLeaveCleanup();
@@ -1524,6 +1938,18 @@ const App: React.FC = () => {
     ...c,
     isOnline: c.user_id ? onlineUsers.has(c.user_id) : false,
   }));
+
+  if (isWelcome) {
+    return (
+      <Welcome
+        onNavigate={(path) => {
+          if (path === "/") {
+            setIsWelcome(false);
+          }
+        }}
+      />
+    );
+  }
 
   if (authLoading) {
     return (
@@ -1618,13 +2044,7 @@ const App: React.FC = () => {
             characters={derivedCharacters}
             moduleInfo={moduleInfo}
             onSend={(text, recipientId, type, quote) =>
-              addLog(
-                type || "normal",
-                text,
-                undefined,
-                recipientId,
-                quote ? { quote } : undefined
-              )
+              handleSend(text, recipientId, type, quote)
             }
             onRollDice={rollDice}
             onShowStory={handleShowStory}

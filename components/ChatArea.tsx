@@ -371,14 +371,18 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
               >
                 <div
                   className={cn(
-                    "text-xs px-4 py-1.5 rounded-full border flex items-center gap-2 shadow-sm backdrop-blur-sm",
+                    "text-xs px-4 py-2 rounded-xl border flex items-start gap-2 shadow-sm backdrop-blur-sm max-w-[85%]",
                     isStatus
                       ? "bg-red-500/10 border-red-500/20 text-red-300"
                       : "bg-slate-800/60 border-slate-700/50 text-slate-400"
                   )}
                 >
-                  {isStatus ? <Activity size={12} /> : <Info size={12} />}
-                  <span className="font-mono">{log.content}</span>
+                  <div className="mt-0.5 shrink-0">
+                    {isStatus ? <Activity size={12} /> : <Info size={12} />}
+                  </div>
+                  <span className="font-mono whitespace-pre-wrap text-left leading-relaxed">
+                    {log.content}
+                  </span>
                 </div>
               </div>
             );
@@ -520,7 +524,11 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                       投掷了
                     </span>
                     <span className="text-white text-lg font-bold">
-                      {diceData.count}D{diceData.type || 6}
+                      {diceData.expression ? (
+                        <span className="text-base">{diceData.expression}</span>
+                      ) : (
+                        `${diceData.count}D${diceData.type || 6}`
+                      )}
                     </span>
                     <span className="text-slate-600">:</span>
                     <span

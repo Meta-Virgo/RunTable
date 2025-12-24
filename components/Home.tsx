@@ -174,7 +174,9 @@ export const Home: React.FC<HomeProps> = ({
   // Rooms State
   const [rooms, setRooms] = useState<Room[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
-  const [roomFilter, setRoomFilter] = useState<'all' | 'mine' | 'created' | 'kp_online'>('all');
+  const [roomFilter, setRoomFilter] = useState<
+    "all" | "mine" | "created" | "kp_online"
+  >("all");
   const [showCreateRoom, setShowCreateRoom] = useState(false);
   const [newRoomTitle, setNewRoomTitle] = useState("");
   const [newRoomDesc, setNewRoomDesc] = useState("");
@@ -566,375 +568,377 @@ export const Home: React.FC<HomeProps> = ({
         </Button>
       </header>
 
-      <main className="flex-1 container mx-auto p-4 md:p-8 max-w-6xl overflow-y-auto custom-scrollbar">
-        {/* Mobile Nav */}
-        <div className="md:hidden flex bg-slate-800/50 p-1 rounded-lg mb-6">
-          <button
-            onClick={() => setActiveTab("rooms")}
-            className={`flex-1 py-2 rounded-md text-sm font-medium ${
-              activeTab === "rooms"
-                ? "bg-indigo-600 text-white"
-                : "text-slate-400"
-            }`}
-          >
-            大厅
-          </button>
-          <button
-            onClick={() => setActiveTab("characters")}
-            className={`flex-1 py-2 rounded-md text-sm font-medium ${
-              activeTab === "characters"
-                ? "bg-indigo-600 text-white"
-                : "text-slate-400"
-            }`}
-          >
-            车卡
-          </button>
-          <button
-            onClick={() => setActiveTab("profile")}
-            className={`flex-1 py-2 rounded-md text-sm font-medium ${
-              activeTab === "profile"
-                ? "bg-indigo-600 text-white"
-                : "text-slate-400"
-            }`}
-          >
-            我的
-          </button>
-        </div>
+      <main className="flex-1 w-full overflow-y-auto custom-scrollbar">
+        <div className="container mx-auto p-4 md:p-8 max-w-6xl">
+          {/* Mobile Nav */}
+          <div className="md:hidden flex bg-slate-800/50 p-1 rounded-lg mb-6">
+            <button
+              onClick={() => setActiveTab("rooms")}
+              className={`flex-1 py-2 rounded-md text-sm font-medium ${
+                activeTab === "rooms"
+                  ? "bg-indigo-600 text-white"
+                  : "text-slate-400"
+              }`}
+            >
+              大厅
+            </button>
+            <button
+              onClick={() => setActiveTab("characters")}
+              className={`flex-1 py-2 rounded-md text-sm font-medium ${
+                activeTab === "characters"
+                  ? "bg-indigo-600 text-white"
+                  : "text-slate-400"
+              }`}
+            >
+              车卡
+            </button>
+            <button
+              onClick={() => setActiveTab("profile")}
+              className={`flex-1 py-2 rounded-md text-sm font-medium ${
+                activeTab === "profile"
+                  ? "bg-indigo-600 text-white"
+                  : "text-slate-400"
+              }`}
+            >
+              我的
+            </button>
+          </div>
 
-        {activeTab === "rooms" ? (
-          <div className="space-y-6">
-            {/* Room Controls */}
-            <div className="flex flex-col gap-4">
-              <div className="flex flex-col md:flex-row gap-4 justify-between items-center">
-                <div className="relative w-full md:w-96 group">
-                  <Search
-                    className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-indigo-400 transition-colors"
-                    size={18}
-                  />
-                  <input
-                    type="text"
-                    placeholder="搜索房间..."
-                    className="w-full bg-slate-900/50 border border-slate-700/50 rounded-xl pl-10 pr-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 transition-all text-sm"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                  />
+          {activeTab === "rooms" ? (
+            <div className="space-y-6">
+              {/* Room Controls */}
+              <div className="flex flex-col gap-4">
+                <div className="flex flex-col md:flex-row gap-4 justify-between items-center">
+                  <div className="relative w-full md:w-96 group">
+                    <Search
+                      className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-indigo-400 transition-colors"
+                      size={18}
+                    />
+                    <input
+                      type="text"
+                      placeholder="搜索房间..."
+                      className="w-full bg-slate-900/50 border border-slate-700/50 rounded-xl pl-10 pr-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 transition-all text-sm"
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                    />
+                  </div>
+                  <Button icon={Plus} onClick={() => setShowCreateRoom(true)}>
+                    创建房间
+                  </Button>
                 </div>
-                <Button icon={Plus} onClick={() => setShowCreateRoom(true)}>
-                  创建房间
+
+                {/* Filters */}
+                <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
+                  {[
+                    { id: "all", label: "全部" },
+                    { id: "mine", label: "我的角色" },
+                    { id: "created", label: "我的房间" },
+                    { id: "kp_online", label: "KP在线" },
+                  ].map((f) => (
+                    <button
+                      key={f.id}
+                      onClick={() => setRoomFilter(f.id as any)}
+                      className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all whitespace-nowrap ${
+                        roomFilter === f.id
+                          ? "bg-indigo-500/20 text-indigo-400 border border-indigo-500/30"
+                          : "bg-slate-800/50 text-slate-400 border border-transparent hover:bg-slate-800 hover:text-slate-300"
+                      }`}
+                    >
+                      {f.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Create Room Form (Inline) */}
+              {showCreateRoom && (
+                <div className="bg-slate-800/30 border border-indigo-500/30 rounded-2xl p-6 animate-scale-in">
+                  <h3 className="text-lg font-bold text-white mb-4">
+                    新建跑团房间
+                  </h3>
+                  <div className="space-y-4">
+                    <Input
+                      label="房间标题"
+                      value={newRoomTitle}
+                      onChange={(e) => setNewRoomTitle(e.target.value)}
+                      placeholder="例如：印斯茅斯之影"
+                    />
+                    <Input
+                      label="房间密码 (可选)"
+                      value={newRoomPassword}
+                      onChange={(e) => setNewRoomPassword(e.target.value)}
+                      placeholder="留空则为公开房间"
+                      type="password"
+                    />
+                    <Textarea
+                      label="简介 (可选)"
+                      value={newRoomDesc}
+                      onChange={(e) => setNewRoomDesc(e.target.value)}
+                      placeholder="简单的模组介绍或招募要求..."
+                    />
+                    <div className="flex justify-end gap-3 pt-4 border-t border-white/10">
+                      <Button
+                        variant="ghost"
+                        onClick={() => setShowCreateRoom(false)}
+                      >
+                        取消
+                      </Button>
+                      <Button
+                        onClick={handleCreateRoom}
+                        disabled={!newRoomTitle.trim() || loading}
+                        icon={loading ? Loader2 : Plus}
+                      >
+                        {loading ? "创建中..." : "立即创建"}
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Rooms Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {filteredRooms.map((room) => (
+                  <RoomCard
+                    key={room.id}
+                    room={room}
+                    currentUserId={currentUserId}
+                    myCharacters={myCharacters}
+                    onJoinRoom={onJoinRoom}
+                  />
+                ))}
+                {filteredRooms.length === 0 && (
+                  <div className="col-span-full py-12 text-center text-slate-500">
+                    <Users size={48} className="mx-auto mb-3 opacity-20" />
+                    <p>暂无公开房间，快来创建一个吧！</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          ) : activeTab === "characters" ? (
+            <div className="space-y-6">
+              <div className="flex justify-between items-center">
+                <h2 className="text-2xl font-bold text-white">车卡列表</h2>
+                <Button
+                  icon={Plus}
+                  onClick={() => {
+                    setEditingChar(null);
+                    setShowCharModal(true);
+                  }}
+                >
+                  新建角色
                 </Button>
               </div>
 
-              {/* Filters */}
-              <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
-                {[
-                  { id: "all", label: "全部" },
-                  { id: "mine", label: "我的角色" },
-                  { id: "created", label: "我的房间" },
-                  { id: "kp_online", label: "KP在线" },
-                ].map((f) => (
-                  <button
-                    key={f.id}
-                    onClick={() => setRoomFilter(f.id as any)}
-                    className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all whitespace-nowrap ${
-                      roomFilter === f.id
-                        ? "bg-indigo-500/20 text-indigo-400 border border-indigo-500/30"
-                        : "bg-slate-800/50 text-slate-400 border border-transparent hover:bg-slate-800 hover:text-slate-300"
-                    }`}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {myCharacters.map((char) => (
+                  <div
+                    key={char.id}
+                    className="bg-slate-800/30 border border-slate-700/50 hover:border-indigo-500/30 rounded-xl p-5 transition-all group relative overflow-hidden"
                   >
-                    {f.label}
-                  </button>
-                ))}
-              </div>
-            </div>
+                    <div className="absolute top-0 left-0 w-1 h-full bg-indigo-500/50"></div>
+                    <div className="flex gap-4 mb-3 pl-3">
+                      <div className="flex-shrink-0">
+                        <AvatarUpload
+                          url={char.avatar_url}
+                          onUpload={() => {}}
+                          editable={false}
+                          size={64}
+                        />
+                      </div>
+                      <div className="flex-grow">
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <h3 className="font-bold text-white text-lg">
+                              {char.name}
+                            </h3>
+                            <p className="text-xs text-slate-400 mt-1">
+                              {char.sex} · {char.age}岁
+                            </p>
+                          </div>
+                          <div className="text-right">
+                            <div className="text-lg font-mono font-bold text-indigo-400">
+                              {char.hp}
+                              <span className="text-xs text-slate-500 ml-1">
+                                HP
+                              </span>
+                            </div>
+                            <div className="text-sm font-mono text-slate-500">
+                              {char.san} SAN
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
 
-            {/* Create Room Form (Inline) */}
-            {showCreateRoom && (
-              <div className="bg-slate-800/30 border border-indigo-500/30 rounded-2xl p-6 animate-scale-in">
-                <h3 className="text-lg font-bold text-white mb-4">
-                  新建跑团房间
-                </h3>
-                <div className="space-y-4">
-                  <Input
-                    label="房间标题"
-                    value={newRoomTitle}
-                    onChange={(e) => setNewRoomTitle(e.target.value)}
-                    placeholder="例如：印斯茅斯之影"
-                  />
-                  <Input
-                    label="房间密码 (可选)"
-                    value={newRoomPassword}
-                    onChange={(e) => setNewRoomPassword(e.target.value)}
-                    placeholder="留空则为公开房间"
-                    type="password"
-                  />
-                  <Textarea
-                    label="简介 (可选)"
-                    value={newRoomDesc}
-                    onChange={(e) => setNewRoomDesc(e.target.value)}
-                    placeholder="简单的模组介绍或招募要求..."
-                  />
-                  <div className="flex justify-end gap-3 pt-4 border-t border-white/10">
-                    <Button
-                      variant="ghost"
-                      onClick={() => setShowCreateRoom(false)}
-                    >
-                      取消
-                    </Button>
-                    <Button
-                      onClick={handleCreateRoom}
-                      disabled={!newRoomTitle.trim() || loading}
-                      icon={loading ? Loader2 : Plus}
-                    >
-                      {loading ? "创建中..." : "立即创建"}
-                    </Button>
+                    <div className="mb-4 pl-3">
+                      <p className="text-xs text-slate-300 line-clamp-3 leading-relaxed">
+                        {char.backstory || "暂无背景故事..."}
+                      </p>
+                    </div>
+
+                    <div className="pl-3">
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        className="w-full"
+                        onClick={() => {
+                          setEditingChar(char);
+                          setShowCharModal(true);
+                        }}
+                      >
+                        编辑档案
+                      </Button>
+                    </div>
                   </div>
-                </div>
+                ))}
+                {myCharacters.length === 0 && (
+                  <div className="col-span-full py-12 text-center text-slate-500 border-2 border-dashed border-slate-800 rounded-xl">
+                    <User size={48} className="mx-auto mb-3 opacity-20" />
+                    <p>还没有创建角色，点击右上角新建</p>
+                  </div>
+                )}
               </div>
-            )}
-
-            {/* Rooms Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {filteredRooms.map((room) => (
-                <RoomCard
-                  key={room.id}
-                  room={room}
-                  currentUserId={currentUserId}
-                  myCharacters={myCharacters}
-                  onJoinRoom={onJoinRoom}
-                />
-              ))}
-              {filteredRooms.length === 0 && (
-                <div className="col-span-full py-12 text-center text-slate-500">
-                  <Users size={48} className="mx-auto mb-3 opacity-20" />
-                  <p>暂无公开房间，快来创建一个吧！</p>
-                </div>
-              )}
             </div>
-          </div>
-        ) : activeTab === "characters" ? (
-          <div className="space-y-6">
-            <div className="flex justify-between items-center">
-              <h2 className="text-2xl font-bold text-white">车卡列表</h2>
-              <Button
-                icon={Plus}
-                onClick={() => {
-                  setEditingChar(null);
-                  setShowCharModal(true);
-                }}
-              >
-                新建角色
-              </Button>
-            </div>
+          ) : (
+            <div className="max-w-2xl mx-auto space-y-8 animate-slide-up">
+              <div className="bg-slate-800/30 border border-slate-700/50 rounded-2xl p-8 text-center relative overflow-hidden">
+                <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500"></div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {myCharacters.map((char) => (
-                <div
-                  key={char.id}
-                  className="bg-slate-800/30 border border-slate-700/50 hover:border-indigo-500/30 rounded-xl p-5 transition-all group relative overflow-hidden"
-                >
-                  <div className="absolute top-0 left-0 w-1 h-full bg-indigo-500/50"></div>
-                  <div className="flex gap-4 mb-3 pl-3">
-                    <div className="flex-shrink-0">
+                {!isEditingProfile ? (
+                  <>
+                    <div className="absolute top-4 right-4">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        icon={Edit2}
+                        onClick={() => {
+                          setEditNickname(userNickname || "");
+                          setEditBio(
+                            userBio && userBio !== "NaN" && userBio !== "null"
+                              ? userBio
+                              : ""
+                          );
+                          setIsEditingProfile(true);
+                        }}
+                      >
+                        编辑
+                      </Button>
+                    </div>
+                    {isVip && (
+                      <div className="absolute top-4 left-4">
+                        <span className="bg-gradient-to-r from-purple-600 to-indigo-600 text-white text-xs font-bold px-2 py-1 rounded-full shadow-lg border border-purple-400/30">
+                          VIP
+                        </span>
+                      </div>
+                    )}
+                    <div className="mx-auto mb-4 flex justify-center">
                       <AvatarUpload
-                        url={char.avatar_url}
+                        url={userAvatar}
                         onUpload={() => {}}
                         editable={false}
-                        size={64}
+                        size={96}
                       />
                     </div>
-                    <div className="flex-grow">
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <h3 className="font-bold text-white text-lg">
-                            {char.name}
-                          </h3>
-                          <p className="text-xs text-slate-400 mt-1">
-                            {char.sex} · {char.age}岁
-                          </p>
-                        </div>
-                        <div className="text-right">
-                          <div className="text-lg font-mono font-bold text-indigo-400">
-                            {char.hp}
-                            <span className="text-xs text-slate-500 ml-1">
-                              HP
-                            </span>
-                          </div>
-                          <div className="text-sm font-mono text-slate-500">
-                            {char.san} SAN
-                          </div>
-                        </div>
-                      </div>
+                    <div className="relative inline-block">
+                      <h2
+                        className={`text-2xl font-bold mb-1 transition-colors ${
+                          isVip
+                            ? "text-purple-400 drop-shadow-[0_0_10px_rgba(168,85,247,0.5)]"
+                            : "text-white"
+                        }`}
+                      >
+                        {userNickname || "未命名用户"}
+                      </h2>
                     </div>
-                  </div>
-
-                  <div className="mb-4 pl-3">
-                    <p className="text-xs text-slate-300 line-clamp-3 leading-relaxed">
-                      {char.backstory || "暂无背景故事..."}
-                    </p>
-                  </div>
-
-                  <div className="pl-3">
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      className="w-full"
-                      onClick={() => {
-                        setEditingChar(char);
-                        setShowCharModal(true);
-                      }}
-                    >
-                      编辑档案
-                    </Button>
-                  </div>
-                </div>
-              ))}
-              {myCharacters.length === 0 && (
-                <div className="col-span-full py-12 text-center text-slate-500 border-2 border-dashed border-slate-800 rounded-xl">
-                  <User size={48} className="mx-auto mb-3 opacity-20" />
-                  <p>还没有创建角色，点击右上角新建</p>
-                </div>
-              )}
-            </div>
-          </div>
-        ) : (
-          <div className="max-w-2xl mx-auto space-y-8 animate-slide-up">
-            <div className="bg-slate-800/30 border border-slate-700/50 rounded-2xl p-8 text-center relative overflow-hidden">
-              <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500"></div>
-
-              {!isEditingProfile ? (
-                <>
-                  <div className="absolute top-4 right-4">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      icon={Edit2}
-                      onClick={() => {
-                        setEditNickname(userNickname || "");
-                        setEditBio(
-                          userBio && userBio !== "NaN" && userBio !== "null"
-                            ? userBio
-                            : ""
-                        );
-                        setIsEditingProfile(true);
-                      }}
-                    >
-                      编辑
-                    </Button>
-                  </div>
-                  {isVip && (
-                    <div className="absolute top-4 left-4">
-                      <span className="bg-gradient-to-r from-purple-600 to-indigo-600 text-white text-xs font-bold px-2 py-1 rounded-full shadow-lg border border-purple-400/30">
-                        VIP
+                    <div className="flex justify-center items-center gap-2 mb-4">
+                      <span className="text-sm text-slate-400 font-mono bg-slate-900/50 px-2 py-1 rounded">
+                        UID: {userCode || "---"}
                       </span>
                     </div>
-                  )}
-                  <div className="mx-auto mb-4 flex justify-center">
-                    <AvatarUpload
-                      url={userAvatar}
-                      onUpload={() => {}}
-                      editable={false}
-                      size={96}
-                    />
-                  </div>
-                  <div className="relative inline-block">
-                    <h2
-                      className={`text-2xl font-bold mb-1 transition-colors ${
-                        isVip
-                          ? "text-purple-400 drop-shadow-[0_0_10px_rgba(168,85,247,0.5)]"
-                          : "text-white"
-                      }`}
-                    >
-                      {userNickname || "未命名用户"}
-                    </h2>
-                  </div>
-                  <div className="flex justify-center items-center gap-2 mb-4">
-                    <span className="text-sm text-slate-400 font-mono bg-slate-900/50 px-2 py-1 rounded">
-                      UID: {userCode || "---"}
-                    </span>
-                  </div>
-                  <p className="text-slate-300 mb-6 max-w-md mx-auto italic">
-                    {userBio && userBio !== "NaN" && userBio !== "null"
-                      ? `"${userBio}"`
-                      : "这个人很神秘，什么都没有写..."}
-                  </p>
+                    <p className="text-slate-300 mb-6 max-w-md mx-auto italic">
+                      {userBio && userBio !== "NaN" && userBio !== "null"
+                        ? `"${userBio}"`
+                        : "这个人很神秘，什么都没有写..."}
+                    </p>
 
-                  <div className="grid grid-cols-2 gap-4 text-left mt-6">
-                    <div className="bg-slate-900/50 p-4 rounded-xl border border-slate-700/30">
-                      <div className="text-xs text-slate-500 uppercase font-bold mb-1">
-                        我的车卡
+                    <div className="grid grid-cols-2 gap-4 text-left mt-6">
+                      <div className="bg-slate-900/50 p-4 rounded-xl border border-slate-700/30">
+                        <div className="text-xs text-slate-500 uppercase font-bold mb-1">
+                          我的车卡
+                        </div>
+                        <div className="text-2xl font-mono font-bold text-indigo-400">
+                          {myCharacters.length}
+                        </div>
                       </div>
-                      <div className="text-2xl font-mono font-bold text-indigo-400">
-                        {myCharacters.length}
+                      <div className="bg-slate-900/50 p-4 rounded-xl border border-slate-700/30">
+                        <div className="text-xs text-slate-500 uppercase font-bold mb-1">
+                          注册时间
+                        </div>
+                        <div className="text-sm text-slate-300">
+                          {userCreatedAt
+                            ? new Date(userCreatedAt).toLocaleDateString()
+                            : "---"}
+                        </div>
                       </div>
                     </div>
-                    <div className="bg-slate-900/50 p-4 rounded-xl border border-slate-700/30">
-                      <div className="text-xs text-slate-500 uppercase font-bold mb-1">
-                        注册时间
-                      </div>
-                      <div className="text-sm text-slate-300">
-                        {userCreatedAt
-                          ? new Date(userCreatedAt).toLocaleDateString()
-                          : "---"}
-                      </div>
+                  </>
+                ) : (
+                  <div className="max-w-md mx-auto space-y-4 text-left">
+                    <h3 className="text-lg font-bold text-white mb-4 text-center">
+                      编辑个人资料
+                    </h3>
+                    <div className="flex justify-center mb-4">
+                      <AvatarUpload
+                        url={editAvatar || userAvatar}
+                        onUpload={(url) => setEditAvatar(url)}
+                        editable={true}
+                        size={96}
+                      />
+                    </div>
+                    <Input
+                      label="昵称"
+                      value={editNickname}
+                      onChange={(e) => setEditNickname(e.target.value)}
+                    />
+                    <Textarea
+                      label="个人简介"
+                      value={editBio}
+                      onChange={(e) => setEditBio(e.target.value)}
+                    />
+                    <div className="flex justify-center gap-3 pt-2">
+                      <Button
+                        variant="ghost"
+                        onClick={() => setIsEditingProfile(false)}
+                      >
+                        取消
+                      </Button>
+                      <Button onClick={handleUpdateProfile} disabled={loading}>
+                        {loading ? (
+                          <Loader2 className="animate-spin" />
+                        ) : (
+                          "保存更改"
+                        )}
+                      </Button>
                     </div>
                   </div>
-                </>
-              ) : (
-                <div className="max-w-md mx-auto space-y-4 text-left">
-                  <h3 className="text-lg font-bold text-white mb-4 text-center">
-                    编辑个人资料
-                  </h3>
-                  <div className="flex justify-center mb-4">
-                    <AvatarUpload
-                      url={editAvatar || userAvatar}
-                      onUpload={(url) => setEditAvatar(url)}
-                      editable={true}
-                      size={96}
-                    />
-                  </div>
-                  <Input
-                    label="昵称"
-                    value={editNickname}
-                    onChange={(e) => setEditNickname(e.target.value)}
-                  />
-                  <Textarea
-                    label="个人简介"
-                    value={editBio}
-                    onChange={(e) => setEditBio(e.target.value)}
-                  />
-                  <div className="flex justify-center gap-3 pt-2">
-                    <Button
-                      variant="ghost"
-                      onClick={() => setIsEditingProfile(false)}
-                    >
-                      取消
-                    </Button>
-                    <Button onClick={handleUpdateProfile} disabled={loading}>
-                      {loading ? (
-                        <Loader2 className="animate-spin" />
-                      ) : (
-                        "保存更改"
-                      )}
-                    </Button>
-                  </div>
-                </div>
-              )}
-            </div>
+                )}
+              </div>
 
-            {/* Suggestion Section */}
-            <div className="bg-slate-800/30 border border-slate-700/50 rounded-2xl p-6 text-center">
-              <h3 className="text-sm font-bold text-slate-400 mb-2 uppercase tracking-wider">
-                由衷期待您建议和反馈!
-              </h3>
-              <a
-                href="mailto:may331@foxmail.com"
-                className="text-indigo-400 hover:text-indigo-300 font-mono transition-colors text-lg"
-              >
-                may331@foxmail.com
-              </a>
+              {/* Suggestion Section */}
+              <div className="bg-slate-800/30 border border-slate-700/50 rounded-2xl p-6 text-center">
+                <h3 className="text-sm font-bold text-slate-400 mb-2 uppercase tracking-wider">
+                  由衷期待您建议和反馈!
+                </h3>
+                <a
+                  href="mailto:may331@foxmail.com"
+                  className="text-indigo-400 hover:text-indigo-300 font-mono transition-colors text-lg"
+                >
+                  may331@foxmail.com
+                </a>
+              </div>
             </div>
-          </div>
-        )}
+          )}
+        </div>
       </main>
 
       {/* Edit Room Modal */}
