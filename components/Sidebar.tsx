@@ -379,6 +379,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </>
           )}
         </div>
+
         <div className="p-4 border-t border-white/5 hidden md:block">
           <button
             onClick={() => setIsOpen(!isOpen)}

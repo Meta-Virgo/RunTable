@@ -18,6 +18,7 @@ import { Button } from "./components/UI";
 import { ModuleInfo, Character, Log } from "./types"; // Removed AppData as it might not be used anymore
 import { Menu, LogOut } from "lucide-react";
 import { parseDiceCommand } from "./utils/commandParser";
+import { useLevelSystem } from "./hooks/useLevelSystem";
 
 // --- Constants ---
 const INITIAL_CHAR_STATE: Character = {
@@ -74,6 +75,9 @@ const App: React.FC = () => {
   const [session, setSession] = useState<Session | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [minLoadingPassed, setMinLoadingPassed] = useState(false); // Ensure loading screen shows for a bit
+
+  // Level System
+  const levelInfo = useLevelSystem(session);
 
   // Application State
   const [currentRoomId, setCurrentRoomId] = useState<string | null>(null);
@@ -1993,6 +1997,7 @@ const App: React.FC = () => {
         onJoinRoom={handleJoinRoom}
         onLogout={handleSignOut}
         onlineUsers={globalOnlineUsers}
+        levelInfo={levelInfo}
       />
     );
   }
@@ -2027,6 +2032,7 @@ const App: React.FC = () => {
         isMobile={isMobile}
         isKP={isKP}
         kpOnline={kpId ? onlineUsers.has(kpId) : false}
+        levelInfo={levelInfo}
       />
 
       <main className="flex-1 flex flex-col relative min-w-0 z-10">

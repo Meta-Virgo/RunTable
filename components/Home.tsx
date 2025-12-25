@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { supabase } from "../supabase";
 import { Room, Character } from "../types";
-import { Button, Input, Textarea, Modal } from "./UI";
+import { Button, Input, Textarea, Modal, cn } from "./UI";
 import {
   Plus,
   Search,
@@ -20,6 +20,13 @@ interface HomeProps {
   onJoinRoom: (roomId: string, charId: string | "pc") => void;
   onLogout: () => void;
   onlineUsers: Set<string>;
+  levelInfo?: {
+    level: number;
+    experience: number;
+    nextLevelExp: number;
+    claimReward: (type: "login" | "30m" | "60m" | "120m") => Promise<any>;
+    dailyActivity: any;
+  };
 }
 
 const INITIAL_CHAR_STATE: Character = {
@@ -165,6 +172,7 @@ export const Home: React.FC<HomeProps> = ({
   onJoinRoom,
   onLogout,
   onlineUsers = new Set(),
+  levelInfo,
 }) => {
   const [activeTab, setActiveTab] = useState<
     "rooms" | "characters" | "profile"
@@ -831,15 +839,53 @@ export const Home: React.FC<HomeProps> = ({
                         </span>
                       </div>
                     )}
-                    <div className="mx-auto mb-4 flex justify-center">
-                      <AvatarUpload
-                        url={userAvatar}
-                        onUpload={() => {}}
-                        editable={false}
-                        size={96}
-                      />
+                    <div className="mx-auto mb-4 flex justify-center relative">
+                      <div className="relative">
+                        {/* Circular Progress */}
+                        {levelInfo && (
+                          <svg
+                            className="absolute -top-1 -left-1 w-[104px] h-[104px] rotate-[-90deg]"
+                            viewBox="0 0 100 100"
+                          >
+                            <circle
+                              cx="50"
+                              cy="50"
+                              r="48"
+                              fill="none"
+                              stroke="#1e293b"
+                              strokeWidth="3"
+                            />
+                            <circle
+                              cx="50"
+                              cy="50"
+                              r="48"
+                              fill="none"
+                              stroke="#6366f1"
+                              strokeWidth="3"
+                              strokeDasharray="301.59"
+                              strokeDashoffset={
+                                301.59 -
+                                Math.min(
+                                  levelInfo.experience / levelInfo.nextLevelExp,
+                                  1
+                                ) *
+                                  301.59
+                              }
+                              strokeLinecap="round"
+                              className="transition-all duration-1000 ease-out"
+                            />
+                          </svg>
+                        )}
+
+                        <AvatarUpload
+                          url={userAvatar}
+                          onUpload={() => {}}
+                          editable={false}
+                          size={96}
+                        />
+                      </div>
                     </div>
-                    <div className="relative inline-block">
+                    <div className="relative inline-flex items-center gap-2">
                       <h2
                         className={`text-2xl font-bold mb-1 transition-colors ${
                           isVip
@@ -849,6 +895,11 @@ export const Home: React.FC<HomeProps> = ({
                       >
                         {userNickname || "未命名用户"}
                       </h2>
+                      {levelInfo && (
+                        <span className="bg-indigo-500/20 text-indigo-300 text-[10px] font-bold px-1.5 py-0.5 rounded border border-indigo-500/30">
+                          LV.{levelInfo.level}
+                        </span>
+                      )}
                     </div>
                     <div className="flex justify-center items-center gap-2 mb-4">
                       <span className="text-sm text-slate-400 font-mono bg-slate-900/50 px-2 py-1 rounded">

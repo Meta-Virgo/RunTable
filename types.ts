@@ -10,6 +10,8 @@ export interface Profile {
   created_at: string;
   is_vip?: boolean;
   avatar_url?: string | null;
+  level?: number;
+  experience?: number;
 }
 
 export interface Room {
