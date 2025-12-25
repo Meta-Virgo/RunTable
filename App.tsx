@@ -7,6 +7,7 @@ import { Home } from "./components/Home";
 import { Sidebar } from "./components/Sidebar";
 import { ChatArea } from "./components/ChatArea";
 import { Dashboard } from "./components/Dashboard";
+import { LoadingScreen } from "./components/LoadingScreen";
 import {
   ModuleModal,
   CharacterModal,
@@ -72,6 +73,7 @@ const App: React.FC = () => {
   // Auth State
   const [session, setSession] = useState<Session | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
+  const [minLoadingPassed, setMinLoadingPassed] = useState(false); // Ensure loading screen shows for a bit
 
   // Application State
   const [currentRoomId, setCurrentRoomId] = useState<string | null>(null);
@@ -215,6 +217,14 @@ const App: React.FC = () => {
   useEffect(() => {
     charactersRef.current = characters;
   }, [characters]);
+
+  // Minimum Loading Time
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setMinLoadingPassed(true);
+    }, 2000); // Show loading screen for at least 2 seconds
+    return () => clearTimeout(timer);
+  }, []);
 
   // Auth Check
   useEffect(() => {
@@ -1969,12 +1979,8 @@ const App: React.FC = () => {
     );
   }
 
-  if (authLoading) {
-    return (
-      <div className="h-screen w-full flex items-center justify-center bg-[#020617] text-slate-500">
-        Loading...
-      </div>
-    );
+  if (authLoading || !minLoadingPassed) {
+    return <LoadingScreen />;
   }
 
   if (!session) {
