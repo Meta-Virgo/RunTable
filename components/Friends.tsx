@@ -1,18 +1,23 @@
 import React, { useState, useEffect } from "react";
 import { supabase } from "../supabase";
-import { Profile, Friendship, GameHistory, GameHistoryParticipant, Character } from "../types";
-import { Button, Input, Modal, cn } from "./UI";
+import {
+  Profile,
+  Friendship,
+  GameHistory,
+  GameHistoryParticipant,
+} from "../types";
+import { Button, Modal } from "./UI";
 import {
   Search,
   UserPlus,
   UserCheck,
   UserX,
-  MessageSquare,
   History,
   Skull,
   Crown,
   Loader2,
-  User
+  User,
+  Trash2,
 } from "lucide-react";
 import { AvatarUpload } from "./AvatarUpload";
 
@@ -21,7 +26,7 @@ interface FriendsProps {
 }
 
 export const Friends: React.FC<FriendsProps> = ({ currentUser }) => {
-  const [activeTab, setActiveTab] = useState<"list" | "requests" | "add">("list");
+  const [activeTab, setActiveTab] = useState<"list" | "requests">("list");
   const [friends, setFriends] = useState<Friendship[]>([]);
   const [requests, setRequests] = useState<Friendship[]>([]);
   const [loading, setLoading] = useState(false);
@@ -51,15 +56,17 @@ export const Friends: React.FC<FriendsProps> = ({ currentUser }) => {
   const fetchFriends = async () => {
     if (!currentUser) return;
     setLoading(true);
-    
+
     // Fetch accepted friendships where I am user_id OR friend_id
-    const { data, error } = await supabase
+    const { data } = await supabase
       .from("friendships")
-      .select(`
+      .select(
+        `
         *,
         friend_profile:friend_id (*),
         user_profile:user_id (*)
-      `)
+      `
+      )
       .or(`user_id.eq.${currentUser.id},friend_id.eq.${currentUser.id}`)
       .eq("status", "accepted");
 
@@ -80,17 +87,21 @@ export const Friends: React.FC<FriendsProps> = ({ currentUser }) => {
   const fetchRequests = async () => {
     if (!currentUser) return;
     // Fetch pending requests where I am the RECEIVER (friend_id)
-    const { data, error } = await supabase
+    const { data } = await supabase
       .from("friendships")
-      .select(`
+      .select(
+        `
         *,
         user_profile:user_id (*)
-      `)
+      `
+      )
       .eq("friend_id", currentUser.id)
       .eq("status", "pending");
 
     if (data) {
-      setRequests(data.map((r: any) => ({ ...r, friend_profile: r.user_profile })));
+      setRequests(
+        data.map((r: any) => ({ ...r, friend_profile: r.user_profile }))
+      );
     }
   };
 
@@ -99,10 +110,7 @@ export const Friends: React.FC<FriendsProps> = ({ currentUser }) => {
     setIsSearching(true);
     setSearchResults([]);
 
-    let query = supabase
-      .from("profiles")
-      .select("*")
-      .neq("id", currentUser.id); // Exclude self
+    let query = supabase.from("profiles").select("*").neq("id", currentUser.id); // Exclude self
 
     // Check if query is numeric (UID) or string (Nickname)
     if (/^\d+$/.test(searchQuery)) {
@@ -120,28 +128,28 @@ export const Friends: React.FC<FriendsProps> = ({ currentUser }) => {
 
   const sendFriendRequest = async (targetUserId: string) => {
     if (!currentUser) return;
-    
+
     // Check if already friends or requested
     const { data: existing } = await supabase
       .from("friendships")
       .select("*")
-      .or(`and(user_id.eq.${currentUser.id},friend_id.eq.${targetUserId}),and(user_id.eq.${targetUserId},friend_id.eq.${currentUser.id})`)
+      .or(
+        `and(user_id.eq.${currentUser.id},friend_id.eq.${targetUserId}),and(user_id.eq.${targetUserId},friend_id.eq.${currentUser.id})`
+      )
       .single();
 
     if (existing) {
-      if (existing.status === 'accepted') alert("你们已经是好友了");
+      if (existing.status === "accepted") alert("你们已经是好友了");
       else if (existing.user_id === currentUser.id) alert("已发送过申请");
       else alert("对方已经向你发送了申请，请去处理");
       return;
     }
 
-    const { error } = await supabase
-      .from("friendships")
-      .insert({
-        user_id: currentUser.id,
-        friend_id: targetUserId,
-        status: "pending",
-      });
+    const { error } = await supabase.from("friendships").insert({
+      user_id: currentUser.id,
+      friend_id: targetUserId,
+      status: "pending",
+    });
 
     if (error) {
       alert("申请发送失败: " + error.message);
@@ -173,6 +181,21 @@ export const Friends: React.FC<FriendsProps> = ({ currentUser }) => {
     }
   };
 
+  const handleDeleteFriend = async (friendshipId: string) => {
+    if (!confirm("确定要删除这位好友吗？")) return;
+
+    const { error } = await supabase
+      .from("friendships")
+      .delete()
+      .eq("id", friendshipId);
+
+    if (error) {
+      alert("删除失败: " + error.message);
+    } else {
+      setFriends((prev) => prev.filter((f) => f.id !== friendshipId));
+    }
+  };
+
   const fetchUserHistory = async (userId: string) => {
     setHistoryLoading(true);
     // 1. Fetch KP History
@@ -187,10 +210,12 @@ export const Friends: React.FC<FriendsProps> = ({ currentUser }) => {
     // 2. Fetch Player History
     const { data: playerData } = await supabase
       .from("game_history_participants")
-      .select(`
+      .select(
+        `
         *,
         game_history:game_histories (*)
-      `)
+      `
+      )
       .eq("user_id", userId)
       .order("id", { ascending: false });
 
@@ -239,125 +264,221 @@ export const Friends: React.FC<FriendsProps> = ({ currentUser }) => {
             <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full animate-pulse"></span>
           )}
         </button>
-        <button
-          onClick={() => setActiveTab("add")}
-          className={`flex-1 md:flex-none px-6 py-2 rounded-md text-sm font-medium transition-all ${
-            activeTab === "add"
-              ? "bg-indigo-600 text-white shadow-lg"
-              : "text-slate-400 hover:text-white"
-          }`}
-        >
-          添加好友
-        </button>
       </div>
 
       {/* Content */}
       <div className="min-h-[400px]">
         {activeTab === "list" && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {friends.map((f) => {
-              const profile = f.friend_profile!;
-              return (
-                <div key={f.id} className="bg-slate-800/30 border border-slate-700/50 p-4 rounded-xl flex items-center gap-4 hover:bg-slate-800/50 transition-all group">
-                   <div onClick={() => openResume(profile)} className="cursor-pointer">
-                      <AvatarUpload url={profile.avatar_url} onUpload={()=>{}} editable={false} size={56} />
-                   </div>
-                   <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                          <h3 className="font-bold text-white text-lg truncate">{profile.nickname || "Unknown"}</h3>
-                          {profile.is_vip && <span className="text-[10px] bg-purple-500/20 text-purple-400 border border-purple-500/30 px-1 rounded">VIP</span>}
+          <div className="space-y-8">
+            {/* Search Section */}
+            <div className="relative max-w-2xl">
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" />
+              <input
+                type="text"
+                placeholder="输入 UID 或 昵称 搜索用户..."
+                className="w-full bg-slate-900/50 border border-slate-700/50 rounded-xl pl-12 pr-4 py-4 text-lg focus:outline-none focus:border-indigo-500 transition-all text-white placeholder-slate-600"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+              />
+              <Button
+                className="absolute right-2 top-2 bottom-2"
+                onClick={handleSearch}
+                disabled={isSearching}
+              >
+                {isSearching ? <Loader2 className="animate-spin" /> : "搜索"}
+              </Button>
+            </div>
+
+            {/* Search Results */}
+            {searchResults.length > 0 && (
+              <div className="space-y-4">
+                <h3 className="text-white font-bold text-lg border-l-4 border-indigo-500 pl-3">
+                  搜索结果
+                </h3>
+                {searchResults.map((user) => (
+                  <div
+                    key={user.id}
+                    className="bg-slate-800/40 border border-slate-700/50 p-6 rounded-2xl flex items-center gap-6 animate-slide-up"
+                  >
+                    <div
+                      onClick={() => openResume(user)}
+                      className="cursor-pointer transition-transform hover:scale-105"
+                    >
+                      <AvatarUpload
+                        url={user.avatar_url}
+                        onUpload={() => {}}
+                        editable={false}
+                        size={80}
+                      />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-3 mb-1">
+                        <h3 className="text-xl font-bold text-white">
+                          {user.nickname}
+                        </h3>
+                        <span className="text-xs font-mono bg-slate-950 px-2 py-0.5 rounded text-slate-500">
+                          UID: {user.user_code}
+                        </span>
                       </div>
-                      <div className="text-xs text-slate-500 font-mono">UID: {profile.user_code}</div>
-                      <div className="text-xs text-slate-400 truncate mt-1">{profile.bio || "这个人很懒..."}</div>
-                   </div>
-                   <Button variant="ghost" size="icon" icon={History} onClick={() => openResume(profile)} title="查看履历" />
-                   {/* Chat button could go here later */}
-                </div>
-              );
-            })}
-            {friends.length === 0 && (
-               <div className="col-span-full text-center py-12 text-slate-500">
-                  <User size={48} className="mx-auto mb-3 opacity-20" />
-                  <p>暂无好友，去添加一些新朋友吧！</p>
-               </div>
+                      <p className="text-slate-400 text-sm mb-3 line-clamp-2">
+                        {user.bio || "暂无简介"}
+                      </p>
+                      <div className="flex gap-3">
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          icon={History}
+                          onClick={() => openResume(user)}
+                        >
+                          查看履历
+                        </Button>
+                        <Button
+                          size="sm"
+                          icon={UserPlus}
+                          onClick={() => sendFriendRequest(user.id)}
+                        >
+                          申请好友
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
             )}
+
+            {searchResults.length === 0 && searchQuery && !isSearching && (
+              <div className="text-center text-slate-500 py-2">
+                未找到匹配的用户
+              </div>
+            )}
+
+            {/* Friends List */}
+            <div>
+              {searchResults.length > 0 && (
+                <h3 className="text-white font-bold text-lg border-l-4 border-emerald-500 pl-3 mb-4">
+                  我的好友
+                </h3>
+              )}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {friends.map((f) => {
+                  const profile = f.friend_profile!;
+                  return (
+                    <div
+                      key={f.id}
+                      className="bg-slate-800/30 border border-slate-700/50 p-4 rounded-xl flex items-center gap-4 hover:bg-slate-800/50 transition-all group"
+                    >
+                      <div
+                        onClick={() => openResume(profile)}
+                        className="cursor-pointer"
+                      >
+                        <AvatarUpload
+                          url={profile.avatar_url}
+                          onUpload={() => {}}
+                          editable={false}
+                          size={56}
+                        />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <h3 className="font-bold text-white text-lg truncate">
+                            {profile.nickname || "Unknown"}
+                          </h3>
+                          {profile.is_vip && (
+                            <span className="text-[10px] bg-purple-500/20 text-purple-400 border border-purple-500/30 px-1 rounded">
+                              VIP
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-xs text-slate-500 font-mono">
+                          UID: {profile.user_code}
+                        </div>
+                        <div className="text-xs text-slate-400 truncate mt-1">
+                          {profile.bio || "这个人很懒..."}
+                        </div>
+                      </div>
+                      <div className="flex flex-col gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          icon={History}
+                          onClick={() => openResume(profile)}
+                          title="查看履历"
+                        />
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="text-red-400 hover:text-red-300 hover:bg-red-500/10"
+                          onClick={() => handleDeleteFriend(f.id)}
+                          title="删除好友"
+                        >
+                          <Trash2 size={18} />
+                        </Button>
+                      </div>
+                    </div>
+                  );
+                })}
+                {friends.length === 0 && (
+                  <div className="col-span-full text-center py-12 text-slate-500">
+                    <User size={48} className="mx-auto mb-3 opacity-20" />
+                    <p>暂无好友，去搜索添加一些新朋友吧！</p>
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
         )}
 
         {activeTab === "requests" && (
-           <div className="space-y-4 max-w-2xl">
-              {requests.map((r) => {
-                 const profile = r.friend_profile!;
-                 return (
-                    <div key={r.id} className="bg-slate-800/30 border border-indigo-500/30 p-4 rounded-xl flex items-center gap-4 animate-scale-in">
-                       <AvatarUpload url={profile.avatar_url} onUpload={()=>{}} editable={false} size={48} />
-                       <div className="flex-1">
-                          <div className="font-bold text-white">{profile.nickname}</div>
-                          <div className="text-xs text-slate-500">请求添加你为好友</div>
-                       </div>
-                       <div className="flex gap-2">
-                          <Button size="sm" variant="primary" icon={UserCheck} onClick={() => handleAccept(r.id)}>接受</Button>
-                          <Button size="sm" variant="ghost" icon={UserX} onClick={() => handleReject(r.id)}>拒绝</Button>
-                       </div>
+          <div className="space-y-4 max-w-2xl">
+            {requests.map((r) => {
+              const profile = r.friend_profile!;
+              return (
+                <div
+                  key={r.id}
+                  className="bg-slate-800/30 border border-indigo-500/30 p-4 rounded-xl flex items-center gap-4 animate-scale-in"
+                >
+                  <AvatarUpload
+                    url={profile.avatar_url}
+                    onUpload={() => {}}
+                    editable={false}
+                    size={48}
+                  />
+                  <div className="flex-1">
+                    <div className="font-bold text-white">
+                      {profile.nickname}
                     </div>
-                 )
-              })}
-              {requests.length === 0 && (
-                 <div className="text-center py-12 text-slate-500">
-                    <p>暂无新的好友申请</p>
-                 </div>
-              )}
-           </div>
-        )}
-
-        {activeTab === "add" && (
-           <div className="max-w-2xl mx-auto space-y-8">
-              <div className="relative">
-                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" />
-                 <input 
-                    type="text" 
-                    placeholder="输入 UID 或 昵称 搜索用户..." 
-                    className="w-full bg-slate-900/50 border border-slate-700/50 rounded-xl pl-12 pr-4 py-4 text-lg focus:outline-none focus:border-indigo-500 transition-all text-white placeholder-slate-600"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-                 />
-                 <Button 
-                    className="absolute right-2 top-2 bottom-2" 
-                    onClick={handleSearch}
-                    disabled={isSearching}
-                 >
-                    {isSearching ? <Loader2 className="animate-spin"/> : "搜索"}
-                 </Button>
+                    <div className="text-xs text-slate-500">
+                      请求添加你为好友
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      variant="primary"
+                      icon={UserCheck}
+                      onClick={() => handleAccept(r.id)}
+                    >
+                      接受
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      icon={UserX}
+                      onClick={() => handleReject(r.id)}
+                    >
+                      拒绝
+                    </Button>
+                  </div>
+                </div>
+              );
+            })}
+            {requests.length === 0 && (
+              <div className="text-center py-12 text-slate-500">
+                <p>暂无新的好友申请</p>
               </div>
-
-              <div className="space-y-4">
-                 {searchResults.map(user => (
-                    <div key={user.id} className="bg-slate-800/40 border border-slate-700/50 p-6 rounded-2xl flex items-center gap-6 animate-slide-up">
-                       <div onClick={() => openResume(user)} className="cursor-pointer transition-transform hover:scale-105">
-                          <AvatarUpload url={user.avatar_url} onUpload={()=>{}} editable={false} size={80} />
-                       </div>
-                       <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-3 mb-1">
-                             <h3 className="text-xl font-bold text-white">{user.nickname}</h3>
-                             <span className="text-xs font-mono bg-slate-950 px-2 py-0.5 rounded text-slate-500">UID: {user.user_code}</span>
-                          </div>
-                          <p className="text-slate-400 text-sm mb-3 line-clamp-2">{user.bio || "暂无简介"}</p>
-                          <div className="flex gap-3">
-                             <Button size="sm" variant="secondary" icon={History} onClick={() => openResume(user)}>查看履历</Button>
-                             {/* Only show Add button if not already friend/requested - logic simplified here, ideally check status */}
-                             <Button size="sm" icon={UserPlus} onClick={() => sendFriendRequest(user.id)}>申请好友</Button>
-                          </div>
-                       </div>
-                    </div>
-                 ))}
-                 {searchResults.length === 0 && searchQuery && !isSearching && (
-                    <div className="text-center text-slate-500 py-8">
-                       未找到匹配的用户
-                    </div>
-                 )}
-              </div>
-           </div>
+            )}
+          </div>
         )}
       </div>
 
@@ -394,7 +515,9 @@ export const Friends: React.FC<FriendsProps> = ({ currentUser }) => {
 
           <div className="p-4 max-h-[60vh] overflow-y-auto custom-scrollbar">
             {historyLoading ? (
-               <div className="flex justify-center py-8"><Loader2 className="animate-spin text-indigo-500"/></div>
+              <div className="flex justify-center py-8">
+                <Loader2 className="animate-spin text-indigo-500" />
+              </div>
             ) : historyTab === "player" ? (
               <div className="space-y-3">
                 {playerHistory.map((item) => {
