@@ -39,12 +39,17 @@ export const Friends: React.FC<FriendsProps> = ({ currentUser }) => {
   // Resume Modal State
   const [selectedUser, setSelectedUser] = useState<Profile | null>(null);
   const [showResumeModal, setShowResumeModal] = useState(false);
+  const [showHistoryModal, setShowHistoryModal] = useState(false); // Added for standalone history modal
   const [kpHistory, setKpHistory] = useState<GameHistory[]>([]);
   const [playerHistory, setPlayerHistory] = useState<
     (GameHistoryParticipant & { game_history: GameHistory })[]
   >([]);
   const [historyTab, setHistoryTab] = useState<"kp" | "player">("player");
   const [historyLoading, setHistoryLoading] = useState(false);
+
+  // Delete Modal State
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
 
   useEffect(() => {
     if (currentUser) {
@@ -129,6 +134,22 @@ export const Friends: React.FC<FriendsProps> = ({ currentUser }) => {
   const sendFriendRequest = async (targetUserId: string) => {
     if (!currentUser) return;
 
+    // Rate Limit Check (30s per target user)
+    const lastRequestTime = localStorage.getItem(
+      `last_friend_request_${targetUserId}`
+    );
+    if (lastRequestTime) {
+      const timeDiff = Date.now() - parseInt(lastRequestTime);
+      if (timeDiff < 30000) {
+        alert(
+          `操作过于频繁，请等待 ${Math.ceil(
+            (30000 - timeDiff) / 1000
+          )} 秒后再试`
+        );
+        return;
+      }
+    }
+
     // Check if already friends or requested
     const { data: existing } = await supabase
       .from("friendships")
@@ -154,6 +175,10 @@ export const Friends: React.FC<FriendsProps> = ({ currentUser }) => {
     if (error) {
       alert("申请发送失败: " + error.message);
     } else {
+      localStorage.setItem(
+        `last_friend_request_${targetUserId}`,
+        Date.now().toString()
+      );
       alert("好友申请已发送");
     }
   };
@@ -181,18 +206,25 @@ export const Friends: React.FC<FriendsProps> = ({ currentUser }) => {
     }
   };
 
-  const handleDeleteFriend = async (friendshipId: string) => {
-    if (!confirm("确定要删除这位好友吗？")) return;
+  const handleDeleteFriend = (friendshipId: string) => {
+    setDeleteTargetId(friendshipId);
+    setShowDeleteModal(true);
+  };
+
+  const confirmDeleteFriend = async () => {
+    if (!deleteTargetId) return;
 
     const { error } = await supabase
       .from("friendships")
       .delete()
-      .eq("id", friendshipId);
+      .eq("id", deleteTargetId);
 
     if (error) {
       alert("删除失败: " + error.message);
     } else {
-      setFriends((prev) => prev.filter((f) => f.id !== friendshipId));
+      setFriends((prev) => prev.filter((f) => f.id !== deleteTargetId));
+      setShowDeleteModal(false);
+      setDeleteTargetId(null);
     }
   };
 
@@ -220,12 +252,33 @@ export const Friends: React.FC<FriendsProps> = ({ currentUser }) => {
       .order("id", { ascending: false });
 
     if (playerData) {
-      const sorted = (playerData as any[]).sort((a, b) => {
-        return (
-          new Date(b.game_history.created_at).getTime() -
-          new Date(a.game_history.created_at).getTime()
-        );
-      });
+      // Fetch latest character data to ensure avatar/job are up to date
+      const charIds = playerData
+        .map((p: any) => p.character_snapshot?.id)
+        .filter(Boolean);
+
+      let charMap = new Map();
+      if (charIds.length > 0) {
+        const { data: latestChars } = await supabase
+          .from("characters")
+          .select("*")
+          .in("id", charIds);
+        if (latestChars) {
+          charMap = new Map(latestChars.map((c) => [c.id, c]));
+        }
+      }
+
+      const sorted = (playerData as any[])
+        .map((p) => ({
+          ...p,
+          latest_character: charMap.get(p.character_snapshot?.id),
+        }))
+        .sort((a, b) => {
+          return (
+            new Date(b.game_history.created_at).getTime() -
+            new Date(a.game_history.created_at).getTime()
+          );
+        });
       setPlayerHistory(sorted);
     }
     setHistoryLoading(false);
@@ -235,6 +288,12 @@ export const Friends: React.FC<FriendsProps> = ({ currentUser }) => {
     setSelectedUser(user);
     fetchUserHistory(user.id);
     setShowResumeModal(true);
+  };
+
+  const openHistory = (user: Profile) => {
+    setSelectedUser(user);
+    fetchUserHistory(user.id);
+    setShowHistoryModal(true);
   };
 
   return (
@@ -329,7 +388,7 @@ export const Friends: React.FC<FriendsProps> = ({ currentUser }) => {
                           size="sm"
                           variant="secondary"
                           icon={History}
-                          onClick={() => openResume(user)}
+                          onClick={() => openHistory(user)}
                         >
                           查看履历
                         </Button>
@@ -366,12 +425,10 @@ export const Friends: React.FC<FriendsProps> = ({ currentUser }) => {
                   return (
                     <div
                       key={f.id}
-                      className="bg-slate-800/30 border border-slate-700/50 p-4 rounded-xl flex items-center gap-4 hover:bg-slate-800/50 transition-all group"
+                      className="bg-slate-800/30 border border-slate-700/50 p-4 rounded-xl flex items-center gap-4 hover:bg-slate-800/50 transition-all group cursor-pointer"
+                      onClick={() => openResume(profile)}
                     >
-                      <div
-                        onClick={() => openResume(profile)}
-                        className="cursor-pointer"
-                      >
+                      <div>
                         <AvatarUpload
                           url={profile.avatar_url}
                           onUpload={() => {}}
@@ -402,14 +459,20 @@ export const Friends: React.FC<FriendsProps> = ({ currentUser }) => {
                           variant="ghost"
                           size="icon"
                           icon={History}
-                          onClick={() => openResume(profile)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openHistory(profile);
+                          }}
                           title="查看履历"
                         />
                         <Button
                           variant="ghost"
                           size="icon"
                           className="text-red-400 hover:text-red-300 hover:bg-red-500/10"
-                          onClick={() => handleDeleteFriend(f.id)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteFriend(f.id);
+                          }}
                           title="删除好友"
                         >
                           <Trash2 size={18} />
@@ -486,7 +549,269 @@ export const Friends: React.FC<FriendsProps> = ({ currentUser }) => {
       {showResumeModal && selectedUser && (
         <Modal
           onClose={() => setShowResumeModal(false)}
-          title={`${selectedUser.nickname} 的履历`}
+          title={null}
+          headerClassName="hidden"
+          className="max-w-md overflow-visible !bg-transparent !border-none !shadow-none !p-0"
+        >
+          <div className="bg-slate-900/90 border border-slate-700/50 rounded-3xl relative overflow-hidden shadow-2xl backdrop-blur-xl">
+            {/* VIP Badge */}
+            {selectedUser.is_vip && (
+              <div className="absolute top-4 left-4 z-10">
+                <span className="bg-gradient-to-r from-purple-600 to-indigo-600 text-white text-xs font-bold px-2 py-1 rounded-full shadow-lg border border-purple-400/30">
+                  VIP
+                </span>
+              </div>
+            )}
+
+            <div className="p-8 pb-0 text-center relative">
+              {/* Avatar Section */}
+              <div className="mx-auto mb-4 flex justify-center relative">
+                <div className="relative">
+                  <svg
+                    className="absolute -top-1 -left-1 w-[104px] h-[104px] rotate-[-90deg]"
+                    viewBox="0 0 100 100"
+                  >
+                    <circle
+                      cx="50"
+                      cy="50"
+                      r="48"
+                      fill="none"
+                      stroke="#1e293b"
+                      strokeWidth="3"
+                    ></circle>
+                    <circle
+                      cx="50"
+                      cy="50"
+                      r="48"
+                      fill="none"
+                      stroke="#6366f1"
+                      strokeWidth="3"
+                      strokeDasharray="301.59"
+                      strokeDashoffset="52.77825"
+                      strokeLinecap="round"
+                      className="transition-all duration-1000 ease-out"
+                    ></circle>
+                  </svg>
+                  <div
+                    className="relative group block"
+                    style={{ width: "96px", height: "96px" }}
+                  >
+                    <div className="rounded-full overflow-hidden bg-slate-800 border-2 border-slate-700 flex items-center justify-center relative w-full h-full">
+                      <AvatarUpload
+                        url={selectedUser.avatar_url}
+                        onUpload={() => {}}
+                        editable={false}
+                        size={96}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Name & Level */}
+              <div className="relative inline-flex items-center gap-2">
+                <h2 className="text-2xl font-bold mb-1 transition-colors text-purple-400 drop-shadow-[0_0_10px_rgba(168,85,247,0.5)]">
+                  {selectedUser.nickname}
+                </h2>
+                <span className="bg-indigo-500/20 text-indigo-300 text-[10px] font-bold px-1.5 py-0.5 rounded border border-indigo-500/30">
+                  LV.{selectedUser.level || 1}
+                </span>
+              </div>
+
+              {/* UID */}
+              <div className="flex justify-center items-center gap-2 mb-4 mt-2">
+                <span className="text-sm text-slate-400 font-mono bg-slate-900/50 px-2 py-1 rounded">
+                  UID: {selectedUser.user_code}
+                </span>
+              </div>
+
+              {/* Bio */}
+              <p className="text-slate-300 mb-6 max-w-md mx-auto italic">
+                {selectedUser.bio || "这个人很神秘，什么都没有写..."}
+              </p>
+
+              {/* Stats/Tabs Grid */}
+              <div className="grid grid-cols-2 gap-4 text-left mt-6 mb-6">
+                <div
+                  onClick={() => setHistoryTab("player")}
+                  className={`p-4 rounded-xl border cursor-pointer transition-all group ${
+                    historyTab === "player"
+                      ? "bg-slate-800 border-indigo-500/50 shadow-lg shadow-indigo-500/10"
+                      : "bg-slate-900/50 border-slate-700/30 hover:bg-slate-800"
+                  }`}
+                >
+                  <div
+                    className={`text-xs uppercase font-bold mb-1 transition-colors ${
+                      historyTab === "player"
+                        ? "text-indigo-400"
+                        : "text-slate-500 group-hover:text-indigo-400"
+                    }`}
+                  >
+                    参与的团
+                  </div>
+                  <div className="text-2xl font-mono font-bold text-indigo-400">
+                    {playerHistory.length}
+                  </div>
+                </div>
+
+                <div
+                  onClick={() => setHistoryTab("kp")}
+                  className={`p-4 rounded-xl border cursor-pointer transition-all group ${
+                    historyTab === "kp"
+                      ? "bg-slate-800 border-indigo-500/50 shadow-lg shadow-indigo-500/10"
+                      : "bg-slate-900/50 border-slate-700/30 hover:bg-slate-800"
+                  }`}
+                >
+                  <div
+                    className={`text-xs uppercase font-bold mb-1 transition-colors ${
+                      historyTab === "kp"
+                        ? "text-indigo-400"
+                        : "text-slate-500 group-hover:text-indigo-400"
+                    }`}
+                  >
+                    主持的团
+                  </div>
+                  <div className="text-2xl font-mono font-bold text-indigo-400">
+                    {kpHistory.length}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* History List */}
+            <div className="bg-slate-950/30 border-t border-white/5 p-4 max-h-[40vh] overflow-y-auto custom-scrollbar">
+              {historyLoading ? (
+                <div className="flex justify-center py-8">
+                  <Loader2 className="animate-spin text-indigo-500" />
+                </div>
+              ) : historyTab === "player" ? (
+                <div className="space-y-3">
+                  {playerHistory.map((item) => {
+                    const snapshot = item.character_snapshot;
+                    const latest = (item as any).latest_character;
+                    const char = latest || snapshot;
+
+                    // Safely extract data from either structure
+                    const name = char.name;
+                    const avatarUrl =
+                      char.info?.avatar_url ||
+                      char.avatar_url ||
+                      snapshot.info?.avatar_url ||
+                      snapshot.avatar_url;
+                    const job =
+                      char.info?.job ||
+                      char.job ||
+                      snapshot.info?.job ||
+                      snapshot.job ||
+                      "无职业";
+                    const sex =
+                      char.info?.sex ||
+                      char.sex ||
+                      snapshot.info?.sex ||
+                      snapshot.sex ||
+                      "未知";
+
+                    const isDead = item.outcome === "死亡";
+                    const isLost = item.outcome === "失踪";
+                    const isCrazy = item.outcome === "疯狂";
+
+                    return (
+                      <div
+                        key={item.id}
+                        className={`relative p-3 rounded-xl border transition-all ${
+                          isDead
+                            ? "bg-slate-950 border-slate-800 grayscale"
+                            : "bg-slate-800/50 border-slate-700/50 hover:border-indigo-500/30"
+                        }`}
+                      >
+                        <div className="flex justify-between items-start mb-2">
+                          <div>
+                            <h4 className="font-bold text-white text-sm line-clamp-1">
+                              {item.game_history.room_title}
+                            </h4>
+                            <div className="text-[10px] text-slate-500 flex items-center gap-1 mt-0.5">
+                              <History size={10} />
+                              {new Date(
+                                item.game_history.created_at
+                              ).toLocaleDateString()}
+                              <span className="w-0.5 h-0.5 rounded-full bg-slate-600"></span>
+                              KP: {item.game_history.kp_nickname}
+                            </div>
+                          </div>
+                          <div
+                            className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                              isDead
+                                ? "bg-red-950 text-red-500 border border-red-900"
+                                : isLost
+                                ? "bg-yellow-950 text-yellow-500 border border-yellow-900"
+                                : isCrazy
+                                ? "bg-purple-950 text-purple-500 border border-purple-900"
+                                : "bg-emerald-950 text-emerald-500 border border-emerald-900"
+                            }`}
+                          >
+                            {item.outcome}
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2 bg-slate-900/50 p-1.5 rounded-lg">
+                          <div className="w-6 h-6 flex items-center justify-center">
+                            <AvatarUpload
+                              url={avatarUrl}
+                              onUpload={() => {}}
+                              editable={false}
+                              size={24}
+                            />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="text-xs font-medium text-slate-300 truncate">
+                              {name}
+                            </div>
+                            <div className="text-[10px] text-slate-500">
+                              {job} · {sex}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {kpHistory.length === 0 && (
+                    <div className="text-center text-slate-500 py-4 text-sm">
+                      暂无主持记录
+                    </div>
+                  )}
+                  {kpHistory.map((history) => (
+                    <div
+                      key={history.id}
+                      className="bg-slate-800/50 border border-slate-700/50 p-3 rounded-xl hover:border-indigo-500/30 transition-all"
+                    >
+                      <div className="flex justify-between items-start mb-1">
+                        <h4 className="font-bold text-white text-sm">
+                          {history.room_title}
+                        </h4>
+                        <span className="text-[10px] text-slate-500 bg-slate-900 px-1.5 py-0.5 rounded">
+                          {new Date(history.created_at).toLocaleDateString()}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1 text-[10px] text-slate-400">
+                        <Crown size={10} className="text-yellow-500" />
+                        <span>主持人 (KP)</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </Modal>
+      )}
+      {/* Game History Modal - Standalone */}
+      {showHistoryModal && (
+        <Modal
+          onClose={() => setShowHistoryModal(false)}
+          title="跑团履历"
           icon={History}
           className="max-w-2xl"
         >
@@ -514,14 +839,38 @@ export const Friends: React.FC<FriendsProps> = ({ currentUser }) => {
           </div>
 
           <div className="p-4 max-h-[60vh] overflow-y-auto custom-scrollbar">
-            {historyLoading ? (
-              <div className="flex justify-center py-8">
-                <Loader2 className="animate-spin text-indigo-500" />
-              </div>
-            ) : historyTab === "player" ? (
+            {historyTab === "player" ? (
               <div className="space-y-3">
+                {playerHistory.length === 0 && (
+                  <div className="text-center text-slate-500 py-4 text-sm">
+                    暂无参与记录
+                  </div>
+                )}
                 {playerHistory.map((item) => {
-                  const char = item.character_snapshot;
+                  const snapshot = item.character_snapshot;
+                  const latest = (item as any).latest_character;
+                  const char = latest || snapshot;
+
+                  // Safely extract data from either structure
+                  const name = char.name;
+                  const avatarUrl =
+                    char.info?.avatar_url ||
+                    char.avatar_url ||
+                    snapshot.info?.avatar_url ||
+                    snapshot.avatar_url;
+                  const job =
+                    char.info?.job ||
+                    char.job ||
+                    snapshot.info?.job ||
+                    snapshot.job ||
+                    "无职业";
+                  const sex =
+                    char.info?.sex ||
+                    char.sex ||
+                    snapshot.info?.sex ||
+                    snapshot.sex ||
+                    "未知";
+
                   const isDead = item.outcome === "死亡";
                   const isLost = item.outcome === "失踪";
                   const isCrazy = item.outcome === "疯狂";
@@ -567,28 +916,23 @@ export const Friends: React.FC<FriendsProps> = ({ currentUser }) => {
 
                       <div className="flex items-center gap-3 bg-slate-950/30 p-2 rounded-lg border border-white/5">
                         <AvatarUpload
-                          url={char.avatar_url}
+                          url={avatarUrl}
                           onUpload={() => {}}
                           editable={false}
                           size={40}
                         />
                         <div>
                           <div className="font-bold text-sm text-slate-200">
-                            {char.name}
+                            {name}
                           </div>
                           <div className="text-[10px] text-slate-500">
-                            {char.job || "无职业"} · {char.sex}
+                            {job} · {sex}
                           </div>
                         </div>
                       </div>
                     </div>
                   );
                 })}
-                {playerHistory.length === 0 && (
-                  <div className="text-center py-8 text-slate-500 text-sm">
-                    暂无参与记录
-                  </div>
-                )}
               </div>
             ) : (
               <div className="space-y-3">
@@ -623,9 +967,47 @@ export const Friends: React.FC<FriendsProps> = ({ currentUser }) => {
             )}
           </div>
           <div className="px-6 py-4 border-t border-white/10 bg-white/5 flex justify-end">
-            <Button variant="ghost" onClick={() => setShowResumeModal(false)}>
+            <Button variant="ghost" onClick={() => setShowHistoryModal(false)}>
               关闭
             </Button>
+          </div>
+        </Modal>
+      )}
+      {/* Delete Confirmation Modal */}
+      {showDeleteModal && (
+        <Modal
+          onClose={() => setShowDeleteModal(false)}
+          title={null}
+          className="max-w-sm"
+        >
+          <div className="flex flex-col items-center p-8 text-center">
+            <div className="w-16 h-16 bg-red-500/10 rounded-full flex items-center justify-center mb-6 animate-pulse-slow">
+              <Trash2 className="text-red-500" size={32} />
+            </div>
+
+            <h3 className="text-xl font-bold text-white mb-2">删除好友</h3>
+
+            <p className="text-slate-400 mb-8 leading-relaxed">
+              确定要删除这位好友吗？
+              <br />
+              此操作无法撤销，请谨慎操作。
+            </p>
+
+            <div className="flex gap-3 w-full">
+              <Button
+                variant="secondary"
+                className="flex-1"
+                onClick={() => setShowDeleteModal(false)}
+              >
+                取消
+              </Button>
+              <Button
+                className="flex-1 bg-red-600 hover:bg-red-500 text-white border-red-500 shadow-lg shadow-red-500/20"
+                onClick={confirmDeleteFriend}
+              >
+                确认删除
+              </Button>
+            </div>
           </div>
         </Modal>
       )}

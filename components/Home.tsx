@@ -236,6 +236,9 @@ export const Home: React.FC<HomeProps> = ({
   const [historyTab, setHistoryTab] = useState<"kp" | "player">("player");
   const [showHistoryModal, setShowHistoryModal] = useState(false);
 
+  // Friend Requests Count
+  const [friendRequestCount, setFriendRequestCount] = useState(0);
+
   // Initial Data Fetch & Realtime
   useEffect(() => {
     fetchRooms();
@@ -260,6 +263,7 @@ export const Home: React.FC<HomeProps> = ({
 
           // Fetch History
           fetchGameHistory(user.id);
+          fetchFriendRequestCount(user.id);
         } else {
           // Auto-create profile if missing (fallback for old users)
           const { data: newProfile } = await supabase
@@ -280,6 +284,7 @@ export const Home: React.FC<HomeProps> = ({
 
             // Fetch History
             fetchGameHistory(user.id);
+            fetchFriendRequestCount(user.id);
           }
         }
       }
@@ -326,6 +331,43 @@ export const Home: React.FC<HomeProps> = ({
     };
   }, []);
 
+  // Friend Request Realtime Subscription
+  useEffect(() => {
+    if (!currentUserId) return;
+
+    const channel = supabase
+      .channel("friendships_monitor")
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "friendships",
+          filter: `friend_id=eq.${currentUserId}`,
+        },
+        () => {
+          fetchFriendRequestCount(currentUserId);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [currentUserId]);
+
+  const fetchFriendRequestCount = async (userId: string) => {
+    const { count, error } = await supabase
+      .from("friendships")
+      .select("*", { count: "exact", head: true })
+      .eq("friend_id", userId)
+      .eq("status", "pending");
+
+    if (!error && count !== null) {
+      setFriendRequestCount(count);
+    }
+  };
+
   const fetchGameHistory = async (userId: string) => {
     // 1. Fetch KP History
     const { data: kpData } = await supabase
@@ -351,13 +393,33 @@ export const Home: React.FC<HomeProps> = ({
       .order("id", { ascending: false }); // ideally order by game_history.created_at but simple ID sort works for now
 
     if (playerData) {
-      // Sort by game time
-      const sorted = (playerData as any[]).sort((a, b) => {
-        return (
-          new Date(b.game_history.created_at).getTime() -
-          new Date(a.game_history.created_at).getTime()
-        );
-      });
+      // Fetch latest character data
+      const charIds = playerData
+        .map((p: any) => p.character_snapshot?.id)
+        .filter(Boolean);
+
+      let charMap = new Map();
+      if (charIds.length > 0) {
+        const { data: latestChars } = await supabase
+          .from("characters")
+          .select("*")
+          .in("id", charIds);
+        if (latestChars) {
+          charMap = new Map(latestChars.map((c) => [c.id, c]));
+        }
+      }
+
+      const sorted = (playerData as any[])
+        .map((p) => ({
+          ...p,
+          latest_character: charMap.get(p.character_snapshot?.id),
+        }))
+        .sort((a, b) => {
+          return (
+            new Date(b.game_history.created_at).getTime() -
+            new Date(a.game_history.created_at).getTime()
+          );
+        });
       setPlayerHistory(sorted);
     }
   };
@@ -694,13 +756,16 @@ export const Home: React.FC<HomeProps> = ({
             </button>
             <button
               onClick={() => setActiveTab("friends")}
-              className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${
+              className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all relative ${
                 activeTab === "friends"
                   ? "bg-indigo-600 text-white shadow-lg"
                   : "text-slate-400 hover:text-white"
               }`}
             >
               好友
+              {friendRequestCount > 0 && (
+                <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-slate-900 animate-pulse"></span>
+              )}
             </button>
             <button
               onClick={() => setActiveTab("profile")}
@@ -745,13 +810,16 @@ export const Home: React.FC<HomeProps> = ({
             </button>
             <button
               onClick={() => setActiveTab("friends")}
-              className={`flex-1 py-2 rounded-md text-sm font-medium ${
+              className={`flex-1 py-2 rounded-md text-sm font-medium relative ${
                 activeTab === "friends"
                   ? "bg-indigo-600 text-white"
                   : "text-slate-400"
               }`}
             >
               好友
+              {friendRequestCount > 0 && (
+                <span className="absolute top-1 right-2 w-2 h-2 bg-red-500 rounded-full animate-pulse"></span>
+              )}
             </button>
             <button
               onClick={() => setActiveTab("profile")}
@@ -1265,7 +1333,7 @@ export const Home: React.FC<HomeProps> = ({
                   : "text-slate-500 hover:text-slate-300 hover:bg-slate-800/30"
               }`}
             >
-              我参与的 ({playerHistory.length})
+              参与的团 ({playerHistory.length})
             </button>
             <button
               onClick={() => setHistoryTab("kp")}
@@ -1275,7 +1343,7 @@ export const Home: React.FC<HomeProps> = ({
                   : "text-slate-500 hover:text-slate-300 hover:bg-slate-800/30"
               }`}
             >
-              我主持的 ({kpHistory.length})
+              主持的团 ({kpHistory.length})
             </button>
           </div>
 
@@ -1283,7 +1351,30 @@ export const Home: React.FC<HomeProps> = ({
             {historyTab === "player" ? (
               <div className="space-y-3">
                 {playerHistory.map((item) => {
-                  const char = item.character_snapshot;
+                  const snapshot = item.character_snapshot;
+                  const latest = (item as any).latest_character;
+                  const char = latest || snapshot;
+
+                  // Safely extract data from either structure
+                  const name = char.name;
+                  const avatarUrl =
+                    char.info?.avatar_url ||
+                    char.avatar_url ||
+                    snapshot.info?.avatar_url ||
+                    snapshot.avatar_url;
+                  const job =
+                    char.info?.job ||
+                    char.job ||
+                    snapshot.info?.job ||
+                    snapshot.job ||
+                    "无职业";
+                  const sex =
+                    char.info?.sex ||
+                    char.sex ||
+                    snapshot.info?.sex ||
+                    snapshot.sex ||
+                    "未知";
+
                   const isDead = item.outcome === "死亡";
                   const isLost = item.outcome === "失踪";
                   const isCrazy = item.outcome === "疯狂";
@@ -1329,17 +1420,17 @@ export const Home: React.FC<HomeProps> = ({
 
                       <div className="flex items-center gap-3 bg-slate-950/30 p-2 rounded-lg border border-white/5">
                         <AvatarUpload
-                          url={char.avatar_url}
+                          url={avatarUrl}
                           onUpload={() => {}}
                           editable={false}
                           size={40}
                         />
                         <div>
                           <div className="font-bold text-sm text-slate-200">
-                            {char.name}
+                            {name}
                           </div>
                           <div className="text-[10px] text-slate-500">
-                            {char.job || "无职业"} · {char.sex}
+                            {job} · {sex}
                           </div>
                         </div>
                       </div>
