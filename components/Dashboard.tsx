@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Edit2, UserPlus, Users, Swords, User, UserCog, Heart, Zap, Brain, AlertTriangle } from 'lucide-react';
+import { Edit2, UserPlus, Users, Swords, User, UserCog, Heart, Zap, Brain, AlertTriangle, Check } from 'lucide-react';
 import { Button, StatBadge, cn } from './UI';
 import { ModuleInfo, Character } from '../types';
 
@@ -11,10 +11,11 @@ interface DashboardProps {
   onEditChar: (char: Character) => void;
   onDeleteRoom: () => void;
   onClearChat: () => void;
+  onConcludeGame: () => void;
   isKP: boolean;
 }
 
-export const Dashboard: React.FC<DashboardProps> = ({ moduleInfo, characters, onEditModule, onAddChar, onEditChar, onDeleteRoom, onClearChat, isKP }) => {
+export const Dashboard: React.FC<DashboardProps> = ({ moduleInfo, characters, onEditModule, onAddChar, onEditChar, onDeleteRoom, onClearChat, onConcludeGame, isKP }) => {
   const [resetConfirm, setResetConfirm] = useState(false);
   const [clearChatConfirm, setClearChatConfirm] = useState(false);
   const pcCharacters = characters.filter(c => c.role === '调查员');
@@ -98,6 +99,28 @@ export const Dashboard: React.FC<DashboardProps> = ({ moduleInfo, characters, on
                      })}
                    </div>
                </section>
+           )}
+
+           {/* Game Management - KP Only */}
+           {isKP && (
+             <section className="pt-8 border-t border-white/5">
+                <div className="flex justify-between items-center mb-6">
+                    <h2 className="text-xl md:text-2xl font-bold text-white flex items-center gap-3">
+                        <Zap className="text-amber-400" /> 跑团管理
+                    </h2>
+                </div>
+                <div className="glass-panel bg-amber-500/10 border-amber-500/20 p-6 md:p-8 rounded-2xl flex flex-col md:flex-row justify-between items-center gap-6">
+                    <div className="flex-1">
+                        <h3 className="text-lg font-bold text-white mb-2">完结跑团</h3>
+                        <p className="text-slate-400 text-sm leading-relaxed">
+                            当跑团结束时使用此功能。系统将生成跑团履历，记录所有玩家的最终状态，并将房间标记为“已完成”。
+                        </p>
+                    </div>
+                    <Button onClick={onConcludeGame} variant="primary" size="lg" icon={Check}>
+                        结团结算
+                    </Button>
+                </div>
+             </section>
            )}
 
            {/* Danger Zone */}

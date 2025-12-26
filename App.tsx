@@ -13,6 +13,7 @@ import {
   CharacterModal,
   StatusModal,
   StoryModal,
+  ConclusionModal,
 } from "./components/Modals";
 import { Button } from "./components/UI";
 import { ModuleInfo, Character, Log } from "./types"; // Removed AppData as it might not be used anymore
@@ -56,18 +57,23 @@ const App: React.FC = () => {
     const path = window.location.pathname;
     const hash = window.location.hash;
     const search = window.location.search;
-    
+
     // 1. Explicit path match
-    if (path.startsWith('/welcome')) return true;
-    
+    if (path.startsWith("/welcome")) return true;
+
     // 2. Check for Supabase signup confirmation in hash/search (e.g. #access_token=...&type=signup)
     // This handles cases where redirect might land on root but preserves auth params
-    if (hash.includes('type=signup') || search.includes('type=signup') || 
-        hash.includes('type=invite') || search.includes('type=invite') ||
-        hash.includes('type=recovery') || search.includes('type=recovery')) {
+    if (
+      hash.includes("type=signup") ||
+      search.includes("type=signup") ||
+      hash.includes("type=invite") ||
+      search.includes("type=invite") ||
+      hash.includes("type=recovery") ||
+      search.includes("type=recovery")
+    ) {
       return true;
     }
-    
+
     return false;
   });
 
@@ -95,104 +101,115 @@ const App: React.FC = () => {
   const [isKP, setIsKP] = useState(false);
   const [kpId, setKpId] = useState<string | null>(null);
   const [onlineUsers, setOnlineUsers] = useState<Set<string>>(new Set());
-  const [globalOnlineUsers, setGlobalOnlineUsers] = useState<Set<string>>(new Set());
+  const [globalOnlineUsers, setGlobalOnlineUsers] = useState<Set<string>>(
+    new Set()
+  );
   const [userNickname, setUserNickname] = useState<string>("");
   const [isVip, setIsVip] = useState(false);
 
   // Load More Logs Logic
   const handleLoadMoreLogs = async () => {
-    if (isLoadingMore || !hasMoreLogs || logs.length === 0 || !currentRoomId) return;
-    
+    if (isLoadingMore || !hasMoreLogs || logs.length === 0 || !currentRoomId)
+      return;
+
     // Safety check: ensure logs are sorted by time (oldest first) before picking the first one
     // This handles edge cases where logs might be out of order
-    const sortedLogs = [...logs].sort((a, b) => 
-        new Date(a.createdAt || a.timestamp).getTime() - new Date(b.createdAt || b.timestamp).getTime()
+    const sortedLogs = [...logs].sort(
+      (a, b) =>
+        new Date(a.createdAt || a.timestamp).getTime() -
+        new Date(b.createdAt || b.timestamp).getTime()
     );
     const oldestLog = sortedLogs[0];
-    
+
     if (!oldestLog) return;
 
     setIsLoadingMore(true);
     const oldestTime = oldestLog.createdAt;
-    
+
     if (!oldestTime) {
-        console.error("Missing createdAt for log:", oldestLog);
-        setIsLoadingMore(false);
-        return;
+      console.error("Missing createdAt for log:", oldestLog);
+      setIsLoadingMore(false);
+      return;
     }
 
     try {
-        const { data: msgs, error: msgError } = await supabase
-            .from("messages")
-            .select(
-            `
+      const { data: msgs, error: msgError } = await supabase
+        .from("messages")
+        .select(
+          `
                 *,
                 characters ( id, name, type, role, info, theme_color, avatar_url )
             `
-            )
-            .eq("room_id", currentRoomId)
-            .lt("created_at", oldestTime) // Get messages older than the current oldest
-            .order("created_at", { ascending: false })
-            .limit(PAGE_SIZE);
+        )
+        .eq("room_id", currentRoomId)
+        .lt("created_at", oldestTime) // Get messages older than the current oldest
+        .order("created_at", { ascending: false })
+        .limit(PAGE_SIZE);
 
-        if (msgError) throw msgError;
+      if (msgError) throw msgError;
 
-        if (msgs && msgs.length > 0) {
-            msgs.reverse(); // Sort oldest first
+      if (msgs && msgs.length > 0) {
+        msgs.reverse(); // Sort oldest first
 
-            // Fetch Profiles
-            const userIds = Array.from(new Set(msgs.map((m: any) => m.user_id)));
-            const { data: profiles } = await supabase
-                .from("profiles")
-                .select("id, nickname, avatar_url")
-                .in("id", userIds);
+        // Fetch Profiles
+        const userIds = Array.from(new Set(msgs.map((m: any) => m.user_id)));
+        const { data: profiles } = await supabase
+          .from("profiles")
+          .select("id, nickname, avatar_url")
+          .in("id", userIds);
 
-            const profileMap = new Map(profiles?.map((p: any) => [p.id, p]) || []);
+        const profileMap = new Map(profiles?.map((p: any) => [p.id, p]) || []);
 
-            const formattedLogs: Log[] = msgs.map((msg: any) => {
-                const charName = msg.characters
-                    ? msg.characters.name
-                    : profileMap.get(msg.user_id)?.nickname || "守秘人";
-                const charAvatar = msg.characters
-                    ? msg.characters.avatar_url
-                    : profileMap.get(msg.user_id)?.avatar_url;
-                
-                let charRole = "Keeper";
-                if (msg.characters) {
-                    charRole = msg.characters.role || (msg.characters.type === "investigator" ? "调查员" : msg.characters.type === "monster" ? "怪物" : "NPC");
-                }
+        const formattedLogs: Log[] = msgs.map((msg: any) => {
+          const charName = msg.characters
+            ? msg.characters.name
+            : profileMap.get(msg.user_id)?.nickname || "守秘人";
+          const charAvatar = msg.characters
+            ? msg.characters.avatar_url
+            : profileMap.get(msg.user_id)?.avatar_url;
 
-                return {
-                    id: msg.id,
-                    timestamp: new Date(msg.created_at).toLocaleTimeString([], {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                    }),
-                    createdAt: msg.created_at,
-                    charId: msg.character_id || "pc",
-                    charName: charName,
-                    charRole: charRole,
-                    charAvatar: charAvatar,
-                    type: msg.type as Log["type"],
-                    content: msg.content,
-                    isMine: msg.user_id === session?.user?.id,
-                    recipientId: msg.recipient_id,
-                    quote: msg.meta?.quote,
-                };
-            });
+          let charRole = "Keeper";
+          if (msg.characters) {
+            charRole =
+              msg.characters.role ||
+              (msg.characters.type === "investigator"
+                ? "调查员"
+                : msg.characters.type === "monster"
+                ? "怪物"
+                : "NPC");
+          }
 
-            setLogs(prev => [...formattedLogs, ...prev]);
-            
-            if (msgs.length < PAGE_SIZE) {
-                setHasMoreLogs(false);
-            }
-        } else {
-            setHasMoreLogs(false);
+          return {
+            id: msg.id,
+            timestamp: new Date(msg.created_at).toLocaleTimeString([], {
+              hour: "2-digit",
+              minute: "2-digit",
+            }),
+            createdAt: msg.created_at,
+            charId: msg.character_id || "pc",
+            charName: charName,
+            charRole: charRole,
+            charAvatar: charAvatar,
+            type: msg.type as Log["type"],
+            content: msg.content,
+            isMine: msg.user_id === session?.user?.id,
+            recipientId: msg.recipient_id,
+            quote: msg.meta?.quote,
+          };
+        });
+
+        setLogs((prev) => [...formattedLogs, ...prev]);
+
+        if (msgs.length < PAGE_SIZE) {
+          setHasMoreLogs(false);
         }
+      } else {
+        setHasMoreLogs(false);
+      }
     } catch (error) {
-        console.error("Error loading more logs:", error);
+      console.error("Error loading more logs:", error);
     } finally {
-        setIsLoadingMore(false);
+      setIsLoadingMore(false);
     }
   };
 
@@ -210,6 +227,7 @@ const App: React.FC = () => {
   const [statusTargetId, setStatusTargetId] = useState<string | null>(null);
   const [storyContent, setStoryContent] = useState("");
   const [isGeneratingStory, setIsGeneratingStory] = useState(false);
+  const [showConclusionModal, setShowConclusionModal] = useState(false);
 
   // Pagination State
   const [hasMoreLogs, setHasMoreLogs] = useState(true);
@@ -312,19 +330,20 @@ const App: React.FC = () => {
   useEffect(() => {
     if (!session?.user) return;
 
-    const channel = supabase.channel('global_presence')
-      .on('presence', { event: 'sync' }, () => {
-         const newState = channel.presenceState();
-         const userIds = new Set<string>();
-         for (const id in newState) {
-           (newState[id] as any[]).forEach(p => {
-             if (p.user_id) userIds.add(p.user_id);
-           });
-         }
-         setGlobalOnlineUsers(userIds);
+    const channel = supabase
+      .channel("global_presence")
+      .on("presence", { event: "sync" }, () => {
+        const newState = channel.presenceState();
+        const userIds = new Set<string>();
+        for (const id in newState) {
+          (newState[id] as any[]).forEach((p) => {
+            if (p.user_id) userIds.add(p.user_id);
+          });
+        }
+        setGlobalOnlineUsers(userIds);
       })
       .subscribe(async (status) => {
-        if (status === 'SUBSCRIBED') {
+        if (status === "SUBSCRIBED") {
           await channel.track({
             user_id: session.user.id,
             online_at: new Date().toISOString(),
@@ -1006,7 +1025,7 @@ const App: React.FC = () => {
 
     if (checkInfo) {
       resultData.checkName = checkInfo.name;
-      
+
       if (checkInfo.target !== undefined && count === 1 && type === 100) {
         resultData.checkTarget = checkInfo.target;
 
@@ -1032,7 +1051,7 @@ const App: React.FC = () => {
       JSON.stringify(resultData),
       activeCharId === "pc" ? "pc" : activeCharId
     );
-    
+
     return total;
   };
 
@@ -1480,6 +1499,36 @@ const App: React.FC = () => {
           role: "Unknown",
         };
 
+  const handleConcludeGame = async (outcomes: Record<string, string>) => {
+    if (!currentRoomId || !isKP) return;
+
+    try {
+      const { error } = await supabase.rpc("conclude_game", {
+        p_room_id: currentRoomId,
+        p_outcomes: outcomes,
+      });
+
+      if (error) throw error;
+
+      // Success
+      alert("结团成功！房间已归档。");
+      setShowConclusionModal(false);
+
+      // Navigate back to home
+      setCurrentRoomId(null);
+      setCharacters([]);
+      setLogs([]);
+      setModuleInfo(EMPTY_MODULE_INFO);
+      setIsKP(false);
+      setActiveCharId("pc");
+      setView("main");
+      window.history.replaceState(null, "", window.location.pathname);
+    } catch (error: any) {
+      console.error("Error concluding game:", error);
+      alert("结团失败: " + error.message);
+    }
+  };
+
   const handleSignOut = async () => {
     try {
       const { error } = await supabase.auth.signOut();
@@ -1544,19 +1593,19 @@ const App: React.FC = () => {
       // So we must be careful.
       // Only replace if it matches a known stat OR is a skill.
       // If not, and it looks like 'd', leave it.
-      
-      if (match === 'd') return 'd'; 
+
+      if (match === "d") return "d";
 
       const key = ALIAS_MAP[match] || match;
       if (char) {
         if (char.stats && char.stats[key] !== undefined) {
-           return String(char.stats[key]);
+          return String(char.stats[key]);
         }
         if (char.skills && char.skills[match] !== undefined) {
-           return String(char.skills[match]);
+          return String(char.skills[match]);
         }
       }
-      
+
       // If unknown, return 0 (safe fallback) or keep it (risky)
       // If we keep "sword", eval fails.
       // We return 0.
@@ -1775,7 +1824,7 @@ const App: React.FC = () => {
             total: total,
             details: details,
             expression: `${cmd.payload.expression} = ${total}`,
-            checkName: cmd.payload.reason
+            checkName: cmd.payload.reason,
           };
           const msgType = cmd.type === "roll_hidden" ? "dice_secret" : "dice";
           addLog(
@@ -1837,22 +1886,22 @@ const App: React.FC = () => {
             // If it starts with + or -, or is an expression like "1d4" (which we treat as additive usually? No, "1d4" usually means +1d4 in this context)
             // But if user types ".ra 力量 50" (space 50), it means target=50.
             // If user types ".ra 力量 +50", it means target=base+50.
-            
+
             // Check original string for leading operator
             const isRelative = /^[\+\-\*\/]/.test(modStr.trim());
-            
+
             if (isRelative) {
-                // evaluateDiceExpression result includes the sign if expression was "+10" -> eval("+10") -> 10.
-                // But we need to add to base.
-                // Wait, eval("+10") is 10. eval("-10") is -10.
-                // So target = base + modVal is correct for both cases.
-                checkTarget = baseVal + modVal;
-                checkName = `${skillName} ${modStr}`;
+              // evaluateDiceExpression result includes the sign if expression was "+10" -> eval("+10") -> 10.
+              // But we need to add to base.
+              // Wait, eval("+10") is 10. eval("-10") is -10.
+              // So target = base + modVal is correct for both cases.
+              checkTarget = baseVal + modVal;
+              checkName = `${skillName} ${modStr}`;
             } else {
-                // Absolute (e.g. "50" or "3d6" without plus)
-                // If user types ".ra 力量 3d6", it likely means target is result of 3d6.
-                checkTarget = modVal;
-                checkName = `${skillName} ${modStr}`;
+              // Absolute (e.g. "50" or "3d6" without plus)
+              // If user types ".ra 力量 3d6", it likely means target is result of 3d6.
+              checkTarget = modVal;
+              checkName = `${skillName} ${modStr}`;
             }
           } else {
             checkTarget = baseVal;
@@ -1948,9 +1997,9 @@ const App: React.FC = () => {
 
     // If active char is not PC/KP, remove room_id from character
     // FIX: KP's characters (NPC/Monster) should NOT be removed from room when KP leaves
-    // MODIFIED: Per user request, do NOT remove room_id when player leaves. 
+    // MODIFIED: Per user request, do NOT remove room_id when player leaves.
     // It stays bound until they join a new room or are kicked by KP.
-  
+
     doLeaveCleanup();
   };
 
@@ -2032,7 +2081,6 @@ const App: React.FC = () => {
         isMobile={isMobile}
         isKP={isKP}
         kpOnline={kpId ? onlineUsers.has(kpId) : false}
-        levelInfo={levelInfo}
       />
 
       <main className="flex-1 flex flex-col relative min-w-0 z-10">
@@ -2110,12 +2158,23 @@ const App: React.FC = () => {
             }}
             onDeleteRoom={handleDeleteRoom}
             onClearChat={handleClearChat}
+            onConcludeGame={() => setShowConclusionModal(true)}
             isKP={isKP}
           />
         )}
       </main>
 
       {/* Modals */}
+      {showConclusionModal && (
+        <ConclusionModal
+          characters={characters.filter(
+            (c) => c.type === "investigator" || c.role === "调查员"
+          )}
+          onConfirm={handleConcludeGame}
+          onClose={() => setShowConclusionModal(false)}
+        />
+      )}
+
       {showModuleModal && (
         <ModuleModal
           info={moduleInfo}

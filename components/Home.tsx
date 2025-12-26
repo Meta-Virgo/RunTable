@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { supabase } from "../supabase";
-import { Room, Character } from "../types";
+import { Room, Character, GameHistory, GameHistoryParticipant } from "../types";
 import { Button, Input, Textarea, Modal, cn } from "./UI";
 import {
   Plus,
@@ -12,9 +12,14 @@ import {
   Users,
   Edit2,
   BookOpen,
+  Lock,
+  History,
+  Crown,
+  Skull,
 } from "lucide-react";
 import { CharacterModal } from "./Modals";
 import { AvatarUpload } from "./AvatarUpload";
+import { Friends } from "./Friends";
 
 interface HomeProps {
   onJoinRoom: (roomId: string, charId: string | "pc") => void;
@@ -116,9 +121,15 @@ const RoomCard: React.FC<RoomCardProps> = ({
           <span className="text-xs text-slate-500 font-mono bg-slate-900/50 px-1.5 py-0.5 rounded border border-white/5">
             #{room.room_number || "???"}
           </span>
-          <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 uppercase">
-            Open
-          </span>
+          {(room as any).isArchived ? (
+            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-500/10 text-slate-400 border border-slate-500/20 uppercase">
+              Archived
+            </span>
+          ) : (
+            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 uppercase">
+              Open
+            </span>
+          )}
         </div>
       </div>
       <p className="text-slate-400 text-sm mb-4 line-clamp-2 flex-1">
@@ -175,7 +186,7 @@ export const Home: React.FC<HomeProps> = ({
   levelInfo,
 }) => {
   const [activeTab, setActiveTab] = useState<
-    "rooms" | "characters" | "profile"
+    "rooms" | "characters" | "friends" | "profile"
   >("rooms");
   const [loading, setLoading] = useState(false);
 
@@ -198,6 +209,7 @@ export const Home: React.FC<HomeProps> = ({
   const [editingChar, setEditingChar] = useState<Character | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [userCode, setUserCode] = useState<number | null>(null);
+  const [userEmail, setUserEmail] = useState<string>("");
   const [userNickname, setUserNickname] = useState<string | null>(null);
   const [userBio, setUserBio] = useState<string | null>(null);
   const [userAvatar, setUserAvatar] = useState<string | null>(null);
@@ -210,6 +222,20 @@ export const Home: React.FC<HomeProps> = ({
   const [editBio, setEditBio] = useState("");
   const [editAvatar, setEditAvatar] = useState<string | null>(null);
 
+  // Change Password State
+  const [showChangePwdModal, setShowChangePwdModal] = useState(false);
+  const [oldPassword, setOldPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmNewPassword, setConfirmNewPassword] = useState("");
+
+  // Game History State
+  const [kpHistory, setKpHistory] = useState<GameHistory[]>([]);
+  const [playerHistory, setPlayerHistory] = useState<
+    (GameHistoryParticipant & { game_history: GameHistory })[]
+  >([]);
+  const [historyTab, setHistoryTab] = useState<"kp" | "player">("player");
+  const [showHistoryModal, setShowHistoryModal] = useState(false);
+
   // Initial Data Fetch & Realtime
   useEffect(() => {
     fetchRooms();
@@ -217,6 +243,7 @@ export const Home: React.FC<HomeProps> = ({
     supabase.auth.getUser().then(async ({ data: { user } }) => {
       if (user) {
         setCurrentUserId(user.id);
+        setUserEmail(user.email || "");
         // Fetch User Profile
         const { data: profile } = await supabase
           .from("profiles")
@@ -230,6 +257,9 @@ export const Home: React.FC<HomeProps> = ({
           setUserAvatar(profile.avatar_url);
           setUserCreatedAt(profile.created_at);
           setIsVip(!!profile.is_vip);
+
+          // Fetch History
+          fetchGameHistory(user.id);
         } else {
           // Auto-create profile if missing (fallback for old users)
           const { data: newProfile } = await supabase
@@ -247,6 +277,9 @@ export const Home: React.FC<HomeProps> = ({
             setUserAvatar(newProfile.avatar_url);
             setUserCreatedAt(newProfile.created_at);
             setIsVip(!!newProfile.is_vip);
+
+            // Fetch History
+            fetchGameHistory(user.id);
           }
         }
       }
@@ -293,6 +326,42 @@ export const Home: React.FC<HomeProps> = ({
     };
   }, []);
 
+  const fetchGameHistory = async (userId: string) => {
+    // 1. Fetch KP History
+    const { data: kpData } = await supabase
+      .from("game_histories")
+      .select("*")
+      .eq("kp_id", userId)
+      .order("created_at", { ascending: false });
+
+    if (kpData) {
+      setKpHistory(kpData);
+    }
+
+    // 2. Fetch Player History
+    const { data: playerData } = await supabase
+      .from("game_history_participants")
+      .select(
+        `
+        *,
+        game_history:game_histories (*)
+      `
+      )
+      .eq("user_id", userId)
+      .order("id", { ascending: false }); // ideally order by game_history.created_at but simple ID sort works for now
+
+    if (playerData) {
+      // Sort by game time
+      const sorted = (playerData as any[]).sort((a, b) => {
+        return (
+          new Date(b.game_history.created_at).getTime() -
+          new Date(a.game_history.created_at).getTime()
+        );
+      });
+      setPlayerHistory(sorted);
+    }
+  };
+
   const fetchRooms = async () => {
     setLoading(true);
     const {
@@ -301,19 +370,58 @@ export const Home: React.FC<HomeProps> = ({
 
     let query = supabase
       .from("rooms")
-      .select("*")
-      .order("created_at", { ascending: false });
+      .select("*, characters(count), messages(count)")
+      .order("last_active_at", { ascending: false, nullsFirst: false });
 
     if (user) {
-      // Show open rooms OR rooms created by me
-      query = query.or(`status.eq.open,kp_id.eq.${user.id}`);
+      // Show open rooms OR rooms created by me, but exclude completed
+      query = query
+        .or(`status.eq.open,kp_id.eq.${user.id}`)
+        .neq("status", "completed");
     } else {
       query = query.eq("status", "open");
     }
 
     const { data, error } = await query;
 
-    if (data) setRooms(data);
+    if (data) {
+      const now = new Date().getTime();
+      const processed = data.map((r: any) => {
+        const charCount = r.characters?.[0]?.count || 0;
+        const msgCount = r.messages?.[0]?.count || 0;
+        const createdAt = new Date(r.created_at).getTime();
+        const lastActive = r.last_active_at
+          ? new Date(r.last_active_at).getTime()
+          : createdAt;
+
+        // Zombie Logic: Created > 24h ago, <= 1 person, < 5 messages
+        const isZombie =
+          now - createdAt > 24 * 60 * 60 * 1000 &&
+          charCount <= 1 &&
+          msgCount < 5;
+
+        // Archived Logic: > 7 days no activity
+        const isArchived = now - lastActive > 7 * 24 * 60 * 60 * 1000;
+
+        return {
+          ...r,
+          isZombie,
+          isArchived,
+          last_active_at: r.last_active_at || r.created_at,
+        };
+      });
+
+      // Sort: Non-Zombie first, then by Activity
+      processed.sort((a: any, b: any) => {
+        if (a.isZombie !== b.isZombie) return a.isZombie ? 1 : -1;
+        return (
+          new Date(b.last_active_at).getTime() -
+          new Date(a.last_active_at).getTime()
+        );
+      });
+
+      setRooms(processed);
+    }
     if (error) console.error("Error fetching rooms:", error);
     setLoading(false);
   };
@@ -434,6 +542,25 @@ export const Home: React.FC<HomeProps> = ({
     setLoading(false);
   };
 
+  const handleChangePassword = async () => {
+    if (newPassword !== confirmNewPassword) {
+      alert("两次输入的密码不一致");
+      return;
+    }
+    setLoading(true);
+    const { error } = await supabase.auth.updateUser({ password: newPassword });
+
+    if (!error) {
+      alert("密码修改成功");
+      setShowChangePwdModal(false);
+      setNewPassword("");
+      setConfirmNewPassword("");
+    } else {
+      alert("修改失败: " + error.message);
+    }
+    setLoading(false);
+  };
+
   const handleSaveCharacter = async (char: Character) => {
     const {
       data: { user },
@@ -510,12 +637,18 @@ export const Home: React.FC<HomeProps> = ({
 
   const myRoomIds = new Set(myCharacters.map((c) => c.room_id).filter(Boolean));
 
-  const filteredRooms = rooms.filter((r) => {
+  const filteredRooms = rooms.filter((r: any) => {
     const matchesSearch =
       r.title.includes(searchQuery) ||
       (r.description && r.description.includes(searchQuery));
 
     if (!matchesSearch) return false;
+
+    if (roomFilter === "all") {
+      // Default Lobby: Hide Archived
+      if (r.isArchived) return false;
+      return true;
+    }
 
     if (roomFilter === "mine") {
       return myRoomIds.has(r.id);
@@ -560,6 +693,16 @@ export const Home: React.FC<HomeProps> = ({
               车卡
             </button>
             <button
+              onClick={() => setActiveTab("friends")}
+              className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${
+                activeTab === "friends"
+                  ? "bg-indigo-600 text-white shadow-lg"
+                  : "text-slate-400 hover:text-white"
+              }`}
+            >
+              好友
+            </button>
+            <button
               onClick={() => setActiveTab("profile")}
               className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${
                 activeTab === "profile"
@@ -599,6 +742,16 @@ export const Home: React.FC<HomeProps> = ({
               }`}
             >
               车卡
+            </button>
+            <button
+              onClick={() => setActiveTab("friends")}
+              className={`flex-1 py-2 rounded-md text-sm font-medium ${
+                activeTab === "friends"
+                  ? "bg-indigo-600 text-white"
+                  : "text-slate-400"
+              }`}
+            >
+              好友
             </button>
             <button
               onClick={() => setActiveTab("profile")}
@@ -807,6 +960,22 @@ export const Home: React.FC<HomeProps> = ({
                 )}
               </div>
             </div>
+          ) : activeTab === "friends" ? (
+            <Friends
+              currentUser={
+                currentUserId
+                  ? {
+                      id: currentUserId,
+                      nickname: userNickname,
+                      bio: userBio,
+                      user_code: userCode || undefined,
+                      created_at: userCreatedAt || "",
+                      is_vip: isVip,
+                      avatar_url: userAvatar,
+                    }
+                  : null
+              }
+            />
           ) : (
             <div className="max-w-2xl mx-auto space-y-8 animate-slide-up">
               <div className="bg-slate-800/30 border border-slate-700/50 rounded-2xl p-8 text-center relative overflow-hidden">
@@ -913,12 +1082,15 @@ export const Home: React.FC<HomeProps> = ({
                     </p>
 
                     <div className="grid grid-cols-2 gap-4 text-left mt-6">
-                      <div className="bg-slate-900/50 p-4 rounded-xl border border-slate-700/30">
-                        <div className="text-xs text-slate-500 uppercase font-bold mb-1">
-                          我的车卡
+                      <div
+                        className="bg-slate-900/50 p-4 rounded-xl border border-slate-700/30 cursor-pointer hover:bg-slate-800 hover:border-indigo-500/50 transition-all group"
+                        onClick={() => setShowHistoryModal(true)}
+                      >
+                        <div className="text-xs text-slate-500 uppercase font-bold mb-1 group-hover:text-indigo-400 transition-colors">
+                          个人履历
                         </div>
                         <div className="text-2xl font-mono font-bold text-indigo-400">
-                          {myCharacters.length}
+                          {playerHistory.length + kpHistory.length}
                         </div>
                       </div>
                       <div className="bg-slate-900/50 p-4 rounded-xl border border-slate-700/30">
@@ -974,6 +1146,27 @@ export const Home: React.FC<HomeProps> = ({
                   </div>
                 )}
               </div>
+
+              {!isEditingProfile && (
+                <div className="bg-slate-800/30 border border-slate-700/50 rounded-2xl p-6 text-center">
+                  <h3 className="text-sm font-bold text-slate-400 mb-4 uppercase tracking-wider">
+                    账户安全
+                  </h3>
+                  <Button
+                    variant="secondary"
+                    className="w-full md:w-auto min-w-[120px]"
+                    icon={Lock}
+                    onClick={() => {
+                      setOldPassword("");
+                      setNewPassword("");
+                      setConfirmNewPassword("");
+                      setShowChangePwdModal(true);
+                    }}
+                  >
+                    修改密码
+                  </Button>
+                </div>
+              )}
 
               {/* Suggestion Section */}
               <div className="bg-slate-800/30 border border-slate-700/50 rounded-2xl p-6 text-center">
@@ -1053,6 +1246,199 @@ export const Home: React.FC<HomeProps> = ({
           }
           onClose={() => setShowCharModal(false)}
         />
+      )}
+
+      {/* Game History Modal */}
+      {showHistoryModal && (
+        <Modal
+          onClose={() => setShowHistoryModal(false)}
+          title="跑团履历"
+          icon={History}
+          className="max-w-2xl"
+        >
+          <div className="flex border-b border-white/5">
+            <button
+              onClick={() => setHistoryTab("player")}
+              className={`flex-1 py-3 text-sm font-bold transition-colors ${
+                historyTab === "player"
+                  ? "bg-slate-800/50 text-white border-b-2 border-indigo-500"
+                  : "text-slate-500 hover:text-slate-300 hover:bg-slate-800/30"
+              }`}
+            >
+              我参与的 ({playerHistory.length})
+            </button>
+            <button
+              onClick={() => setHistoryTab("kp")}
+              className={`flex-1 py-3 text-sm font-bold transition-colors ${
+                historyTab === "kp"
+                  ? "bg-slate-800/50 text-white border-b-2 border-indigo-500"
+                  : "text-slate-500 hover:text-slate-300 hover:bg-slate-800/30"
+              }`}
+            >
+              我主持的 ({kpHistory.length})
+            </button>
+          </div>
+
+          <div className="p-4 max-h-[60vh] overflow-y-auto custom-scrollbar">
+            {historyTab === "player" ? (
+              <div className="space-y-3">
+                {playerHistory.map((item) => {
+                  const char = item.character_snapshot;
+                  const isDead = item.outcome === "死亡";
+                  const isLost = item.outcome === "失踪";
+                  const isCrazy = item.outcome === "疯狂";
+
+                  return (
+                    <div
+                      key={item.id}
+                      className={`relative p-4 rounded-xl border transition-all ${
+                        isDead
+                          ? "bg-slate-950 border-slate-800 grayscale"
+                          : "bg-slate-800/50 border-slate-700/50 hover:border-indigo-500/30"
+                      }`}
+                    >
+                      <div className="flex justify-between items-start mb-3">
+                        <div>
+                          <h4 className="font-bold text-white text-base line-clamp-1">
+                            {item.game_history.room_title}
+                          </h4>
+                          <div className="text-xs text-slate-500 flex items-center gap-2 mt-1">
+                            <History size={12} />
+                            {new Date(
+                              item.game_history.created_at
+                            ).toLocaleDateString()}
+                            <span className="w-1 h-1 rounded-full bg-slate-600"></span>
+                            KP: {item.game_history.kp_nickname}
+                          </div>
+                        </div>
+                        <div
+                          className={`px-2 py-0.5 rounded text-[10px] font-bold border uppercase tracking-wider flex items-center gap-1 ${
+                            isDead
+                              ? "bg-slate-800 text-slate-400 border-slate-700"
+                              : isLost
+                              ? "bg-amber-900/20 text-amber-400 border-amber-500/20"
+                              : isCrazy
+                              ? "bg-purple-900/20 text-purple-400 border-purple-500/20"
+                              : "bg-emerald-900/20 text-emerald-400 border-emerald-500/20"
+                          }`}
+                        >
+                          {isDead && <Skull size={10} />}
+                          {item.outcome}
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-3 bg-slate-950/30 p-2 rounded-lg border border-white/5">
+                        <AvatarUpload
+                          url={char.avatar_url}
+                          onUpload={() => {}}
+                          editable={false}
+                          size={40}
+                        />
+                        <div>
+                          <div className="font-bold text-sm text-slate-200">
+                            {char.name}
+                          </div>
+                          <div className="text-[10px] text-slate-500">
+                            {char.job || "无职业"} · {char.sex}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+                {playerHistory.length === 0 && (
+                  <div className="text-center py-8 text-slate-500 text-sm">
+                    暂无参与记录
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {kpHistory.map((item) => (
+                  <div
+                    key={item.id}
+                    className="bg-slate-800/50 border border-slate-700/50 p-4 rounded-xl hover:border-indigo-500/30 transition-all"
+                  >
+                    <div className="flex justify-between items-start mb-2">
+                      <h4 className="font-bold text-white text-base">
+                        {item.room_title}
+                      </h4>
+                      <div className="px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 flex items-center gap-1">
+                        <Crown size={10} />
+                        Keeper
+                      </div>
+                    </div>
+                    <p className="text-xs text-slate-400 line-clamp-2 mb-3">
+                      {item.room_description || "暂无描述..."}
+                    </p>
+                    <div className="text-[10px] text-slate-500 font-mono bg-slate-950/50 px-2 py-1 rounded inline-block">
+                      结团于: {new Date(item.created_at).toLocaleString()}
+                    </div>
+                  </div>
+                ))}
+                {kpHistory.length === 0 && (
+                  <div className="text-center py-8 text-slate-500 text-sm">
+                    暂无主持记录
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+          <div className="px-6 py-4 border-t border-white/10 bg-white/5 flex justify-end">
+            <Button variant="ghost" onClick={() => setShowHistoryModal(false)}>
+              关闭
+            </Button>
+          </div>
+        </Modal>
+      )}
+
+      {/* Change Password Modal */}
+      {showChangePwdModal && (
+        <Modal
+          onClose={() => setShowChangePwdModal(false)}
+          title="修改密码"
+          icon={Lock}
+          className="max-w-md"
+        >
+          <div className="p-6 space-y-4">
+            <Input
+              label="旧密码"
+              type="password"
+              value={oldPassword}
+              onChange={(e) => setOldPassword(e.target.value)}
+              placeholder="请输入旧密码"
+            />
+            <Input
+              label="新密码"
+              type="password"
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+              placeholder="请输入新密码"
+            />
+            <Input
+              label="确认新密码"
+              type="password"
+              value={confirmNewPassword}
+              onChange={(e) => setConfirmNewPassword(e.target.value)}
+              placeholder="请再次输入新密码"
+            />
+          </div>
+          <div className="px-6 py-4 border-t border-white/10 bg-white/5 flex justify-end gap-3">
+            <Button
+              variant="ghost"
+              onClick={() => setShowChangePwdModal(false)}
+            >
+              取消
+            </Button>
+            <Button
+              onClick={handleChangePassword}
+              disabled={!newPassword || loading}
+              icon={loading ? Loader2 : Lock}
+            >
+              {loading ? "修改中..." : "确认修改"}
+            </Button>
+          </div>
+        </Modal>
       )}
     </div>
   );

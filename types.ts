@@ -14,15 +14,46 @@ export interface Profile {
   experience?: number;
 }
 
+export interface Friendship {
+  id: string;
+  user_id: string;
+  friend_id: string;
+  status: "pending" | "accepted";
+  created_at: string;
+  friend_profile?: Profile; // Joined data
+}
+
 export interface Room {
   id: string;
   created_at: string;
   kp_id: string;
   title: string;
   description: string | null;
-  status: "open" | "closed" | "archived";
+  status: "open" | "closed" | "archived" | "completed";
   room_number?: number;
   password?: string | null;
+  last_active_at?: string;
+}
+
+export interface GameHistory {
+  id: string;
+  created_at: string;
+  room_id: string | null;
+  room_title: string;
+  room_description: string | null;
+  start_time: string | null;
+  end_time: string | null;
+  kp_id: string;
+  kp_nickname: string | null;
+}
+
+export interface GameHistoryParticipant {
+  id: string;
+  game_history_id: string;
+  user_id: string;
+  user_nickname: string | null;
+  character_snapshot: Character;
+  outcome: "存活" | "死亡" | "失踪" | "疯狂";
 }
 
 export interface Character {
