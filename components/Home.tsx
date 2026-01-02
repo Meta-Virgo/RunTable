@@ -57,6 +57,8 @@ const INITIAL_CHAR_STATE: Character = {
   type: "investigator",
   backstory: "",
   skills: {},
+  items: [],
+  spells: [],
 };
 
 interface RoomCardProps {
@@ -524,6 +526,8 @@ export const Home: React.FC<HomeProps> = ({
         san: c.stats?.san || 50,
         mp: c.stats?.mp || 10,
         skills: c.info?.skills || c.stats?.skills || {},
+        items: c.info?.items || [],
+        spells: c.info?.spells || [],
       }));
       setMyCharacters(mappedChars);
     }
@@ -641,6 +645,8 @@ export const Home: React.FC<HomeProps> = ({
         notes: char.notes,
         backstory: char.backstory,
         skills: char.skills || {},
+        items: char.items || [],
+        spells: char.spells || [],
       },
       stats: {
         str: char.str,

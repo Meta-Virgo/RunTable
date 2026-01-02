@@ -168,7 +168,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               e.stopPropagation();
               onOpenStatusEdit(char.id);
             }}
-            className="absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded-lg text-slate-500 hover:text-white hover:bg-slate-700 opacity-0 group-hover:opacity-100 transition-all cursor-pointer"
+            className="absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded-lg text-slate-500 hover:text-white hover:bg-slate-700 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-all cursor-pointer"
           >
             <Activity size={14} />
           </button>

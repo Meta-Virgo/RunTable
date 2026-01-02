@@ -693,7 +693,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                       "flex items-center gap-1 transition-opacity",
                       activeMessageId === log.id
                         ? "opacity-100"
-                        : "opacity-0 group-hover/bubble:opacity-100",
+                        : "opacity-100 md:opacity-0 md:group-hover/bubble:opacity-100",
                       alignRight ? "flex-row-reverse" : "flex-row"
                     )}
                   >

@@ -46,6 +46,8 @@ const INITIAL_CHAR_STATE: Character = {
   notes: "",
   backstory: "",
   skills: {},
+  items: [],
+  spells: [],
 };
 
 const EMPTY_MODULE_INFO: ModuleInfo = { title: "", description: "", notes: "" };
@@ -379,6 +381,8 @@ const App: React.FC = () => {
           notes: c.info?.notes || "",
           backstory: c.info?.backstory || "",
           skills: c.info?.skills || c.stats?.skills || {},
+          items: c.info?.items || [],
+          spells: c.info?.spells || [],
           str: c.stats?.str || 50,
           con: c.stats?.con || 50,
           siz: c.stats?.siz || 50,
@@ -603,6 +607,8 @@ const App: React.FC = () => {
               notes: newChar.info?.notes || "",
               backstory: newChar.info?.backstory || "",
               skills: newChar.info?.skills || newChar.stats?.skills || {},
+              items: newChar.info?.items || [],
+              spells: newChar.info?.spells || [],
               str: newChar.stats?.str || 50,
               con: newChar.stats?.con || 50,
               siz: newChar.stats?.siz || 50,
@@ -681,6 +687,14 @@ const App: React.FC = () => {
                         : c.backstory,
                     skills:
                       safeInfo.skills || safeStats.skills || c.skills || {},
+                    items:
+                      safeInfo.items !== undefined
+                        ? safeInfo.items
+                        : c.items || [],
+                    spells:
+                      safeInfo.spells !== undefined
+                        ? safeInfo.spells
+                        : c.spells || [],
 
                     // Update mapped fields from stats
                     str: safeStats.str !== undefined ? safeStats.str : c.str,
@@ -736,6 +750,8 @@ const App: React.FC = () => {
               notes: newChar.info?.notes || "",
               backstory: newChar.info?.backstory || "",
               skills: newChar.info?.skills || newChar.stats?.skills || {},
+              items: newChar.info?.items || [],
+              spells: newChar.info?.spells || [],
               str: newChar.stats?.str || 50,
               con: newChar.stats?.con || 50,
               siz: newChar.stats?.siz || 50,
@@ -926,6 +942,8 @@ const App: React.FC = () => {
           notes: c.info?.notes || "",
           backstory: c.info?.backstory || "",
           skills: c.info?.skills || c.stats?.skills || {},
+          items: c.info?.items || [],
+          spells: c.info?.spells || [],
           str: c.stats?.str || 50,
           con: c.stats?.con || 50,
           siz: c.stats?.siz || 50,
@@ -1225,6 +1243,8 @@ const App: React.FC = () => {
         notes: char.notes,
         backstory: char.backstory,
         skills: char.skills || {},
+        items: char.items || [],
+        spells: char.spells || [],
       },
 
       stats: {
@@ -1273,6 +1293,8 @@ const App: React.FC = () => {
             notes: latestChar.info?.notes || "",
             backstory: latestChar.info?.backstory || "",
             skills: latestChar.info?.skills || latestChar.stats?.skills || {},
+            items: latestChar.info?.items || [],
+            spells: latestChar.info?.spells || [],
             str: latestChar.stats?.str || 50,
             con: latestChar.stats?.con || 50,
             siz: latestChar.stats?.siz || 50,
@@ -1319,6 +1341,8 @@ const App: React.FC = () => {
             notes: data.info?.notes || "",
             backstory: data.info?.backstory || "",
             skills: data.info?.skills || data.stats?.skills || {},
+            items: data.info?.items || [],
+            spells: data.info?.spells || [],
             str: data.stats?.str || 50,
             con: data.stats?.con || 50,
             siz: data.stats?.siz || 50,

@@ -56,6 +56,11 @@ export interface GameHistoryParticipant {
   outcome: "存活" | "死亡" | "失踪" | "疯狂";
 }
 
+export interface InventoryItem {
+  name: string;
+  quantity: number;
+}
+
 export interface Character {
   id: string;
   created_at?: string;
@@ -67,7 +72,7 @@ export interface Character {
   type: "investigator" | "npc" | "monster";
   theme_color?: string;
   avatar_url?: string | null;
-  inventory?: string | null;
+  inventory?: string | null; // Deprecated, use items instead
 
   info?: Record<string, any>; // For storing job, age, sex, notes, backstory, skills etc.
   stats?: Record<string, any>; // For storing str, con, siz, etc.
@@ -92,6 +97,8 @@ export interface Character {
   notes: string;
   backstory: string;
   skills: Record<string, number>;
+  items?: InventoryItem[];
+  spells?: InventoryItem[];
 
   // Frontend only
   isOnline?: boolean;

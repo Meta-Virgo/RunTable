@@ -11,10 +11,12 @@ import {
   FileText,
   X,
   LogOut,
+  Zap,
+  Package,
 } from "lucide-react";
 import { Modal, Input, Textarea, Button, NumberStepper, cn } from "./UI";
 import { AvatarUpload } from "./AvatarUpload";
-import { ModuleInfo, Character } from "../types";
+import { ModuleInfo, Character, InventoryItem } from "../types";
 
 const ATTR_MAP = [
   { key: "str", label: "力量 STR" },
@@ -157,6 +159,149 @@ export const ModuleModal: React.FC<{
         </Button>
       </div>
     </Modal>
+  );
+};
+
+const ItemListEditor: React.FC<{
+  title: string;
+  icon: React.ElementType;
+  items: InventoryItem[];
+  onChange: (items: InventoryItem[]) => void;
+  disabled?: boolean;
+}> = ({ title, icon: Icon, items, onChange, disabled }) => {
+  const [newItemName, setNewItemName] = useState("");
+  const [newItemQty, setNewItemQty] = useState(1);
+  const [isAdding, setIsAdding] = useState(false);
+  const inputRef = React.useRef<HTMLInputElement>(null);
+
+  const handleAdd = () => {
+    if (!newItemName.trim()) return;
+    onChange([...items, { name: newItemName.trim(), quantity: newItemQty }]);
+    setNewItemName("");
+    setNewItemQty(1);
+    setIsAdding(false);
+  };
+
+  const handleRemove = (index: number) => {
+    const newItems = [...items];
+    newItems.splice(index, 1);
+    onChange(newItems);
+  };
+
+  const handleUpdateQty = (index: number, delta: number) => {
+    const newItems = [...items];
+    const newQty = Math.max(0, newItems[index].quantity + delta);
+    if (newQty === 0) {
+      // Optional: Ask for confirmation or just remove?
+      // Let's just remove if 0
+      newItems.splice(index, 1);
+    } else {
+      newItems[index].quantity = newQty;
+    }
+    onChange(newItems);
+  };
+
+  return (
+    <div className="bg-slate-900/40 p-5 rounded-2xl border border-white/5 flex flex-col h-full">
+      <div className="flex justify-between items-center mb-4">
+        <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2">
+          <Icon size={12} /> {title}
+        </h4>
+        {!disabled && !isAdding && (
+          <Button
+            onClick={() => {
+              setIsAdding(true);
+              setTimeout(() => inputRef.current?.focus(), 100);
+            }}
+            variant="ghost"
+            size="sm"
+            icon={UserPlus}
+          >
+            添加
+          </Button>
+        )}
+      </div>
+
+      {isAdding && (
+        <div className="flex gap-2 mb-4 items-center bg-slate-950/50 p-2 rounded-lg border border-white/10 animate-fade-in">
+          <input
+            ref={inputRef}
+            value={newItemName}
+            onChange={(e) => setNewItemName(e.target.value)}
+            placeholder="名称..."
+            className="flex-1 min-w-0 bg-transparent text-sm text-white focus:outline-none"
+            onKeyDown={(e) => {
+              if (e.key === "Enter") handleAdd();
+              if (e.key === "Escape") setIsAdding(false);
+            }}
+          />
+          <div className="flex items-center gap-1 border-l border-white/10 pl-2">
+            <span className="text-xs text-slate-500">x</span>
+            <input
+              type="number"
+              value={newItemQty}
+              onChange={(e) => setNewItemQty(parseInt(e.target.value) || 1)}
+              className="w-12 bg-transparent text-sm text-white focus:outline-none text-right"
+              min={1}
+            />
+          </div>
+          <Button
+            onClick={handleAdd}
+            variant="primary"
+            size="sm"
+            className="shrink-0 shadow-none h-7 py-0"
+            disabled={!newItemName.trim()}
+          >
+            确定
+          </Button>
+        </div>
+      )}
+
+      <div className="space-y-2 flex-1 overflow-y-auto custom-scrollbar min-h-[100px] max-h-[200px]">
+        {items.map((item, idx) => (
+          <div
+            key={idx}
+            className="flex items-center justify-between p-2 bg-slate-950/30 rounded-lg border border-white/5 group hover:bg-slate-950/50 transition-colors"
+          >
+            <span
+              className="text-sm text-slate-300 font-medium truncate flex-1 mr-2"
+              title={item.name}
+            >
+              {item.name}
+            </span>
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1 bg-slate-900 rounded-md px-1.5 py-0.5 border border-white/5">
+                <span className="text-xs text-slate-500">x</span>
+                <span className="text-sm font-mono text-indigo-300">
+                  {item.quantity}
+                </span>
+              </div>
+              {!disabled && (
+                <div className="flex gap-1 opacity-100 transition-opacity">
+                  <button
+                    onClick={() => handleUpdateQty(idx, 1)}
+                    className="p-1 hover:text-indigo-400 text-slate-500 transition-colors"
+                  >
+                    <UserPlus size={12} />
+                  </button>
+                  <button
+                    onClick={() => handleUpdateQty(idx, -1)}
+                    className="p-1 hover:text-red-400 text-slate-500 transition-colors"
+                  >
+                    <Trash2 size={12} />
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        ))}
+        {items.length === 0 && !isAdding && (
+          <div className="text-center text-slate-600 text-xs py-8">
+            暂无条目
+          </div>
+        )}
+      </div>
+    </div>
   );
 };
 
@@ -550,10 +695,27 @@ export const CharacterModal: React.FC<{
             disabled={readOnly}
           />
           <Textarea
-            label="详细备注 / 物品 / 法术"
+            label="详细备注"
             value={form.notes}
             onChange={(e) => setForm({ ...form, notes: e.target.value })}
             rows={5}
+            disabled={readOnly}
+          />
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 h-72">
+          <ItemListEditor
+            title="物品清单"
+            icon={Package}
+            items={form.items || []}
+            onChange={(items) => setForm({ ...form, items })}
+            disabled={readOnly}
+          />
+          <ItemListEditor
+            title="法术 / 能力"
+            icon={Zap}
+            items={form.spells || []}
+            onChange={(spells) => setForm({ ...form, spells })}
             disabled={readOnly}
           />
         </div>
@@ -889,4 +1051,3 @@ export const ConclusionModal: React.FC<{
     </Modal>
   );
 };
-
