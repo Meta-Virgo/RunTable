@@ -156,7 +156,7 @@ export const Square: React.FC = () => {
         .select(
           `
           *,
-          post_likes (count),
+          post_likes (user_id),
           post_comments (count)
         `
         )
@@ -164,14 +164,17 @@ export const Square: React.FC = () => {
         .order("created_at", { ascending: false });
 
       if (postsData) {
-        // 2. Fetch Profiles manually
-        const userIds = Array.from(
-          new Set(postsData.map((p: any) => p.user_id))
+        // 2. Fetch Profiles manually (authors AND likers)
+        const authorIds = postsData.map((p: any) => p.user_id);
+        const likerIds = postsData.flatMap((p: any) =>
+          p.post_likes ? p.post_likes.map((l: any) => l.user_id) : []
         );
+        const allUserIds = Array.from(new Set([...authorIds, ...likerIds]));
+
         const { data: profilesData } = await supabase
           .from("profiles")
           .select("id, nickname, avatar_url, is_vip")
-          .in("id", userIds);
+          .in("id", allUserIds);
 
         const profileMap = new Map(
           profilesData?.map((p: any) => [p.id, p]) || []
@@ -201,9 +204,13 @@ export const Square: React.FC = () => {
             avatar_url: null,
             is_vip: false,
           },
-          like_count: p.post_likes?.[0]?.count || 0,
+          like_count: p.post_likes?.length || 0,
           comment_count: p.post_comments?.[0]?.count || 0,
           is_liked: myLikedPostIds.has(p.id),
+          liked_by:
+            p.post_likes
+              ?.map((l: any) => profileMap.get(l.user_id))
+              .filter(Boolean) || [],
         }));
         setPosts(formattedPosts);
       }
@@ -421,6 +428,9 @@ export const Square: React.FC = () => {
                   ...p,
                   like_count: Math.max(0, (p.like_count || 0) - 1),
                   is_liked: false,
+                  liked_by: (p.liked_by || []).filter(
+                    (u) => u.nickname !== currentUser.nickname
+                  ),
                 }
               : p
           )
@@ -441,6 +451,10 @@ export const Square: React.FC = () => {
                   ...p,
                   like_count: (p.like_count || 0) + 1,
                   is_liked: true,
+                  liked_by: [
+                    ...(p.liked_by || []),
+                    { nickname: currentUser.nickname || "我" },
+                  ],
                 }
               : p
           )
@@ -856,220 +870,252 @@ export const Square: React.FC = () => {
                 暂无帖子，来抢沙发吧！
               </div>
             ) : (
-              posts.map((post) => (
-                <div key={post.id} className="group flex gap-4 animate-fade-in">
-                  <div className="w-10 h-10 rounded-full bg-slate-700 flex items-center justify-center text-slate-300 font-bold shrink-0 overflow-hidden">
-                    <button
-                      className="w-full h-full"
-                      title="查看资料"
-                      onClick={() => openProfile(post.user_id)}
-                    >
-                      {post.profiles?.avatar_url ? (
-                        <img
-                          src={post.profiles.avatar_url}
-                          alt={post.profiles.nickname}
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        post.profiles?.nickname?.[0] || "?"
-                      )}
-                    </button>
-                  </div>
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-1">
+              posts
+                .filter(
+                  (post) =>
+                    !searchQuery ||
+                    post.content
+                      .toLowerCase()
+                      .includes(searchQuery.toLowerCase()) ||
+                    post.tags?.some((t) =>
+                      t.toLowerCase().includes(searchQuery.toLowerCase())
+                    )
+                )
+                .map((post) => (
+                  <div
+                    key={post.id}
+                    className="group flex gap-4 animate-fade-in"
+                  >
+                    <div className="w-10 h-10 rounded-full bg-slate-700 flex items-center justify-center text-slate-300 font-bold shrink-0 overflow-hidden">
                       <button
-                        className={cn(
-                          "font-bold text-sm",
-                          post.profiles?.is_vip
-                            ? "text-purple-400"
-                            : "text-white"
-                        )}
+                        className="w-full h-full"
+                        title="查看资料"
                         onClick={() => openProfile(post.user_id)}
                       >
-                        {post.profiles?.nickname || "未知用户"}
-                      </button>
-                      {post.profiles?.is_vip && (
-                        <span className="text-[10px] bg-purple-500/20 text-purple-300 px-1 rounded border border-purple-500/30">
-                          VIP
-                        </span>
-                      )}
-                      <span className="text-xs text-slate-500">
-                        {new Date(post.created_at).toLocaleString()}
-                      </span>
-                    </div>
-
-                    <div className="text-slate-300 text-sm leading-relaxed mb-2 whitespace-pre-wrap">
-                      {post.content}
-                    </div>
-
-                    {post.image_url && (
-                      <div className="mb-2">
-                        <img
-                          src={post.image_url}
-                          alt="Post Image"
-                          className="max-h-64 rounded-lg border border-white/10 cursor-pointer hover:opacity-90 transition-opacity"
-                          onClick={() => window.open(post.image_url!, "_blank")}
-                        />
-                      </div>
-                    )}
-
-                    {post.tags && post.tags.length > 0 && (
-                      <div className="flex gap-2 mb-2">
-                        {post.tags.map((tag) => (
-                          <span
-                            key={tag}
-                            className="text-[10px] bg-indigo-500/10 text-indigo-400 px-1.5 py-0.5 rounded"
-                          >
-                            #{tag}
-                          </span>
-                        ))}
-                      </div>
-                    )}
-
-                    <div className="flex items-center gap-6 text-slate-500 text-xs">
-                      <button
-                        className="flex items-center gap-1 hover:text-indigo-400 transition-colors"
-                        onClick={() => {
-                          if (expandedPostId === post.id) {
-                            setExpandedPostId(null);
-                          } else {
-                            setExpandedPostId(post.id);
-                            fetchComments(post.id);
-                          }
-                        }}
-                      >
-                        <MessageSquare size={14} />
-                        {post.comment_count} 评论
-                      </button>
-                      <button
-                        className={cn(
-                          "flex items-center gap-1 hover:text-pink-400 transition-colors",
-                          post.is_liked && "text-pink-400"
+                        {post.profiles?.avatar_url ? (
+                          <img
+                            src={post.profiles.avatar_url}
+                            alt={post.profiles.nickname}
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          post.profiles?.nickname?.[0] || "?"
                         )}
-                        onClick={() => handleLike(post.id)}
-                      >
-                        <Heart
-                          size={14}
-                          className={cn(post.is_liked && "fill-current")}
-                        />
-                        {post.like_count} 赞
                       </button>
-                      {currentUser?.id === post.user_id && (
-                        <button
-                          className="flex items-center gap-1 hover:text-red-400 transition-colors"
-                          onClick={() => requestDeletePost(post.id)}
-                        >
-                          <Trash2 size={14} />
-                          删除
-                        </button>
-                      )}
                     </div>
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <button
+                          className={cn(
+                            "font-bold text-sm",
+                            post.profiles?.is_vip
+                              ? "text-purple-400"
+                              : "text-white"
+                          )}
+                          onClick={() => openProfile(post.user_id)}
+                        >
+                          {post.profiles?.nickname || "未知用户"}
+                        </button>
+                        {post.profiles?.is_vip && (
+                          <span className="text-[10px] bg-purple-500/20 text-purple-300 px-1 rounded border border-purple-500/30">
+                            VIP
+                          </span>
+                        )}
+                        <span className="text-xs text-slate-500">
+                          {new Date(post.created_at).toLocaleString()}
+                        </span>
+                      </div>
 
-                    {/* Comments Section */}
-                    {expandedPostId === post.id && (
-                      <div className="mt-4 pt-4 border-t border-white/5 animate-fade-in">
-                        <div className="space-y-4 mb-4">
-                          {loadingComments[post.id] ? (
-                            <div className="flex justify-center py-4">
-                              <Loader2
-                                className="animate-spin text-slate-500"
-                                size={16}
-                              />
-                            </div>
-                          ) : comments[post.id]?.length > 0 ? (
-                            comments[post.id].map((comment) => (
-                              <div key={comment.id} className="flex gap-3">
-                                <div className="w-6 h-6 rounded-full bg-slate-700 flex items-center justify-center text-slate-300 text-xs font-bold shrink-0 overflow-hidden">
-                                  {comment.profiles?.avatar_url ? (
-                                    <img
-                                      src={comment.profiles.avatar_url}
-                                      className="w-full h-full object-cover"
-                                    />
-                                  ) : (
-                                    comment.profiles?.nickname?.[0] || "?"
-                                  )}
-                                </div>
-                                <div className="flex-1">
-                                  <div className="flex items-center gap-2 mb-0.5">
-                                    <button
-                                      className={cn(
-                                        "text-xs font-bold",
-                                        comment.profiles?.is_vip
-                                          ? "text-purple-400"
-                                          : "text-slate-300"
-                                      )}
-                                      onClick={() =>
-                                        openProfile(comment.user_id)
-                                      }
-                                    >
-                                      {comment.profiles?.nickname || "未知用户"}
-                                    </button>
-                                    <span className="text-[10px] text-slate-600">
-                                      {new Date(
-                                        comment.created_at
-                                      ).toLocaleString()}
-                                    </span>
-                                  </div>
-                                  <p className="text-xs text-slate-400 leading-relaxed">
-                                    {comment.content}
-                                  </p>
-                                </div>
-                                {currentUser?.id === comment.user_id && (
-                                  <button
-                                    className="text-slate-600 hover:text-red-400 transition-colors"
-                                    onClick={() =>
-                                      requestDeleteComment(comment.id, post.id)
-                                    }
-                                  >
-                                    <Trash2 size={14} />
-                                  </button>
-                                )}
+                      <div className="text-slate-300 text-sm leading-relaxed mb-2 whitespace-pre-wrap">
+                        {post.content}
+                      </div>
+
+                      {post.image_url && (
+                        <div className="mb-2">
+                          <img
+                            src={post.image_url}
+                            alt="Post Image"
+                            className="max-h-64 rounded-lg border border-white/10 cursor-pointer hover:opacity-90 transition-opacity"
+                            onClick={() =>
+                              window.open(post.image_url!, "_blank")
+                            }
+                          />
+                        </div>
+                      )}
+
+                      {post.tags && post.tags.length > 0 && (
+                        <div className="flex gap-2 mb-2">
+                          {post.tags.map((tag) => (
+                            <span
+                              key={tag}
+                              className="text-[10px] bg-indigo-500/10 text-indigo-400 px-1.5 py-0.5 rounded"
+                            >
+                              #{tag}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+
+                      <div className="flex items-center gap-6 text-slate-500 text-xs">
+                        <button
+                          className="flex items-center gap-1 hover:text-indigo-400 transition-colors"
+                          onClick={() => {
+                            if (expandedPostId === post.id) {
+                              setExpandedPostId(null);
+                            } else {
+                              setExpandedPostId(post.id);
+                              fetchComments(post.id);
+                            }
+                          }}
+                        >
+                          <MessageSquare size={14} />
+                          {post.comment_count} 评论
+                        </button>
+                        <button
+                          className={cn(
+                            "flex items-center gap-1 hover:text-pink-400 transition-colors group/like relative",
+                            post.is_liked && "text-pink-400"
+                          )}
+                          onClick={() => handleLike(post.id)}
+                        >
+                          <Heart
+                            size={14}
+                            className={cn(post.is_liked && "fill-current")}
+                          />
+                          {post.like_count} 赞
+                          {post.liked_by && post.liked_by.length > 0 && (
+                            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover/like:block z-50">
+                              <div className="bg-slate-900 text-slate-200 text-xs px-2 py-1 rounded border border-slate-700 whitespace-nowrap shadow-xl">
+                                {post.liked_by
+                                  .slice(0, 5)
+                                  .map((u) => u.nickname)
+                                  .join(", ")}
+                                {post.liked_by.length > 5 &&
+                                  ` 等 ${post.liked_by.length} 人`}
                               </div>
-                            ))
-                          ) : (
-                            <div className="text-center text-slate-600 text-xs py-2">
-                              暂无评论，快来抢沙发~
                             </div>
                           )}
-                        </div>
-
-                        {/* Comment Input */}
-                        <div className="flex gap-3 items-start">
-                          <div className="flex-1 relative">
-                            <input
-                              type="text"
-                              className="w-full bg-slate-900/50 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 placeholder:text-slate-600 focus:outline-none focus:border-indigo-500 transition-colors pr-10"
-                              placeholder="写下你的评论..."
-                              value={newCommentContent}
-                              onChange={(e) =>
-                                setNewCommentContent(e.target.value)
-                              }
-                              onKeyDown={(e) => {
-                                if (e.key === "Enter" && !e.shiftKey) {
-                                  e.preventDefault();
-                                  handleSendComment(post.id);
-                                }
-                              }}
-                            />
-                            <CornerDownRight
-                              className="absolute right-3 top-2.5 text-slate-600"
-                              size={14}
-                            />
-                          </div>
-                          <Button
-                            size="sm"
-                            disabled={!newCommentContent.trim() || commenting}
-                            onClick={() => handleSendComment(post.id)}
-                            icon={commenting ? Loader2 : Send}
+                        </button>
+                        {currentUser?.id === post.user_id && (
+                          <button
+                            className="flex items-center gap-1 hover:text-red-400 transition-colors"
+                            onClick={() => requestDeletePost(post.id)}
                           >
-                            发送
-                          </Button>
-                        </div>
+                            <Trash2 size={14} />
+                            删除
+                          </button>
+                        )}
                       </div>
-                    )}
+
+                      {/* Comments Section */}
+                      {expandedPostId === post.id && (
+                        <div className="mt-4 pt-4 border-t border-white/5 animate-fade-in">
+                          <div className="space-y-4 mb-4">
+                            {loadingComments[post.id] ? (
+                              <div className="flex justify-center py-4">
+                                <Loader2
+                                  className="animate-spin text-slate-500"
+                                  size={16}
+                                />
+                              </div>
+                            ) : comments[post.id]?.length > 0 ? (
+                              comments[post.id].map((comment) => (
+                                <div key={comment.id} className="flex gap-3">
+                                  <div className="w-6 h-6 rounded-full bg-slate-700 flex items-center justify-center text-slate-300 text-xs font-bold shrink-0 overflow-hidden">
+                                    {comment.profiles?.avatar_url ? (
+                                      <img
+                                        src={comment.profiles.avatar_url}
+                                        className="w-full h-full object-cover"
+                                      />
+                                    ) : (
+                                      comment.profiles?.nickname?.[0] || "?"
+                                    )}
+                                  </div>
+                                  <div className="flex-1">
+                                    <div className="flex items-center gap-2 mb-0.5">
+                                      <button
+                                        className={cn(
+                                          "text-xs font-bold",
+                                          comment.profiles?.is_vip
+                                            ? "text-purple-400"
+                                            : "text-slate-300"
+                                        )}
+                                        onClick={() =>
+                                          openProfile(comment.user_id)
+                                        }
+                                      >
+                                        {comment.profiles?.nickname ||
+                                          "未知用户"}
+                                      </button>
+                                      <span className="text-[10px] text-slate-600">
+                                        {new Date(
+                                          comment.created_at
+                                        ).toLocaleString()}
+                                      </span>
+                                    </div>
+                                    <p className="text-xs text-slate-400 leading-relaxed">
+                                      {comment.content}
+                                    </p>
+                                  </div>
+                                  {currentUser?.id === comment.user_id && (
+                                    <button
+                                      className="text-slate-600 hover:text-red-400 transition-colors"
+                                      onClick={() =>
+                                        requestDeleteComment(
+                                          comment.id,
+                                          post.id
+                                        )
+                                      }
+                                    >
+                                      <Trash2 size={14} />
+                                    </button>
+                                  )}
+                                </div>
+                              ))
+                            ) : (
+                              <div className="text-center text-slate-600 text-xs py-2">
+                                暂无评论，快来抢沙发~
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Comment Input */}
+                          <div className="flex gap-3 items-start">
+                            <div className="flex-1 relative">
+                              <input
+                                type="text"
+                                className="w-full bg-slate-900/50 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 placeholder:text-slate-600 focus:outline-none focus:border-indigo-500 transition-colors pr-10"
+                                placeholder="写下你的评论..."
+                                value={newCommentContent}
+                                onChange={(e) =>
+                                  setNewCommentContent(e.target.value)
+                                }
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter" && !e.shiftKey) {
+                                    e.preventDefault();
+                                    handleSendComment(post.id);
+                                  }
+                                }}
+                              />
+                              <CornerDownRight
+                                className="absolute right-3 top-2.5 text-slate-600"
+                                size={14}
+                              />
+                            </div>
+                            <Button
+                              size="sm"
+                              disabled={!newCommentContent.trim() || commenting}
+                              onClick={() => handleSendComment(post.id)}
+                              icon={commenting ? Loader2 : Send}
+                            >
+                              发送
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   </div>
-                </div>
-              ))
+                ))
             )}
           </div>
         </div>

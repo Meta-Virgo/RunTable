@@ -194,6 +194,7 @@ export interface Post {
   like_count?: number;
   comment_count?: number;
   is_liked?: boolean; // If current user liked it
+  liked_by?: { nickname: string }[];
 }
 
 export interface PostComment {
