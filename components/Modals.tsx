@@ -13,6 +13,8 @@ import {
   LogOut,
   Zap,
   Package,
+  Plus,
+  Minus,
 } from "lucide-react";
 import { Modal, Input, Textarea, Button, NumberStepper, cn } from "./UI";
 import { AvatarUpload } from "./AvatarUpload";
@@ -171,13 +173,23 @@ const ItemListEditor: React.FC<{
 }> = ({ title, icon: Icon, items, onChange, disabled }) => {
   const [newItemName, setNewItemName] = useState("");
   const [newItemQty, setNewItemQty] = useState(1);
+  const [newItemDesc, setNewItemDesc] = useState("");
   const [isAdding, setIsAdding] = useState(false);
+  const [expandedIndex, setExpandedIndex] = useState<number | null>(null);
   const inputRef = React.useRef<HTMLInputElement>(null);
 
   const handleAdd = () => {
     if (!newItemName.trim()) return;
-    onChange([...items, { name: newItemName.trim(), quantity: newItemQty }]);
+    onChange([
+      ...items,
+      {
+        name: newItemName.trim(),
+        quantity: newItemQty,
+        description: newItemDesc.trim(),
+      },
+    ]);
     setNewItemName("");
+    setNewItemDesc("");
     setNewItemQty(1);
     setIsAdding(false);
   };
@@ -223,37 +235,61 @@ const ItemListEditor: React.FC<{
       </div>
 
       {isAdding && (
-        <div className="flex gap-2 mb-4 items-center bg-slate-950/50 p-2 rounded-lg border border-white/10 animate-fade-in">
-          <input
-            ref={inputRef}
-            value={newItemName}
-            onChange={(e) => setNewItemName(e.target.value)}
-            placeholder="名称..."
-            className="flex-1 min-w-0 bg-transparent text-sm text-white focus:outline-none"
+        <div className="flex flex-col gap-2 mb-4 bg-slate-950/50 p-2 rounded-lg border border-white/10 animate-fade-in">
+          <div className="flex gap-2 items-center">
+            <input
+              ref={inputRef}
+              value={newItemName}
+              onChange={(e) => setNewItemName(e.target.value)}
+              placeholder="名称..."
+              className="flex-1 min-w-0 bg-transparent text-sm text-white focus:outline-none"
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  // If there's a description input, maybe move focus?
+                  // But for now let's just submit if description is empty or user wants to.
+                  // Actually, better to let them tab to description.
+                }
+                if (e.key === "Escape") setIsAdding(false);
+              }}
+            />
+            <div className="flex items-center gap-1 border-l border-white/10 pl-2">
+              <span className="text-xs text-slate-500">
+                {title === "法术 / 能力" ? "MP" : "x"}
+              </span>
+              <input
+                type="number"
+                value={newItemQty}
+                onChange={(e) => setNewItemQty(parseInt(e.target.value) || 1)}
+                className="w-12 bg-transparent text-sm text-white focus:outline-none text-right"
+                min={1}
+              />
+            </div>
+          </div>
+          <textarea
+            value={newItemDesc}
+            onChange={(e) => setNewItemDesc(e.target.value)}
+            placeholder="详细描述 (可选)..."
+            className="w-full bg-transparent text-xs text-slate-400 focus:outline-none border-t border-white/5 pt-2 resize-none"
+            rows={2}
             onKeyDown={(e) => {
-              if (e.key === "Enter") handleAdd();
-              if (e.key === "Escape") setIsAdding(false);
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                handleAdd();
+              }
             }}
           />
-          <div className="flex items-center gap-1 border-l border-white/10 pl-2">
-            <span className="text-xs text-slate-500">x</span>
-            <input
-              type="number"
-              value={newItemQty}
-              onChange={(e) => setNewItemQty(parseInt(e.target.value) || 1)}
-              className="w-12 bg-transparent text-sm text-white focus:outline-none text-right"
-              min={1}
-            />
+          <div className="flex justify-end">
+            <Button
+              onClick={handleAdd}
+              variant="primary"
+              size="sm"
+              className="shrink-0 shadow-none h-7 py-0"
+              disabled={!newItemName.trim()}
+            >
+              确定
+            </Button>
           </div>
-          <Button
-            onClick={handleAdd}
-            variant="primary"
-            size="sm"
-            className="shrink-0 shadow-none h-7 py-0"
-            disabled={!newItemName.trim()}
-          >
-            确定
-          </Button>
         </div>
       )}
 
@@ -261,38 +297,51 @@ const ItemListEditor: React.FC<{
         {items.map((item, idx) => (
           <div
             key={idx}
-            className="flex items-center justify-between p-2 bg-slate-950/30 rounded-lg border border-white/5 group hover:bg-slate-950/50 transition-colors"
+            className="flex flex-col p-2 bg-slate-950/30 rounded-lg border border-white/5 group hover:bg-slate-950/50 transition-colors cursor-pointer"
+            onClick={() => setExpandedIndex(expandedIndex === idx ? null : idx)}
           >
-            <span
-              className="text-sm text-slate-300 font-medium truncate flex-1 mr-2"
-              title={item.name}
-            >
-              {item.name}
-            </span>
-            <div className="flex items-center gap-2">
-              <div className="flex items-center gap-1 bg-slate-900 rounded-md px-1.5 py-0.5 border border-white/5">
-                <span className="text-xs text-slate-500">x</span>
-                <span className="text-sm font-mono text-indigo-300">
-                  {item.quantity}
-                </span>
-              </div>
-              {!disabled && (
-                <div className="flex gap-1 opacity-100 transition-opacity">
-                  <button
-                    onClick={() => handleUpdateQty(idx, 1)}
-                    className="p-1 hover:text-indigo-400 text-slate-500 transition-colors"
-                  >
-                    <UserPlus size={12} />
-                  </button>
-                  <button
-                    onClick={() => handleUpdateQty(idx, -1)}
-                    className="p-1 hover:text-red-400 text-slate-500 transition-colors"
-                  >
-                    <Trash2 size={12} />
-                  </button>
+            <div className="flex items-center justify-between">
+              <span
+                className="text-sm text-slate-300 font-medium truncate flex-1 mr-2"
+                title={item.name}
+              >
+                {item.name}
+              </span>
+              <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1 bg-slate-900 rounded-md px-1.5 py-0.5 border border-white/5">
+                  <span className="text-xs text-slate-500">
+                    {title === "法术 / 能力" ? "MP" : "x"}
+                  </span>
+                  <span className="text-sm font-mono text-indigo-300">
+                    {item.quantity}
+                  </span>
                 </div>
-              )}
+                {!disabled && (
+                  <div
+                    className="flex gap-1 opacity-100 transition-opacity"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <button
+                      onClick={() => handleUpdateQty(idx, 1)}
+                      className="p-1 hover:text-indigo-400 text-slate-500 transition-colors"
+                    >
+                      <Plus size={12} />
+                    </button>
+                    <button
+                      onClick={() => handleUpdateQty(idx, -1)}
+                      className="p-1 hover:text-red-400 text-slate-500 transition-colors"
+                    >
+                      <Minus size={12} />
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
+            {expandedIndex === idx && (
+              <div className="mt-2 text-xs text-slate-400 border-t border-white/5 pt-2 whitespace-pre-wrap animate-fade-in">
+                {item.description || "暂无描述"}
+              </div>
+            )}
           </div>
         ))}
         {items.length === 0 && !isAdding && (

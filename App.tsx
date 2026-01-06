@@ -687,14 +687,8 @@ const App: React.FC = () => {
                         : c.backstory,
                     skills:
                       safeInfo.skills || safeStats.skills || c.skills || {},
-                    items:
-                      safeInfo.items !== undefined
-                        ? safeInfo.items
-                        : c.items || [],
-                    spells:
-                      safeInfo.spells !== undefined
-                        ? safeInfo.spells
-                        : c.spells || [],
+                    items: safeInfo.items !== undefined ? safeInfo.items : c.items || [],
+                    spells: safeInfo.spells !== undefined ? safeInfo.spells : c.spells || [],
 
                     // Update mapped fields from stats
                     str: safeStats.str !== undefined ? safeStats.str : c.str,

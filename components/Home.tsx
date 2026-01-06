@@ -16,10 +16,12 @@ import {
   History,
   Crown,
   Skull,
+  MessageSquare,
 } from "lucide-react";
 import { CharacterModal } from "./Modals";
 import { AvatarUpload } from "./AvatarUpload";
 import { Friends } from "./Friends";
+import { Square } from "./Square";
 
 interface HomeProps {
   onJoinRoom: (roomId: string, charId: string | "pc") => void;
@@ -188,7 +190,7 @@ export const Home: React.FC<HomeProps> = ({
   levelInfo,
 }) => {
   const [activeTab, setActiveTab] = useState<
-    "rooms" | "characters" | "friends" | "profile"
+    "rooms" | "characters" | "friends" | "profile" | "square"
   >("rooms");
   const [loading, setLoading] = useState(false);
 
@@ -751,6 +753,16 @@ export const Home: React.FC<HomeProps> = ({
               大厅
             </button>
             <button
+              onClick={() => setActiveTab("square")}
+              className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${
+                activeTab === "square"
+                  ? "bg-indigo-600 text-white shadow-lg"
+                  : "text-slate-400 hover:text-white"
+              }`}
+            >
+              广场
+            </button>
+            <button
               onClick={() => setActiveTab("characters")}
               className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${
                 activeTab === "characters"
@@ -790,7 +802,67 @@ export const Home: React.FC<HomeProps> = ({
         </Button>
       </header>
 
-      <main className="flex-1 w-full overflow-y-auto custom-scrollbar">
+      <main className={`flex-1 w-full ${activeTab === "square" ? "overflow-hidden flex flex-col" : "overflow-y-auto custom-scrollbar"}`}>
+        {activeTab === "square" ? (
+          <>
+            <div className="md:hidden flex bg-slate-800/50 p-1 rounded-lg m-4 shrink-0">
+            <button
+              onClick={() => setActiveTab("rooms")}
+              className={`flex-1 py-2 rounded-md text-sm font-medium ${
+                activeTab === "rooms"
+                  ? "bg-indigo-600 text-white"
+                  : "text-slate-400"
+              }`}
+            >
+              大厅
+            </button>
+            <button
+              onClick={() => setActiveTab("square")}
+              className={`flex-1 py-2 rounded-md text-sm font-medium ${
+                activeTab === "square"
+                  ? "bg-indigo-600 text-white"
+                  : "text-slate-400"
+              }`}
+            >
+              广场
+            </button>
+            <button
+              onClick={() => setActiveTab("characters")}
+              className={`flex-1 py-2 rounded-md text-sm font-medium ${
+                activeTab === "characters"
+                  ? "bg-indigo-600 text-white"
+                  : "text-slate-400"
+              }`}
+            >
+              车卡
+            </button>
+            <button
+              onClick={() => setActiveTab("friends")}
+              className={`flex-1 py-2 rounded-md text-sm font-medium relative ${
+                activeTab === "friends"
+                  ? "bg-indigo-600 text-white"
+                  : "text-slate-400"
+              }`}
+            >
+              好友
+              {friendRequestCount > 0 && (
+                <span className="absolute top-1 right-2 w-2 h-2 bg-red-500 rounded-full animate-pulse"></span>
+              )}
+            </button>
+            <button
+              onClick={() => setActiveTab("profile")}
+              className={`flex-1 py-2 rounded-md text-sm font-medium ${
+                activeTab === "profile"
+                  ? "bg-indigo-600 text-white"
+                  : "text-slate-400"
+              }`}
+            >
+              我的
+            </button>
+            </div>
+            <Square />
+          </>
+        ) : (
         <div className="container mx-auto p-4 md:p-8 max-w-6xl">
           {/* Mobile Nav */}
           <div className="md:hidden flex bg-slate-800/50 p-1 rounded-lg mb-6">
@@ -803,6 +875,16 @@ export const Home: React.FC<HomeProps> = ({
               }`}
             >
               大厅
+            </button>
+            <button
+              onClick={() => setActiveTab("square")}
+              className={`flex-1 py-2 rounded-md text-sm font-medium ${
+                activeTab === "square"
+                  ? "bg-indigo-600 text-white"
+                  : "text-slate-400"
+              }`}
+            >
+              广场
             </button>
             <button
               onClick={() => setActiveTab("characters")}
@@ -1257,6 +1339,7 @@ export const Home: React.FC<HomeProps> = ({
             </div>
           )}
         </div>
+        )}
       </main>
 
       {/* Edit Room Modal */}

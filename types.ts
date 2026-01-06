@@ -59,6 +59,7 @@ export interface GameHistoryParticipant {
 export interface InventoryItem {
   name: string;
   quantity: number;
+  description?: string;
 }
 
 export interface Character {
@@ -159,4 +160,72 @@ export interface AppData {
   moduleInfo: ModuleInfo;
   characters: Character[];
   logs: Log[];
+}
+
+// Square System Types
+export interface Channel {
+  id: string;
+  name: string;
+  category: string;
+  description?: string;
+  created_at: string;
+}
+
+export interface Post {
+  id: string;
+  channel_id: string;
+  user_id: string;
+  content: string;
+  image_url?: string | null;
+  tags?: string[];
+  created_at: string;
+  updated_at: string;
+
+  // Joined Data
+  profiles?: {
+    nickname: string;
+    avatar_url: string;
+    is_vip: boolean;
+  };
+  post_likes?: { count: number }[]; // For count aggregation
+  post_comments?: { count: number }[]; // For count aggregation
+
+  // Frontend Helpers
+  like_count?: number;
+  comment_count?: number;
+  is_liked?: boolean; // If current user liked it
+}
+
+export interface PostComment {
+  id: string;
+  post_id: string;
+  user_id: string;
+  content: string;
+  created_at: string;
+
+  // Joined Data
+  profiles?: {
+    nickname: string;
+    avatar_url: string;
+    is_vip: boolean;
+  };
+}
+
+export interface Notification {
+  id: string;
+  user_id: string;
+  actor_id: string;
+  type: "like" | "comment";
+  post_id: string;
+  is_read: boolean;
+  created_at: string;
+
+  // Joined Data
+  actor?: {
+    nickname: string;
+    avatar_url: string;
+  };
+  post?: {
+    content: string;
+  };
 }
