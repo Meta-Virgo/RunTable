@@ -23,9 +23,33 @@ import {
   X,
   Trash2,
   CornerDownRight,
+  ArrowUp,
 } from "lucide-react";
 import { Button, cn, Modal } from "./UI";
 import { AvatarUpload } from "./AvatarUpload";
+
+const MAX_POST_LENGTH = 140;
+
+const PostContent: React.FC<{ content: string }> = ({ content }) => {
+  const [expanded, setExpanded] = useState(false);
+  const shouldTruncate = content.length > MAX_POST_LENGTH;
+
+  return (
+    <div className="text-slate-300 text-sm leading-relaxed mb-2 whitespace-pre-wrap">
+      {shouldTruncate && !expanded
+        ? content.slice(0, MAX_POST_LENGTH) + "..."
+        : content}
+      {shouldTruncate && (
+        <button
+          className="ml-1 text-indigo-400 hover:text-indigo-300 text-xs font-bold hover:underline"
+          onClick={() => setExpanded(!expanded)}
+        >
+          {expanded ? "收起" : "展开"}
+        </button>
+      )}
+    </div>
+  );
+};
 
 export const Square: React.FC = () => {
   const [activeChannelId, setActiveChannelId] = useState<string | null>(null);
@@ -52,6 +76,33 @@ export const Square: React.FC = () => {
   const [newCommentContent, setNewCommentContent] = useState("");
   const [commenting, setCommenting] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
+
+  const [showBackToTop, setShowBackToTop] = useState(false);
+  const scrollContainerRef = React.useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      if (scrollContainerRef.current) {
+        setShowBackToTop(scrollContainerRef.current.scrollTop > 300);
+      }
+    };
+
+    const container = scrollContainerRef.current;
+    if (container) {
+      container.addEventListener("scroll", handleScroll);
+    }
+    return () => {
+      if (container) {
+        container.removeEventListener("scroll", handleScroll);
+      }
+    };
+  }, []);
+
+  const scrollToTop = () => {
+    if (scrollContainerRef.current) {
+      scrollContainerRef.current.scrollTo({ top: 0, behavior: "smooth" });
+    }
+  };
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [showProfile, setShowProfile] = useState(false);
@@ -784,7 +835,10 @@ export const Square: React.FC = () => {
         </header>
 
         {/* Post List */}
-        <div className="flex-1 overflow-y-auto p-6 custom-scrollbar">
+        <div
+          className="flex-1 overflow-y-auto p-6 custom-scrollbar"
+          ref={scrollContainerRef}
+        >
           <div className="max-w-4xl mx-auto space-y-6">
             {/* Input Area */}
             <div
@@ -926,9 +980,7 @@ export const Square: React.FC = () => {
                         </span>
                       </div>
 
-                      <div className="text-slate-300 text-sm leading-relaxed mb-2 whitespace-pre-wrap">
-                        {post.content}
-                      </div>
+                      <PostContent content={post.content} />
 
                       {post.image_url && (
                         <div className="mb-2">
@@ -1120,6 +1172,20 @@ export const Square: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Back to Top Button */}
+      <button
+        onClick={scrollToTop}
+        className={cn(
+          "fixed bottom-8 right-8 z-50 p-3 bg-indigo-600 text-white rounded-full shadow-lg shadow-indigo-600/30 transition-all duration-300 hover:bg-indigo-500 hover:scale-110",
+          showBackToTop
+            ? "opacity-100 translate-y-0"
+            : "opacity-0 translate-y-10 pointer-events-none"
+        )}
+      >
+        <ArrowUp size={24} />
+      </button>
+
       {/* Profile Modal (Friends Resume Card) */}
       {showProfile && selectedProfile && (
         <Modal
