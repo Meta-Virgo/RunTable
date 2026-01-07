@@ -15,6 +15,7 @@ import {
   Package,
   Plus,
   Minus,
+  Pencil,
 } from "lucide-react";
 import { Modal, Input, Textarea, Button, NumberStepper, cn } from "./UI";
 import { AvatarUpload } from "./AvatarUpload";
@@ -178,6 +179,37 @@ const ItemListEditor: React.FC<{
   const [expandedIndex, setExpandedIndex] = useState<number | null>(null);
   const inputRef = React.useRef<HTMLInputElement>(null);
 
+  // Edit state
+  const [editingIndex, setEditingIndex] = useState<number | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editQty, setEditQty] = useState(0);
+  const [editDesc, setEditDesc] = useState("");
+
+  const startEdit = (index: number) => {
+    setEditingIndex(index);
+    setEditName(items[index].name);
+    setEditQty(items[index].quantity);
+    setEditDesc(items[index].description || "");
+    setExpandedIndex(null);
+  };
+
+  const saveEdit = () => {
+    if (editingIndex === null) return;
+    if (!editName.trim()) return;
+    const newItems = [...items];
+    newItems[editingIndex] = {
+      name: editName.trim(),
+      quantity: editQty,
+      description: editDesc.trim(),
+    };
+    onChange(newItems);
+    setEditingIndex(null);
+  };
+
+  const cancelEdit = () => {
+    setEditingIndex(null);
+  };
+
   const handleAdd = () => {
     if (!newItemName.trim()) return;
     onChange([
@@ -279,7 +311,15 @@ const ItemListEditor: React.FC<{
               }
             }}
           />
-          <div className="flex justify-end">
+          <div className="flex justify-end gap-2">
+            <Button
+              onClick={() => setIsAdding(false)}
+              variant="ghost"
+              size="sm"
+              className="h-7 py-0 text-xs"
+            >
+              取消
+            </Button>
             <Button
               onClick={handleAdd}
               variant="primary"
@@ -294,56 +334,150 @@ const ItemListEditor: React.FC<{
       )}
 
       <div className="space-y-2 flex-1 overflow-y-auto custom-scrollbar min-h-[100px] max-h-[200px]">
-        {items.map((item, idx) => (
-          <div
-            key={idx}
-            className="flex flex-col p-2 bg-slate-950/30 rounded-lg border border-white/5 group hover:bg-slate-950/50 transition-colors cursor-pointer"
-            onClick={() => setExpandedIndex(expandedIndex === idx ? null : idx)}
-          >
-            <div className="flex items-center justify-between">
-              <span
-                className="text-sm text-slate-300 font-medium truncate flex-1 mr-2"
-                title={item.name}
+        {items.map((item, idx) => {
+          if (editingIndex === idx) {
+            return (
+              <div
+                key={idx}
+                className="flex flex-col gap-2 p-2 bg-slate-950/50 rounded-lg border border-indigo-500/50 animate-fade-in"
               >
-                {item.name}
-              </span>
-              <div className="flex items-center gap-2">
-                <div className="flex items-center gap-1 bg-slate-900 rounded-md px-1.5 py-0.5 border border-white/5">
-                  <span className="text-xs text-slate-500">
-                    {title === "法术 / 能力" ? "MP" : "x"}
-                  </span>
-                  <span className="text-sm font-mono text-indigo-300">
-                    {item.quantity}
-                  </span>
-                </div>
-                {!disabled && (
-                  <div
-                    className="flex gap-1 opacity-100 transition-opacity"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    <button
-                      onClick={() => handleUpdateQty(idx, 1)}
-                      className="p-1 hover:text-indigo-400 text-slate-500 transition-colors"
-                    >
-                      <Plus size={12} />
-                    </button>
-                    <button
-                      onClick={() => handleUpdateQty(idx, -1)}
-                      className="p-1 hover:text-red-400 text-slate-500 transition-colors"
-                    >
-                      <Minus size={12} />
-                    </button>
+                <div className="flex gap-2 items-center">
+                  <input
+                    value={editName}
+                    onChange={(e) => setEditName(e.target.value)}
+                    placeholder="名称..."
+                    className="flex-1 min-w-0 bg-transparent text-sm text-white focus:outline-none"
+                    autoFocus
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && !e.shiftKey) {
+                        e.preventDefault();
+                      }
+                      if (e.key === "Escape") cancelEdit();
+                    }}
+                  />
+                  <div className="flex items-center gap-1 border-l border-white/10 pl-2">
+                    <span className="text-xs text-slate-500">
+                      {title === "法术 / 能力" ? "MP" : "x"}
+                    </span>
+                    <input
+                      type="number"
+                      value={editQty}
+                      onChange={(e) =>
+                        setEditQty(parseInt(e.target.value) || 0)
+                      }
+                      className="w-12 bg-transparent text-sm text-white focus:outline-none text-right"
+                      min={0}
+                    />
                   </div>
-                )}
+                </div>
+                <textarea
+                  value={editDesc}
+                  onChange={(e) => setEditDesc(e.target.value)}
+                  placeholder="详细描述..."
+                  className="w-full bg-transparent text-xs text-slate-400 focus:outline-none border-t border-white/5 pt-2 resize-none"
+                  rows={2}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault();
+                      saveEdit();
+                    }
+                  }}
+                />
+                <div className="flex justify-end gap-2">
+                  <Button
+                    onClick={cancelEdit}
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 py-0 text-xs"
+                  >
+                    取消
+                  </Button>
+                  <Button
+                    onClick={saveEdit}
+                    variant="primary"
+                    size="sm"
+                    className="h-6 py-0 text-xs shadow-none"
+                    disabled={!editName.trim()}
+                  >
+                    保存
+                  </Button>
+                </div>
               </div>
+            );
+          }
+
+          return (
+            <div
+              key={idx}
+              className="flex flex-col p-2 bg-slate-950/30 rounded-lg border border-white/5 group hover:bg-slate-950/50 transition-colors cursor-pointer"
+              onClick={() =>
+                setExpandedIndex(expandedIndex === idx ? null : idx)
+              }
+            >
+              <div className="flex items-center justify-between">
+                <span
+                  className="text-sm text-slate-300 font-medium truncate flex-1 mr-2"
+                  title={item.name}
+                >
+                  {item.name}
+                </span>
+                <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1 bg-slate-900 rounded-md px-1.5 py-0.5 border border-white/5">
+                    <span className="text-xs text-slate-500">
+                      {title === "法术 / 能力" ? "MP" : "x"}
+                    </span>
+                    <span className="text-sm font-mono text-indigo-300">
+                      {item.quantity}
+                    </span>
+                  </div>
+                  {!disabled && (
+                    <div
+                      className="flex gap-1 opacity-100 transition-opacity"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      {title === "法术 / 能力" ? (
+                        <>
+                          <button
+                            onClick={() => startEdit(idx)}
+                            className="p-1 hover:text-indigo-400 text-slate-500 transition-colors"
+                          >
+                            <Pencil size={12} />
+                          </button>
+                          <button
+                            onClick={() => handleRemove(idx)}
+                            className="p-1 hover:text-red-400 text-slate-500 transition-colors"
+                          >
+                            <Trash2 size={12} />
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <button
+                            onClick={() => handleUpdateQty(idx, 1)}
+                            className="p-1 hover:text-indigo-400 text-slate-500 transition-colors"
+                          >
+                            <Plus size={12} />
+                          </button>
+                          <button
+                            onClick={() => handleUpdateQty(idx, -1)}
+                            className="p-1 hover:text-red-400 text-slate-500 transition-colors"
+                          >
+                            <Minus size={12} />
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+              {expandedIndex === idx && (
+                <div className="mt-2 text-xs text-slate-400 border-t border-white/5 pt-2 whitespace-pre-wrap animate-fade-in break-all">
+                  {item.description || "暂无描述"}
+                </div>
+              )}
             </div>
-            {expandedIndex === idx && (
-              <div className="mt-2 text-xs text-slate-400 border-t border-white/5 pt-2 whitespace-pre-wrap animate-fade-in break-all">
-                {item.description || "暂无描述"}
-              </div>
-            )}
-          </div>
-        ))}
+          );
+        })}
         {items.length === 0 && !isAdding && (
           <div className="text-center text-slate-600 text-xs py-8">
             暂无条目
