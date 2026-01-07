@@ -338,7 +338,7 @@ const ItemListEditor: React.FC<{
               </div>
             </div>
             {expandedIndex === idx && (
-              <div className="mt-2 text-xs text-slate-400 border-t border-white/5 pt-2 whitespace-pre-wrap animate-fade-in">
+              <div className="mt-2 text-xs text-slate-400 border-t border-white/5 pt-2 whitespace-pre-wrap animate-fade-in break-all">
                 {item.description || "暂无描述"}
               </div>
             )}

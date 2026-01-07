@@ -860,7 +860,9 @@ export const Home: React.FC<HomeProps> = ({
               我的
             </button>
             </div>
-            <Square />
+            <div className="flex-1 min-h-0 relative">
+              <Square />
+            </div>
           </>
         ) : (
         <div className="container mx-auto p-4 md:p-8 max-w-6xl">

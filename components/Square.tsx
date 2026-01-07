@@ -24,6 +24,7 @@ import {
   Trash2,
   CornerDownRight,
   ArrowUp,
+  Menu,
 } from "lucide-react";
 import { Button, cn, Modal } from "./UI";
 import { AvatarUpload } from "./AvatarUpload";
@@ -76,6 +77,7 @@ export const Square: React.FC = () => {
   const [newCommentContent, setNewCommentContent] = useState("");
   const [commenting, setCommenting] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
+  const [showMobileSidebar, setShowMobileSidebar] = useState(false);
 
   const [showBackToTop, setShowBackToTop] = useState(false);
   const scrollContainerRef = React.useRef<HTMLDivElement>(null);
@@ -646,14 +648,34 @@ export const Square: React.FC = () => {
   const activeChannel = channels.find((c) => c.id === activeChannelId);
 
   return (
-    <div className="flex h-full bg-[#020617] text-slate-200 overflow-hidden">
+    <div className="flex h-full bg-[#020617] text-slate-200 overflow-hidden relative">
+      {/* Mobile Sidebar Overlay */}
+      {showMobileSidebar && (
+        <div
+          className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm md:hidden"
+          onClick={() => setShowMobileSidebar(false)}
+        />
+      )}
+
       {/* Left Sidebar - Channels */}
-      <div className="w-64 flex-shrink-0 border-r border-white/5 bg-slate-900/50 flex flex-col">
-        <div className="h-16 flex items-center px-4 border-b border-white/5">
+      <div
+        className={cn(
+          "w-64 flex-shrink-0 border-r border-white/5 bg-slate-900 md:bg-slate-900/50 flex flex-col transition-transform duration-300 ease-in-out z-50",
+          "fixed inset-y-0 left-0 md:relative md:translate-x-0",
+          showMobileSidebar ? "translate-x-0" : "-translate-x-full"
+        )}
+      >
+        <div className="h-16 flex items-center px-4 border-b border-white/5 justify-between">
           <h2 className="font-bold text-white flex items-center gap-2">
             <MessageSquare className="text-indigo-500" size={20} />
             广场频道
           </h2>
+          <button
+            className="md:hidden text-slate-400 hover:text-white"
+            onClick={() => setShowMobileSidebar(false)}
+          >
+            <X size={20} />
+          </button>
         </div>
 
         <div className="flex-1 overflow-y-auto p-3 space-y-6 custom-scrollbar">
@@ -673,7 +695,10 @@ export const Square: React.FC = () => {
                     .map((channel) => (
                       <button
                         key={channel.id}
-                        onClick={() => setActiveChannelId(channel.id)}
+                        onClick={() => {
+                          setActiveChannelId(channel.id);
+                          setShowMobileSidebar(false);
+                        }}
                         className={cn(
                           "w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm font-medium transition-all group",
                           activeChannelId === channel.id
@@ -711,9 +736,15 @@ export const Square: React.FC = () => {
       {/* Main Content */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Header */}
-        <header className="h-16 border-b border-white/5 flex items-center justify-between px-6 bg-slate-900/30">
+        <header className="h-16 border-b border-white/5 flex items-center justify-between px-4 md:px-6 bg-slate-900/30">
           <div className="flex items-center gap-3">
-            <Hash className="text-slate-500" size={24} />
+            <button
+              className="md:hidden text-slate-400 hover:text-white mr-1"
+              onClick={() => setShowMobileSidebar(true)}
+            >
+              <Menu size={24} />
+            </button>
+            <Hash className="text-slate-500 hidden md:block" size={24} />
             <div>
               <h3 className="font-bold text-white text-lg">
                 {activeChannel?.name || "加载中..."}
@@ -836,7 +867,7 @@ export const Square: React.FC = () => {
 
         {/* Post List */}
         <div
-          className="flex-1 overflow-y-auto p-6 custom-scrollbar"
+          className="flex-1 overflow-y-auto p-4 md:p-6 custom-scrollbar"
           ref={scrollContainerRef}
         >
           <div className="max-w-4xl mx-auto space-y-6">
