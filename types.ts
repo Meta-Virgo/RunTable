@@ -92,6 +92,11 @@ export interface Character {
   pow: number;
   edu: number;
   luck: number;
+  
+  // Computed stats
+  db?: string;
+  build?: number;
+
   hp: number;
   san: number;
   mp: number;

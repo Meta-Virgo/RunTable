@@ -139,7 +139,7 @@ export const parseDiceCommand = (input: string): DiceCommand | null => {
 
     const changes = matches.map(m => ({
       stat: m[1],
-      op: m[2] || '=',
+      type: m[2] || '=',
       value: parseInt(m[3])
     }));
 

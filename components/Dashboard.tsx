@@ -11,6 +11,7 @@ import {
   Brain,
   AlertTriangle,
   Check,
+  Copy,
 } from "lucide-react";
 import { Button, StatBadge, cn } from "./UI";
 import { ModuleInfo, Character } from "../types";
@@ -21,6 +22,7 @@ interface DashboardProps {
   onEditModule: () => void;
   onAddChar: (role: string) => void;
   onEditChar: (char: Character) => void;
+  onDuplicateChar: (char: Character) => void;
   onDeleteRoom: () => void;
   onClearChat: () => void;
   onConcludeGame: () => void;
@@ -33,6 +35,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
   onEditModule,
   onAddChar,
   onEditChar,
+  onDuplicateChar,
   onDeleteRoom,
   onClearChat,
   onConcludeGame,
@@ -163,6 +166,18 @@ export const Dashboard: React.FC<DashboardProps> = ({
                         : "border-t-cyan-500/50"
                     )}
                   >
+                    <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onDuplicateChar(npc);
+                        }}
+                        className="p-1.5 bg-slate-900/80 text-slate-400 hover:text-white rounded-lg hover:bg-indigo-600 transition-colors border border-white/10"
+                        title="复制角色"
+                      >
+                        <Copy size={14} />
+                      </button>
+                    </div>
                     <div className="flex items-start gap-4 mb-4 md:mb-6">
                       <div
                         className={cn(

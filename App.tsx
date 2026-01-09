@@ -20,6 +20,7 @@ import { ModuleInfo, Character, Log } from "./types"; // Removed AppData as it m
 import { Menu, LogOut } from "lucide-react";
 import { parseDiceCommand } from "./utils/commandParser";
 import { useLevelSystem } from "./hooks/useLevelSystem";
+import { calculateDBAndBuild } from "./utils/cocRules";
 
 // --- Constants ---
 const INITIAL_CHAR_STATE: Character = {
@@ -395,6 +396,7 @@ const App: React.FC = () => {
           hp: c.stats?.hp || 10,
           san: c.stats?.san || 50,
           mp: c.stats?.mp || 10,
+          ...calculateDBAndBuild(c.stats?.str || 50, c.stats?.siz || 50),
         }));
         setCharacters(mappedChars);
       }
@@ -621,6 +623,10 @@ const App: React.FC = () => {
               hp: newChar.stats?.hp || 10,
               san: newChar.stats?.san || 50,
               mp: newChar.stats?.mp || 10,
+              ...calculateDBAndBuild(
+                newChar.stats?.str || 50,
+                newChar.stats?.siz || 50
+              ),
             };
             return [...prev, mappedChar];
           });
@@ -704,6 +710,10 @@ const App: React.FC = () => {
                     hp: safeStats.hp !== undefined ? safeStats.hp : c.hp,
                     san: safeStats.san !== undefined ? safeStats.san : c.san,
                     mp: safeStats.mp !== undefined ? safeStats.mp : c.mp,
+                    ...calculateDBAndBuild(
+                      safeStats.str !== undefined ? safeStats.str : c.str,
+                      safeStats.siz !== undefined ? safeStats.siz : c.siz
+                    ),
 
                     room_id:
                       newChar.room_id !== undefined
@@ -758,6 +768,10 @@ const App: React.FC = () => {
               hp: newChar.stats?.hp || 10,
               san: newChar.stats?.san || 50,
               mp: newChar.stats?.mp || 10,
+              ...calculateDBAndBuild(
+                newChar.stats?.str || 50,
+                newChar.stats?.siz || 50
+              ),
             };
             setCharacters((prev) => [...prev, mappedChar]);
           }
@@ -950,6 +964,7 @@ const App: React.FC = () => {
           hp: c.stats?.hp || 10,
           san: c.stats?.san || 50,
           mp: c.stats?.mp || 10,
+          ...calculateDBAndBuild(c.stats?.str || 50, c.stats?.siz || 50),
         }));
         setCharacters(mappedChars);
 
@@ -1217,6 +1232,145 @@ const App: React.FC = () => {
   };
 
   // --- CRUD ---
+  const handleDuplicateCharacter = async (char: Character) => {
+    if (!currentRoomId || !session?.user) return;
+
+    // Greek letters for suffixes
+    const greekSuffixes = [
+      "β",
+      "γ",
+      "δ",
+      "ε",
+      "ζ",
+      "η",
+      "θ",
+      "ι",
+      "κ",
+      "λ",
+      "μ",
+      "ν",
+      "ξ",
+      "ο",
+      "π",
+      "ρ",
+      "σ",
+      "τ",
+      "υ",
+      "φ",
+      "χ",
+      "ψ",
+      "ω",
+    ];
+
+    // 1. Determine base name (remove existing Greek suffix if any)
+    let baseName = char.name;
+    // Check if it ends with space + suffix
+    for (const suffix of greekSuffixes) {
+      if (baseName.endsWith(" " + suffix)) {
+        baseName = baseName.substring(0, baseName.length - suffix.length - 1);
+        break;
+      }
+      // Check if it ends with suffix + number (e.g. β2)
+      // Regex approach might be cleaner but let's stick to simple logic for now
+    }
+    // Also handle the case where it might be "Name β2"
+    // For simplicity, let's just strip everything after the last known suffix or just start fresh if needed.
+    // Actually, let's use a regex to strip existing suffix pattern
+    // Pattern: space + greek letter + optional number
+    // e.g. " Goblin β", " Goblin β2"
+    const suffixRegex = new RegExp(` (${greekSuffixes.join("|")})\\d*$`);
+    const match = char.name.match(suffixRegex);
+    if (match) {
+      baseName = char.name.substring(0, match.index);
+    }
+
+    // 2. Find next available suffix
+    const existingNames = new Set(characters.map((c) => c.name));
+    let newName = "";
+    
+    // Try suffixes in order
+    for (const suffix of greekSuffixes) {
+      const candidate = `${baseName} ${suffix}`;
+      if (!existingNames.has(candidate)) {
+        newName = candidate;
+        break;
+      }
+      // Also check numbered versions if simple suffix is taken? 
+      // Requirement says "add β... and so on". 
+      // It implies β, γ, δ...
+      // If we run out of letters, we can loop or add numbers.
+    }
+
+    // If all single letters taken, try adding numbers to them?
+    if (!newName) {
+       // Fallback: Try β2, β3...
+       let counter = 2;
+       while (!newName) {
+         const candidate = `${baseName} ${greekSuffixes[0]}${counter}`;
+         if (!existingNames.has(candidate)) {
+            newName = candidate;
+         }
+         counter++;
+         if (counter > 100) break; // Safety break
+       }
+    }
+    
+    if (!newName) newName = `${baseName} Copy`; // Ultimate fallback
+
+    // 3. Prepare data
+    const charData = {
+      room_id: currentRoomId,
+      user_id: session.user.id,
+      name: newName,
+      role: char.role,
+      avatar_url: char.avatar_url,
+      type: char.type || "monster", // Default to monster if undefined, or keep char.type
+      info: {
+        job: char.job,
+        age: char.age,
+        sex: char.sex,
+        notes: char.notes,
+        backstory: char.backstory,
+        skills: char.skills || {},
+        items: char.items || [],
+        spells: char.spells || [],
+      },
+      stats: {
+        str: char.str,
+        con: char.con,
+        siz: char.siz,
+        dex: char.dex,
+        app: char.app,
+        int: char.int,
+        pow: char.pow,
+        edu: char.edu,
+        luck: char.luck,
+        hp: char.hp,
+        san: char.san,
+        mp: char.mp,
+        skills: char.skills || {},
+      },
+    };
+
+    try {
+      const { data, error } = await supabase
+        .from("characters")
+        .insert(charData)
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      if (data) {
+        addLog("system", `守秘人 复制了 [${char.name}] -> [${newName}]`);
+        // State update handled by Realtime subscription
+      }
+    } catch (error: any) {
+      console.error("复制角色失败:", error);
+      alert("复制失败: " + error.message);
+    }
+  };
+
   const handleSaveCharacter = async (char: Character) => {
     if (!currentRoomId || !session?.user) return;
 
@@ -1301,6 +1455,10 @@ const App: React.FC = () => {
             hp: latestChar.stats?.hp || 10,
             san: latestChar.stats?.san || 50,
             mp: latestChar.stats?.mp || 10,
+            ...calculateDBAndBuild(
+              latestChar.stats?.str || 50,
+              latestChar.stats?.siz || 50
+            ),
           };
           setCharacters((prev) =>
             prev.map((c) => (c.id === char.id ? mappedLatest : c))
@@ -1349,6 +1507,7 @@ const App: React.FC = () => {
             hp: data.stats?.hp || 10,
             san: data.stats?.san || 50,
             mp: data.stats?.mp || 10,
+            ...calculateDBAndBuild(data.stats?.str || 50, data.stats?.siz || 50),
           };
           // OPTIMIZATION: Do NOT manually update state here if Realtime is active.
           // Realtime subscription will handle the UI update to avoid duplication race conditions.
@@ -1593,6 +1752,12 @@ const App: React.FC = () => {
     SAN: "san",
     mp: "mp",
     MP: "mp",
+    db: "db",
+    DB: "db",
+    伤害加值: "db",
+    build: "build",
+    Build: "build",
+    体格: "build",
   };
 
   const evaluateDiceExpression = (
@@ -1605,17 +1770,16 @@ const App: React.FC = () => {
     // 1. Replace stats
     evalString = evalString.replace(/[a-z\u4e00-\u9fa5]+/g, (match) => {
       // Ignore 'd' if it is part of dice notation (e.g. 1d100)
-      // Actually, regex logic: if match is 'd' and preceded by digit or followed by digit?
-      // But we handle dice replacement later.
-      // If user writes "3d6", "d" matches here? Yes.
-      // So we must be careful.
-      // Only replace if it matches a known stat OR is a skill.
-      // If not, and it looks like 'd', leave it.
-
       if (match === "d") return "d";
 
       const key = ALIAS_MAP[match] || match;
       if (char) {
+        // Priority 1: Check top-level computed props (db, build)
+        if ((char as any)[key] !== undefined) {
+          // Ensure value is string and lowercased (e.g. "+1D4" -> "+1d4")
+          return String((char as any)[key]).toLowerCase();
+        }
+
         if (char.stats && char.stats[key] !== undefined) {
           return String(char.stats[key]);
         }
@@ -1645,8 +1809,15 @@ const App: React.FC = () => {
       return String(total);
     });
 
-    // 3. Eval
-    if (!/^[\d\+\-\*\/\(\)\.\s]+$/.test(evalString)) {
+    // 3. Clean up operators (handle ++, +-, etc.)
+    evalString = evalString.replace(/\s+/g, ""); // Remove spaces
+    evalString = evalString.replace(/\+\+/g, "+");
+    evalString = evalString.replace(/\-\-/g, "+");
+    evalString = evalString.replace(/\+\-/g, "-");
+    evalString = evalString.replace(/\-\+/g, "-");
+
+    // 4. Eval
+    if (!/^[\d\+\-\*\/\(\)\.]+$/.test(evalString)) {
       return { total: 0, details: ["表达式错误"] };
     }
 
@@ -2174,6 +2345,7 @@ const App: React.FC = () => {
               setEditingChar(char);
               setShowCharModal(true);
             }}
+            onDuplicateChar={handleDuplicateCharacter}
             onDeleteRoom={handleDeleteRoom}
             onClearChat={handleClearChat}
             onConcludeGame={() => setShowConclusionModal(true)}
