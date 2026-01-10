@@ -194,6 +194,7 @@ export interface Post {
   };
   post_likes?: { count: number }[]; // For count aggregation
   post_comments?: { count: number }[]; // For count aggregation
+  latest_comments?: PostComment[]; // For list view preview
 
   // Frontend Helpers
   like_count?: number;
