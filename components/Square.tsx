@@ -19,18 +19,96 @@ import {
   Loader2,
   Send,
   Heart,
-  Image as ImageIcon,
   X,
   Trash2,
   CornerDownRight,
   ArrowUp,
   Menu,
+  FileText,
 } from "lucide-react";
 import { Button, cn, Modal } from "./UI";
 import { AvatarUpload } from "./AvatarUpload";
+import { useElasticScroll } from "../hooks/useElasticScroll";
 
 const MAX_POST_LENGTH = 140;
 const MAX_COMMENT_LENGTH = 100;
+
+const formatTime = (dateStr: string) => {
+  const date = new Date(dateStr);
+  const now = new Date();
+
+  const isSameDay =
+    date.getDate() === now.getDate() &&
+    date.getMonth() === now.getMonth() &&
+    date.getFullYear() === now.getFullYear();
+
+  if (isSameDay) {
+    return date.toLocaleTimeString([], {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    });
+  }
+
+  const yesterday = new Date(now);
+  yesterday.setDate(now.getDate() - 1);
+  const isYesterday =
+    date.getDate() === yesterday.getDate() &&
+    date.getMonth() === yesterday.getMonth() &&
+    date.getFullYear() === yesterday.getFullYear();
+
+  if (isYesterday) {
+    return `昨天 ${date.toLocaleTimeString([], {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    })}`;
+  }
+
+  const dayBefore = new Date(now);
+  dayBefore.setDate(now.getDate() - 2);
+  const isDayBefore =
+    date.getDate() === dayBefore.getDate() &&
+    date.getMonth() === dayBefore.getMonth() &&
+    date.getFullYear() === dayBefore.getFullYear();
+
+  if (isDayBefore) {
+    return `前天 ${date.toLocaleTimeString([], {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    })}`;
+  }
+
+  if (date.getFullYear() === now.getFullYear()) {
+    return date
+      .toLocaleDateString([], {
+        month: "2-digit",
+        day: "2-digit",
+      })
+      .replace(/\//g, "-");
+  }
+
+  return date
+    .toLocaleDateString([], {
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    })
+    .replace(/\//g, "-");
+};
+
+const formatDetailTime = (dateStr: string) => {
+  const date = new Date(dateStr);
+  return date.toLocaleString([], {
+    year: "numeric",
+    month: "numeric",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
+};
 
 const PostContent: React.FC<{ content: string }> = ({ content }) => {
   const [expanded, setExpanded] = useState(false);
@@ -77,7 +155,11 @@ const CommentContent: React.FC<{ content: string }> = ({ content }) => {
   );
 };
 
-export const Square: React.FC = () => {
+interface SquareProps {
+  onScrollChange?: (direction: "up" | "down") => void;
+}
+
+export const Square: React.FC<SquareProps> = ({ onScrollChange }) => {
   const [activeChannelId, setActiveChannelId] = useState<string | null>(null);
   const [channels, setChannels] = useState<Channel[]>([]);
   const [posts, setPosts] = useState<Post[]>([]);
@@ -100,17 +182,36 @@ export const Square: React.FC = () => {
     Record<string, boolean>
   >({});
   const [newCommentContent, setNewCommentContent] = useState("");
-  const [commenting, setCommenting] = useState(false);
+  const [_commenting, setCommenting] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const [showMobileSidebar, setShowMobileSidebar] = useState(false);
 
   const [showBackToTop, setShowBackToTop] = useState(false);
   const scrollContainerRef = React.useRef<HTMLDivElement>(null);
+  const contentRef = React.useRef<HTMLDivElement>(null);
+  useElasticScroll(scrollContainerRef, contentRef);
+
+  const lastScrollTop = React.useRef(0);
 
   useEffect(() => {
     const handleScroll = () => {
       if (scrollContainerRef.current) {
-        setShowBackToTop(scrollContainerRef.current.scrollTop > 300);
+        const scrollTop = scrollContainerRef.current.scrollTop;
+        setShowBackToTop(scrollTop > 300);
+
+        if (onScrollChange) {
+          const diff = scrollTop - lastScrollTop.current;
+          // Threshold to avoid jitter
+          if (Math.abs(diff) > 10) {
+            if (diff > 0 && scrollTop > 50) {
+              // Only hide when scrolling down and not at very top
+              onScrollChange("down");
+            } else if (diff < 0) {
+              onScrollChange("up");
+            }
+            lastScrollTop.current = scrollTop;
+          }
+        }
       }
     };
 
@@ -203,7 +304,7 @@ export const Square: React.FC = () => {
       }
 
       // 2. Get Channels
-      const { data, error } = await supabase
+      const { data, error: _error } = await supabase
         .from("channels")
         .select("*")
         .order("category")
@@ -304,70 +405,72 @@ export const Square: React.FC = () => {
   // Separate effect for fetching comment previews
   useEffect(() => {
     if (posts.length === 0) return;
-    
+
     // Identify posts that need comment previews
     const postsNeedingComments = posts.filter(
-        p => (p.comment_count || 0) > 0 && p.latest_comments === undefined
+      (p) => (p.comment_count || 0) > 0 && p.latest_comments === undefined
     );
 
     if (postsNeedingComments.length === 0) return;
 
     const fetchPreviews = async () => {
-        // Fetch in parallel for simplicity
-        const results = await Promise.all(
-            postsNeedingComments.map(async (post) => {
-                const { data } = await supabase
-                    .from("post_comments")
-                    .select("*") // Fetch raw comments first
-                    .eq("post_id", post.id)
-                    .order("created_at", { ascending: false })
-                    .limit(1);
-                return { postId: post.id, comments: data || [] };
-            })
-        );
+      // Fetch in parallel for simplicity
+      const results = await Promise.all(
+        postsNeedingComments.map(async (post) => {
+          const { data } = await supabase
+            .from("post_comments")
+            .select("*") // Fetch raw comments first
+            .eq("post_id", post.id)
+            .order("created_at", { ascending: false })
+            .limit(1);
+          return { postId: post.id, comments: data || [] };
+        })
+      );
 
-        // Collect all user IDs from the fetched comments
-        const userIds = new Set<string>();
-        results.forEach(r => {
-            r.comments.forEach((c: any) => userIds.add(c.user_id));
-        });
+      // Collect all user IDs from the fetched comments
+      const userIds = new Set<string>();
+      results.forEach((r) => {
+        r.comments.forEach((c: any) => userIds.add(c.user_id));
+      });
 
-        // Fetch profiles for these users
-        let profileMap = new Map();
-        if (userIds.size > 0) {
-            const { data: profiles } = await supabase
-                .from("profiles")
-                .select("id, nickname, avatar_url, is_vip")
-                .in("id", Array.from(userIds));
-            
-            if (profiles) {
-                profileMap = new Map(profiles.map((p: any) => [p.id, p]));
-            }
+      // Fetch profiles for these users
+      let profileMap = new Map();
+      if (userIds.size > 0) {
+        const { data: profiles } = await supabase
+          .from("profiles")
+          .select("id, nickname, avatar_url, is_vip")
+          .in("id", Array.from(userIds));
+
+        if (profiles) {
+          profileMap = new Map(profiles.map((p: any) => [p.id, p]));
         }
+      }
 
-        setPosts(prev => prev.map(p => {
-            const res = results.find(r => r.postId === p.id);
-            if (res) {
-                // Attach profiles to comments
-                const commentsWithProfiles = res.comments.map((c: any) => ({
-                    ...c,
-                    profiles: profileMap.get(c.user_id) || {
-                        nickname: "未知用户",
-                        avatar_url: null,
-                        is_vip: false,
-                    }
-                }));
-                return { ...p, latest_comments: commentsWithProfiles };
-            }
-            return p;
-        }));
+      setPosts((prev) =>
+        prev.map((p) => {
+          const res = results.find((r) => r.postId === p.id);
+          if (res) {
+            // Attach profiles to comments
+            const commentsWithProfiles = res.comments.map((c: any) => ({
+              ...c,
+              profiles: profileMap.get(c.user_id) || {
+                nickname: "未知用户",
+                avatar_url: null,
+                is_vip: false,
+              },
+            }));
+            return { ...p, latest_comments: commentsWithProfiles };
+          }
+          return p;
+        })
+      );
     };
 
     fetchPreviews();
   }, [posts, activeChannelId]); // Changed dependency to posts to ensure it runs when content updates but length matches
 
   // Realtime subscription for posts in this channel
-   useEffect(() => {
+  useEffect(() => {
     if (!activeChannelId) return;
 
     const channel = supabase
@@ -490,19 +593,39 @@ export const Square: React.FC = () => {
     setLoadingComments((prev) => ({ ...prev, [postId]: true }));
     const { data: rawComments } = await supabase
       .from("post_comments")
-      .select("*")
+      .select(
+        `
+        *,
+        quote:quote_id (
+          id,
+          content,
+          user_id
+        ),
+        comment_likes (user_id)
+      `
+      )
       .eq("post_id", postId)
       .order("created_at", { ascending: true });
 
     if (rawComments && rawComments.length > 0) {
-      const commenterIds = Array.from(
-        new Set(rawComments.map((c: any) => c.user_id))
-      );
+      // Collect all user IDs (commenters + quoted users)
+      const userIds = new Set<string>();
+      rawComments.forEach((c: any) => {
+        userIds.add(c.user_id);
+        if (c.quote?.user_id) {
+          userIds.add(c.quote.user_id);
+        }
+      });
+
+      // Fetch profiles
       const { data: profs } = await supabase
         .from("profiles")
         .select("id, nickname, avatar_url, is_vip")
-        .in("id", commenterIds);
+        .in("id", Array.from(userIds));
+
       const pmap = new Map((profs || []).map((p: any) => [p.id, p]));
+      const myId = currentUser?.id;
+
       const merged = rawComments.map((c: any) => ({
         ...c,
         profiles: pmap.get(c.user_id) || {
@@ -510,6 +633,16 @@ export const Square: React.FC = () => {
           avatar_url: null,
           is_vip: false,
         },
+        quote: c.quote
+          ? {
+              ...c.quote,
+              profiles: pmap.get(c.quote.user_id) || { nickname: "未知用户" },
+            }
+          : null,
+        like_count: c.comment_likes?.length || 0,
+        is_liked: myId
+          ? c.comment_likes?.some((l: any) => l.user_id === myId)
+          : false,
       }));
       setComments((prev) => ({ ...prev, [postId]: merged }));
     } else {
@@ -518,18 +651,25 @@ export const Square: React.FC = () => {
     setLoadingComments((prev) => ({ ...prev, [postId]: false }));
   };
 
-  const handleSendComment = async (postId: string, content?: string) => {
+  const handleSendComment = async (
+    postId: string,
+    content?: string,
+    quoteId?: string
+  ) => {
     const finalContent = content || newCommentContent;
     if (!finalContent.trim() || !currentUser) return false;
     if (!content) setCommenting(true);
 
+    const payload: any = {
+      post_id: postId,
+      user_id: currentUser.id,
+      content: finalContent.trim(),
+    };
+    if (quoteId) payload.quote_id = quoteId;
+
     const { data, error } = await supabase
       .from("post_comments")
-      .insert({
-        post_id: postId,
-        user_id: currentUser.id,
-        content: finalContent.trim(),
-      })
+      .insert(payload)
       .select()
       .single();
 
@@ -547,23 +687,34 @@ export const Square: React.FC = () => {
 
       if (!content) setNewCommentContent("");
       fetchComments(postId);
-      
+
       // Update comment count and latest_comments locally
-      const { data: profile } = await supabase.from('profiles').select('*').eq('id', currentUser.id).single();
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("id", currentUser.id)
+        .single();
       const newCommentObj: PostComment = {
-          ...data,
-          profiles: profile || { nickname: '我', avatar_url: null, is_vip: false }
+        ...data,
+        profiles: profile || {
+          nickname: "我",
+          avatar_url: null,
+          is_vip: false,
+        },
       };
 
       setPosts((prev) =>
         prev.map((p) => {
           if (p.id === postId) {
             // Update latest_comments (prepend)
-            const newLatest = [newCommentObj, ...(p.latest_comments || [])].slice(0, 1);
-            return { 
-                ...p, 
-                comment_count: (p.comment_count || 0) + 1,
-                latest_comments: newLatest
+            const newLatest = [
+              newCommentObj,
+              ...(p.latest_comments || []),
+            ].slice(0, 1);
+            return {
+              ...p,
+              comment_count: (p.comment_count || 0) + 1,
+              latest_comments: newLatest,
             };
           }
           return p;
@@ -633,6 +784,64 @@ export const Square: React.FC = () => {
             actor_id: currentUser.id,
             type: "like",
             post_id: postId,
+          });
+        }
+      }
+    }
+  };
+
+  const handleLikeComment = async (commentId: string) => {
+    if (!currentUser || !selectedPostId) return;
+    const postId = selectedPostId;
+    const list = comments[postId] || [];
+    const comment = list.find((c) => c.id === commentId);
+    if (!comment) return;
+
+    if (comment.is_liked) {
+      const { error } = await supabase
+        .from("comment_likes")
+        .delete()
+        .match({ comment_id: commentId, user_id: currentUser.id });
+      if (!error) {
+        setComments((prev) => ({
+          ...prev,
+          [postId]: prev[postId].map((c) =>
+            c.id === commentId
+              ? {
+                  ...c,
+                  like_count: Math.max(0, (c.like_count || 0) - 1),
+                  is_liked: false,
+                }
+              : c
+          ),
+        }));
+      }
+    } else {
+      const { error } = await supabase.from("comment_likes").insert({
+        comment_id: commentId,
+        user_id: currentUser.id,
+      });
+      if (!error) {
+        setComments((prev) => ({
+          ...prev,
+          [postId]: prev[postId].map((c) =>
+            c.id === commentId
+              ? {
+                  ...c,
+                  like_count: (c.like_count || 0) + 1,
+                  is_liked: true,
+                }
+              : c
+          ),
+        }));
+
+        if (comment.user_id !== currentUser.id) {
+          await supabase.from("notifications").insert({
+            user_id: comment.user_id,
+            actor_id: currentUser.id,
+            type: "comment_like", // We might need to handle this type in notifications or just map it to 'like' but strictly it's a comment like
+            post_id: postId, // Keeping post_id for reference
+            // You might want to add a comment_id column to notifications if you want to deep link
           });
         }
       }
@@ -760,6 +969,10 @@ export const Square: React.FC = () => {
   const categories = Array.from(new Set(channels.map((c) => c.category)));
   const activeChannel = channels.find((c) => c.id === activeChannelId);
 
+  const channelScrollRef = React.useRef<HTMLDivElement>(null);
+  const channelContentRef = React.useRef<HTMLDivElement>(null);
+  useElasticScroll(channelScrollRef, channelContentRef);
+
   return (
     <div className="flex h-full bg-[#020617] text-slate-200 overflow-hidden relative">
       {/* Mobile Sidebar Overlay */}
@@ -791,51 +1004,56 @@ export const Square: React.FC = () => {
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-3 space-y-6 custom-scrollbar">
-          {loadingChannels ? (
-            <div className="flex justify-center py-10">
-              <Loader2 className="animate-spin text-slate-500" />
-            </div>
-          ) : (
-            categories.map((category) => (
-              <div key={category}>
-                <h3 className="text-xs font-bold text-slate-500 uppercase px-3 mb-2 tracking-wider">
-                  {category}
-                </h3>
-                <div className="space-y-0.5">
-                  {channels
-                    .filter((c) => c.category === category)
-                    .map((channel) => (
-                      <button
-                        key={channel.id}
-                        onClick={() => {
-                          setActiveChannelId(channel.id);
-                          setShowMobileSidebar(false);
-                        }}
-                        className={cn(
-                          "w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm font-medium transition-all group",
-                          activeChannelId === channel.id
-                            ? "bg-indigo-500/20 text-indigo-300"
-                            : "text-slate-400 hover:bg-slate-800 hover:text-slate-200"
-                        )}
-                      >
-                        <div className="flex items-center gap-2">
-                          <Hash
-                            size={16}
-                            className={
-                              activeChannelId === channel.id
-                                ? "text-indigo-400"
-                                : "text-slate-600 group-hover:text-slate-500"
-                            }
-                          />
-                          {channel.name}
-                        </div>
-                      </button>
-                    ))}
-                </div>
+        <div
+          ref={channelScrollRef}
+          className="flex-1 overflow-y-auto p-3 custom-scrollbar overscroll-y-none"
+        >
+          <div ref={channelContentRef} className="space-y-6">
+            {loadingChannels ? (
+              <div className="flex justify-center py-8">
+                <Loader2 className="animate-spin text-indigo-500" />
               </div>
-            ))
-          )}
+            ) : (
+              categories.map((category) => (
+                <div key={category}>
+                  <h3 className="text-xs font-bold text-slate-500 uppercase px-3 mb-2 tracking-wider">
+                    {category}
+                  </h3>
+                  <div className="space-y-0.5">
+                    {channels
+                      .filter((c) => c.category === category)
+                      .map((channel) => (
+                        <button
+                          key={channel.id}
+                          onClick={() => {
+                            setActiveChannelId(channel.id);
+                            setShowMobileSidebar(false);
+                          }}
+                          className={cn(
+                            "w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm font-medium transition-all group",
+                            activeChannelId === channel.id
+                              ? "bg-indigo-500/20 text-indigo-300"
+                              : "text-slate-400 hover:bg-slate-800 hover:text-slate-200"
+                          )}
+                        >
+                          <div className="flex items-center gap-2">
+                            <Hash
+                              size={16}
+                              className={
+                                activeChannelId === channel.id
+                                  ? "text-indigo-400"
+                                  : "text-slate-600 group-hover:text-slate-500"
+                              }
+                            />
+                            {channel.name}
+                          </div>
+                        </button>
+                      ))}
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
         </div>
 
         <div className="p-4 border-t border-white/5">
@@ -849,7 +1067,7 @@ export const Square: React.FC = () => {
       {/* Main Content */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Header */}
-        <header className="h-16 border-b border-white/5 flex items-center justify-between px-4 md:px-6 bg-slate-900/30">
+        <header className="h-16 border-b border-white/5 flex items-center justify-between px-4 md:px-6 bg-slate-900/30 relative">
           <div className="flex items-center gap-3">
             <button
               className="md:hidden text-slate-400 hover:text-white mr-1"
@@ -882,7 +1100,7 @@ export const Square: React.FC = () => {
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
             </div>
-            <div className="relative">
+            <div className="static md:relative">
               <Button
                 variant="ghost"
                 size="icon"
@@ -900,7 +1118,7 @@ export const Square: React.FC = () => {
                     className="fixed inset-0 z-40"
                     onClick={() => setShowNotifications(false)}
                   ></div>
-                  <div className="absolute right-0 top-full mt-2 w-80 bg-slate-800 border border-slate-700 rounded-xl shadow-xl z-50 overflow-hidden flex flex-col max-h-96">
+                  <div className="absolute left-4 right-4 top-16 mt-2 md:left-auto md:right-0 md:top-full md:mt-2 w-auto md:w-80 bg-slate-800 border border-slate-700 rounded-xl shadow-xl z-50 overflow-hidden flex flex-col max-h-96 origin-top md:origin-top-right animate-scale-in">
                     <div className="p-3 border-b border-slate-700 font-bold text-sm text-slate-300 flex justify-between items-center">
                       <span>通知中心</span>
                       {unreadCount > 0 && (
@@ -980,17 +1198,20 @@ export const Square: React.FC = () => {
 
         {/* Post List */}
         <div
-          className="flex-1 overflow-y-auto p-4 md:p-6 custom-scrollbar"
+          className="flex-1 overflow-y-auto p-4 md:p-6 custom-scrollbar overscroll-y-none"
           ref={scrollContainerRef}
         >
-          <div className="max-w-4xl mx-auto space-y-6">
+          <div
+            ref={contentRef}
+            className="max-w-4xl mx-auto space-y-6 min-h-full"
+          >
             {/* Input Area */}
             <div
-              className="bg-slate-800/30 border border-slate-700/50 rounded-xl p-4 mb-8 focus-within:border-indigo-500 focus-within:bg-slate-800/50 transition-colors"
+              className="bg-slate-800/30 border border-slate-700/50 rounded-xl p-3 md:p-4 mb-8 focus-within:border-indigo-500 focus-within:bg-slate-800/50 transition-colors"
               onDragOver={(e) => e.preventDefault()}
               onDrop={handleDrop}
             >
-              <div className="flex gap-4">
+              <div className="flex gap-3 md:gap-4">
                 <div className="w-10 h-10 rounded-full bg-indigo-500/20 flex items-center justify-center shrink-0 overflow-hidden">
                   {currentUser?.avatar_url ? (
                     <img
@@ -1003,7 +1224,7 @@ export const Square: React.FC = () => {
                     </span>
                   )}
                 </div>
-                <div className="flex-1">
+                <div className="flex-1 min-w-0">
                   {pendingImage && (
                     <div className="mb-2 relative inline-block group">
                       <img
@@ -1028,7 +1249,7 @@ export const Square: React.FC = () => {
                     onChange={(e) => setNewPostContent(e.target.value)}
                     onPaste={handlePaste}
                   />
-                  <div className="flex justify-between items-center mt-2 pt-2 border-t border-white/5">
+                  <div className="flex justify-between items-center mt-2 pt-2 border-t border-white/5 relative z-10">
                     <div className="flex gap-2">
                       <input
                         type="file"
@@ -1114,18 +1335,10 @@ export const Square: React.FC = () => {
                         >
                           {post.profiles?.nickname || "未知用户"}
                         </button>
-                        {post.profiles?.is_vip && (
-                          <span className="text-[10px] bg-purple-500/20 text-purple-300 px-1 rounded border border-purple-500/30">
-                            VIP
-                          </span>
-                        )}
-                        <span className="text-xs text-slate-500">
-                          {new Date(post.created_at).toLocaleString()}
-                        </span>
                       </div>
 
                       {/* Clickable Content Area */}
-                      <div 
+                      <div
                         className="cursor-pointer hover:bg-white/5 -mx-2 px-2 py-1 rounded-lg transition-colors mb-1"
                         onClick={() => {
                           setSelectedPostId(post.id);
@@ -1158,77 +1371,89 @@ export const Square: React.FC = () => {
                         </div>
                       )}
 
-                      <div className="flex items-center gap-6 text-slate-500 text-xs">
-                        <button
-                          className="flex items-center gap-1 hover:text-indigo-400 transition-colors"
-                          onClick={() => {
-                            setSelectedPostId(post.id);
-                            fetchComments(post.id);
-                          }}
-                        >
-                          <MessageSquare size={14} />
-                          {post.comment_count} 评论
-                        </button>
-                        <button
-                          className={cn(
-                            "flex items-center gap-1 hover:text-pink-400 transition-colors group/like relative",
-                            post.is_liked && "text-pink-400"
-                          )}
-                          onClick={() => handleLike(post.id)}
-                        >
-                          <Heart
-                            size={14}
-                            className={cn(post.is_liked && "fill-current")}
-                          />
-                          {post.like_count} 赞
-                          {post.liked_by && post.liked_by.length > 0 && (
-                            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover/like:block z-50">
-                              <div className="bg-slate-900 text-slate-200 text-xs px-2 py-1 rounded border border-slate-700 whitespace-nowrap shadow-xl">
-                                {post.liked_by
-                                  .slice(0, 5)
-                                  .map((u) => u.nickname)
-                                  .join(", ")}
-                                {post.liked_by.length > 5 &&
-                                  ` 等 ${post.liked_by.length} 人`}
-                              </div>
-                            </div>
-                          )}
-                        </button>
-                        {currentUser?.id === post.user_id && (
+                      <div className="flex justify-between items-center mt-2">
+                        <div className="text-xs text-slate-500">
+                          {formatTime(post.created_at)}
+                        </div>
+                        <div className="flex items-center gap-6 text-slate-500 text-xs">
                           <button
-                            className="flex items-center gap-1 hover:text-red-400 transition-colors"
-                            onClick={() => requestDeletePost(post.id)}
+                            className="flex items-center gap-1 hover:text-indigo-400 transition-colors"
+                            onClick={() => {
+                              setSelectedPostId(post.id);
+                              fetchComments(post.id);
+                            }}
                           >
-                            <Trash2 size={14} />
-                            删除
+                            <MessageSquare size={14} />
+                            {post.comment_count} 评论
                           </button>
-                        )}
+                          <button
+                            className={cn(
+                              "flex items-center gap-1 hover:text-pink-400 transition-colors group/like relative",
+                              post.is_liked && "text-pink-400"
+                            )}
+                            onClick={() => handleLike(post.id)}
+                          >
+                            <Heart
+                              size={14}
+                              className={cn(post.is_liked && "fill-current")}
+                            />
+                            {post.like_count} 赞
+                            {post.liked_by && post.liked_by.length > 0 && (
+                              <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover/like:block z-50">
+                                <div className="bg-slate-900 text-slate-200 text-xs px-2 py-1 rounded border border-slate-700 whitespace-nowrap shadow-xl">
+                                  {post.liked_by
+                                    .slice(0, 5)
+                                    .map((u) => u.nickname)
+                                    .join(", ")}
+                                  {post.liked_by.length > 5 &&
+                                    ` 等 ${post.liked_by.length} 人`}
+                                </div>
+                              </div>
+                            )}
+                          </button>
+                          {currentUser?.id === post.user_id && (
+                            <button
+                              className="flex items-center gap-1 hover:text-red-400 transition-colors"
+                              onClick={() => requestDeletePost(post.id)}
+                            >
+                              <Trash2 size={14} />
+                              删除
+                            </button>
+                          )}
+                        </div>
                       </div>
 
                       {/* Comment Preview (One comment + view more) */}
-                      {post.latest_comments && post.latest_comments.length > 0 && (
-                        <div className="mt-3 bg-slate-900/40 rounded-lg p-3 text-xs border border-white/5">
-                           {post.latest_comments.map(c => (
-                             <div key={c.id} className="mb-1 last:mb-0 text-slate-300 flex items-start">
-                               <span className="font-bold text-slate-200 mr-2 shrink-0">
-                                 {c.profiles?.nickname || "未知"}:
-                               </span>
-                               <span className="line-clamp-2 break-all whitespace-pre-wrap">
-                                 {c.content}
-                               </span>
-                             </div>
-                           ))}
-                           {(post.comment_count || 0) > 1 && (
-                             <button 
-                               className="text-indigo-400 mt-2 hover:text-indigo-300 font-medium flex items-center gap-1"
-                               onClick={() => { setSelectedPostId(post.id); fetchComments(post.id); }}
-                             >
-                               查看全部 {post.comment_count} 条评论
-                               <CornerDownRight size={12} />
-                             </button>
-                           )}
-                        </div>
-                      )}
+                      {post.latest_comments &&
+                        post.latest_comments.length > 0 && (
+                          <div className="mt-3 bg-slate-900/40 rounded-lg p-3 text-xs border border-white/5">
+                            {post.latest_comments.map((c) => (
+                              <div
+                                key={c.id}
+                                className="mb-1 last:mb-0 text-slate-300 flex items-start"
+                              >
+                                <span className="font-bold text-slate-200 mr-2 shrink-0">
+                                  {c.profiles?.nickname || "未知"}:
+                                </span>
+                                <span className="line-clamp-2 break-all whitespace-pre-wrap">
+                                  {c.content}
+                                </span>
+                              </div>
+                            ))}
+                            {(post.comment_count || 0) > 1 && (
+                              <button
+                                className="text-indigo-400 mt-2 hover:text-indigo-300 font-medium flex items-center gap-1"
+                                onClick={() => {
+                                  setSelectedPostId(post.id);
+                                  fetchComments(post.id);
+                                }}
+                              >
+                                查看全部 {post.comment_count} 条评论
+                                <CornerDownRight size={12} />
+                              </button>
+                            )}
+                          </div>
+                        )}
                     </div>
                   </div>
                 ))
@@ -1377,6 +1602,11 @@ export const Square: React.FC = () => {
                 </div>
               ) : historyTab === "player" ? (
                 <div className="space-y-3">
+                  {playerHistory.length === 0 && (
+                    <div className="text-center py-8 text-slate-500 text-sm">
+                      暂无记录
+                    </div>
+                  )}
                   {playerHistory.map((item) => {
                     const snapshot = item.character_snapshot;
                     const latest: any = (item as any).latest_character;
@@ -1477,8 +1707,8 @@ export const Square: React.FC = () => {
               ) : (
                 <div className="space-y-3">
                   {kpHistory.length === 0 && (
-                    <div className="text-center text-slate-500 py-4 text-sm">
-                      暂无主持记录
+                    <div className="text-center py-8 text-slate-500 text-sm">
+                      暂无记录
                     </div>
                   )}
                   {kpHistory.map((history) => (
@@ -1532,6 +1762,7 @@ export const Square: React.FC = () => {
           loadingComments={!!loadingComments[selectedPostId]}
           openProfile={openProfile}
           onSendComment={handleSendComment}
+          onLikeComment={handleLikeComment}
         />
       )}
       {/* Confirm Delete */}
@@ -1595,7 +1826,12 @@ const PostDetailModal: React.FC<{
   comments: PostComment[];
   loadingComments: boolean;
   openProfile: (uid: string) => void;
-  onSendComment: (pid: string, content?: string) => Promise<boolean>;
+  onSendComment: (
+    pid: string,
+    content?: string,
+    quoteId?: string
+  ) => Promise<boolean>;
+  onLikeComment: (commentId: string) => void;
 }> = ({
   post,
   currentUser,
@@ -1607,24 +1843,27 @@ const PostDetailModal: React.FC<{
   loadingComments,
   openProfile,
   onSendComment,
+  onLikeComment,
 }) => {
   const [newComment, setNewComment] = useState("");
   const [sending, setSending] = useState(false);
+  const [replyTo, setReplyTo] = useState<PostComment | null>(null);
 
   return (
     <Modal
       onClose={onClose}
-      title="帖子详情"
-      className="max-w-2xl h-[80vh] flex flex-col p-0 overflow-hidden"
+      title={null}
+      headerClassName="hidden"
+      className="max-w-md h-[85vh] flex flex-col p-0 overflow-hidden bg-slate-900"
     >
-      <div className="flex-1 overflow-y-auto p-6 custom-scrollbar">
-        {/* Post Content */}
-        <div className="flex gap-4 mb-6">
-          <div className="w-12 h-12 rounded-full bg-slate-700 flex items-center justify-center text-slate-300 font-bold shrink-0 overflow-hidden">
-            <button
-              className="w-full h-full"
-              onClick={() => openProfile(post.user_id)}
-            >
+      {/* Custom Header */}
+      <div className="flex items-center justify-between px-4 py-3 border-b border-white/5 bg-slate-900/50 backdrop-blur-sm z-10">
+        <div className="flex items-center gap-3">
+          <div
+            className="flex items-center gap-2"
+            onClick={() => openProfile(post.user_id)}
+          >
+            <div className="w-8 h-8 rounded-full bg-slate-700 overflow-hidden cursor-pointer">
               {post.profiles?.avatar_url ? (
                 <img
                   src={post.profiles.avatar_url}
@@ -1632,184 +1871,263 @@ const PostDetailModal: React.FC<{
                   className="w-full h-full object-cover"
                 />
               ) : (
-                post.profiles?.nickname?.[0] || "?"
+                <div className="w-full h-full flex items-center justify-center text-slate-300 font-bold">
+                  {post.profiles?.nickname?.[0] || "?"}
+                </div>
               )}
-            </button>
-          </div>
-          <div className="flex-1">
-            <div className="flex items-center gap-2 mb-1">
-              <button
-                className={cn(
-                  "font-bold text-base",
-                  post.profiles?.is_vip ? "text-purple-400" : "text-white"
-                )}
-                onClick={() => openProfile(post.user_id)}
-              >
-                {post.profiles?.nickname || "未知用户"}
-              </button>
-              {post.profiles?.is_vip && (
-                <span className="text-[10px] bg-purple-500/20 text-purple-300 px-1 rounded border border-purple-500/30">
-                  VIP
-                </span>
+            </div>
+            <span
+              className={cn(
+                "font-bold text-sm cursor-pointer",
+                post.profiles?.is_vip ? "text-purple-400" : "text-slate-200"
               )}
-              <span className="text-xs text-slate-500">
-                {new Date(post.created_at).toLocaleString()}
+            >
+              {post.profiles?.nickname || "未知用户"}
+            </span>
+            {post.profiles?.is_vip && (
+              <span className="text-[10px] bg-purple-500/20 text-purple-300 px-1 rounded border border-purple-500/30">
+                VIP
               </span>
-            </div>
-
-            <div className="text-slate-300 text-base leading-relaxed mb-3 whitespace-pre-wrap">
-              {post.content}
-            </div>
-
-            {post.image_url && (
-              <div className="mb-4">
-                <img
-                  src={post.image_url}
-                  alt="Post Image"
-                  className="max-h-96 rounded-lg border border-white/10"
-                />
-              </div>
             )}
-
-            {post.tags && post.tags.length > 0 && (
-              <div className="flex gap-2 mb-4">
-                {post.tags.map((tag) => (
-                  <span
-                    key={tag}
-                    className="text-xs bg-indigo-500/10 text-indigo-400 px-2 py-0.5 rounded"
-                  >
-                    #{tag}
-                  </span>
-                ))}
-              </div>
-            )}
-
-            <div className="flex items-center gap-6 text-slate-500 text-sm border-b border-white/5 pb-4">
-              <div className="flex items-center gap-1">
-                <MessageSquare size={16} />
-                {post.comment_count} 评论
-              </div>
-              <button
-                className={cn(
-                  "flex items-center gap-1 hover:text-pink-400 transition-colors",
-                  post.is_liked && "text-pink-400"
-                )}
-                onClick={() => onLike(post.id)}
-              >
-                <Heart
-                  size={16}
-                  className={cn(post.is_liked && "fill-current")}
-                />
-                {post.like_count} 赞
-              </button>
-              {currentUser?.id === post.user_id && (
-                <button
-                  className="flex items-center gap-1 hover:text-red-400 transition-colors"
-                  onClick={() => onDeletePost(post.id)}
-                >
-                  <Trash2 size={16} />
-                  删除
-                </button>
-              )}
-            </div>
           </div>
         </div>
+      </div>
 
-        {/* Comments List */}
-        <div className="space-y-4">
-          <h4 className="font-bold text-slate-400 text-sm mb-4">评论列表</h4>
+      <div className="flex-1 overflow-y-auto custom-scrollbar">
+        <div className="p-4">
+          {/* Content */}
+          <div className="text-slate-200 text-base leading-relaxed whitespace-pre-wrap mb-4">
+            {post.content}
+          </div>
+
+          {post.image_url && (
+            <div className="mb-4">
+              <img
+                src={post.image_url}
+                alt="Post Image"
+                className="w-full rounded-lg border border-white/10"
+              />
+            </div>
+          )}
+
+          {/* Metadata */}
+          <div className="flex items-center gap-2 text-xs text-slate-500 mb-2">
+            {post.tags && post.tags.length > 0 && (
+              <span className="flex items-center gap-1 text-slate-400">
+                <FileText size={12} />
+                {post.tags[0]}
+              </span>
+            )}
+            <span>{formatDetailTime(post.created_at)}</span>
+          </div>
+
+          {/* Likes List */}
+          {post.liked_by && post.liked_by.length > 0 && (
+            <div className="flex items-start gap-3 mt-2">
+              <Heart
+                size={16}
+                className={cn(
+                  "mt-0.5",
+                  post.is_liked
+                    ? "fill-pink-500 text-pink-500"
+                    : "text-slate-400"
+                )}
+              />
+              <div className="flex-1 text-xs text-slate-400 leading-5">
+                <span className="text-slate-300 font-medium">
+                  {post.liked_by.map((u) => u.nickname).join(", ")}
+                </span>
+                <span> 赞了</span>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Divider */}
+        <div className="border-b border-white/5 mx-4"></div>
+
+        {/* Comments Section */}
+        <div className="p-4">
+          <h4 className="font-bold text-slate-200 text-sm mb-4">
+            评论 {post.comment_count}
+          </h4>
+
           {loadingComments ? (
             <div className="flex justify-center py-8">
               <Loader2 className="animate-spin text-slate-500" />
             </div>
           ) : comments && comments.length > 0 ? (
-            comments.map((comment) => (
-              <div key={comment.id} className="flex gap-3">
-                <div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center text-slate-300 text-xs font-bold shrink-0 overflow-hidden">
-                   <button
-                      className="w-full h-full"
-                      onClick={() => openProfile(comment.user_id)}
-                    >
+            <div className="space-y-6">
+              {comments.map((comment) => (
+                <div key={comment.id} className="flex gap-3">
+                  <div
+                    className="w-8 h-8 rounded-full bg-slate-700 overflow-hidden shrink-0 cursor-pointer"
+                    onClick={() => openProfile(comment.user_id)}
+                  >
                     {comment.profiles?.avatar_url ? (
                       <img
                         src={comment.profiles.avatar_url}
                         className="w-full h-full object-cover"
                       />
                     ) : (
-                      comment.profiles?.nickname?.[0] || "?"
+                      <div className="w-full h-full flex items-center justify-center text-slate-300 text-xs font-bold">
+                        {comment.profiles?.nickname?.[0] || "?"}
+                      </div>
                     )}
-                  </button>
-                </div>
-                <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-0.5">
-                    <button
-                      className={cn(
-                        "text-sm font-bold",
-                        comment.profiles?.is_vip
-                          ? "text-purple-400"
-                          : "text-slate-300"
-                      )}
-                      onClick={() => openProfile(comment.user_id)}
-                    >
-                      {comment.profiles?.nickname || "未知用户"}
-                    </button>
-                    <span className="text-xs text-slate-600">
-                      {new Date(comment.created_at).toLocaleString()}
-                    </span>
                   </div>
-                  <CommentContent content={comment.content} />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex flex-col gap-1">
+                        <span
+                          className={cn(
+                            "text-sm font-bold cursor-pointer",
+                            comment.profiles?.is_vip
+                              ? "text-purple-400"
+                              : "text-slate-400"
+                          )}
+                          onClick={() => openProfile(comment.user_id)}
+                        >
+                          {comment.profiles?.nickname || "未知用户"}
+                        </span>
+                        {comment.quote && (
+                          <div className="mb-1 pl-2 border-l-2 border-slate-700 text-xs text-slate-500">
+                            <span className="font-bold text-slate-400">
+                              @{comment.quote.profiles?.nickname || "未知用户"}:
+                            </span>{" "}
+                            {comment.quote.content}
+                          </div>
+                        )}
+                        <div className="text-sm text-slate-200 whitespace-pre-wrap leading-relaxed">
+                          {comment.content}
+                        </div>
+                        <div className="flex items-center gap-3 text-xs text-slate-500 mt-1">
+                          <span>{formatTime(comment.created_at)}</span>
+                          <button
+                            className="text-slate-400 hover:text-slate-200"
+                            onClick={() => setReplyTo(comment)}
+                          >
+                            回复
+                          </button>
+                          {currentUser?.id === comment.user_id && (
+                            <button
+                              className="text-red-400/50 hover:text-red-400"
+                              onClick={() =>
+                                onDeleteComment(comment.id, post.id)
+                              }
+                            >
+                              删除
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                      <button
+                        className="flex flex-col items-center gap-0.5 pt-1 group/clike"
+                        onClick={() => onLikeComment(comment.id)}
+                      >
+                        <Heart
+                          size={14}
+                          className={cn(
+                            "transition-colors",
+                            comment.is_liked
+                              ? "fill-pink-500 text-pink-500"
+                              : "text-slate-500 group-hover/clike:text-pink-400"
+                          )}
+                        />
+                        <span
+                          className={cn(
+                            "text-[10px]",
+                            comment.is_liked
+                              ? "text-pink-500"
+                              : "text-slate-500 group-hover/clike:text-pink-400"
+                          )}
+                        >
+                          {comment.like_count || 0}
+                        </span>
+                      </button>
+                    </div>
+                  </div>
                 </div>
-                {currentUser?.id === comment.user_id && (
-                  <button
-                    className="text-slate-600 hover:text-red-400 transition-colors"
-                    onClick={() => onDeleteComment(comment.id, post.id)}
-                  >
-                    <Trash2 size={14} />
-                  </button>
-                )}
-              </div>
-            ))
+              ))}
+            </div>
           ) : (
-            <div className="text-center text-slate-600 py-8">
+            <div className="text-center text-slate-600 py-12 text-sm">
               暂无评论，快来抢沙发~
             </div>
           )}
         </div>
       </div>
 
-      {/* Footer Input */}
-      <div className="p-4 bg-slate-900 border-t border-white/5">
-        <div className="flex gap-3 items-end">
-          <textarea
-            className="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-4 py-2 text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none focus:border-indigo-500 transition-colors resize-none custom-scrollbar min-h-[40px] max-h-[120px]"
-            placeholder="写下你的评论..."
-            rows={1}
-            value={newComment}
-            onChange={(e) => setNewComment(e.target.value)}
-            onKeyDown={async (e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                if (!newComment.trim() || sending) return;
-                setSending(true);
-                const success = await onSendComment(post.id, newComment);
-                if (success) setNewComment("");
-                setSending(false);
-              }
-            }}
-          />
-           <Button
-              size="sm"
-              disabled={!newComment.trim() || sending}
-              onClick={async () => {
-                 setSending(true);
-                 const success = await onSendComment(post.id, newComment);
-                 if (success) setNewComment("");
-                 setSending(false);
-              }}
-              icon={sending ? Loader2 : Send}
+      {/* Bottom Action Bar */}
+      <div className="p-3 px-4 bg-slate-900 border-t border-white/5 flex flex-col gap-2">
+        {replyTo && (
+          <div className="flex items-center justify-between bg-slate-800/50 px-3 py-1.5 rounded-lg text-xs">
+            <span className="text-slate-400">
+              回复{" "}
+              <span className="text-indigo-400 font-bold">
+                @{replyTo.profiles?.nickname || "未知用户"}
+              </span>
+            </span>
+            <button
+              onClick={() => setReplyTo(null)}
+              className="text-slate-500 hover:text-white"
             >
-              发送
-            </Button>
+              <X size={14} />
+            </button>
+          </div>
+        )}
+        <div className="flex items-center gap-3">
+          <div className="flex-1 bg-slate-800/50 rounded-full px-4 py-2 flex items-center gap-2 cursor-text border border-transparent hover:border-slate-700 transition-colors">
+            <input
+              type="text"
+              className="bg-transparent border-none outline-none text-sm text-slate-200 placeholder:text-slate-500 flex-1"
+              placeholder={
+                replyTo
+                  ? `回复 @${replyTo.profiles?.nickname || "..."}...`
+                  : "发言要友善，畅聊不引战"
+              }
+              value={newComment}
+              onChange={(e) => setNewComment(e.target.value)}
+              onKeyDown={async (e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  if (!newComment.trim() || sending) return;
+                  setSending(true);
+                  const success = await onSendComment(
+                    post.id,
+                    newComment,
+                    replyTo?.id
+                  );
+                  if (success) {
+                    setNewComment("");
+                    setReplyTo(null);
+                  }
+                  setSending(false);
+                }
+              }}
+            />
+          </div>
+          <Button
+            size="sm"
+            disabled={!newComment.trim() || sending}
+            onClick={async () => {
+              setSending(true);
+              const success = await onSendComment(
+                post.id,
+                newComment,
+                replyTo?.id
+              );
+              if (success) {
+                setNewComment("");
+                setReplyTo(null);
+              }
+              setSending(false);
+            }}
+            className={cn(
+              "rounded-full px-6 transition-all",
+              !newComment.trim() && "opacity-50"
+            )}
+          >
+            {sending ? <Loader2 size={16} className="animate-spin" /> : "发送"}
+          </Button>
         </div>
       </div>
     </Modal>

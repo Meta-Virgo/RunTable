@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { Button, StatBadge, cn } from "./UI";
 import { ModuleInfo, Character } from "../types";
+import { useElasticScroll } from "../hooks/useElasticScroll";
 
 interface DashboardProps {
   moduleInfo: ModuleInfo;
@@ -48,9 +49,19 @@ export const Dashboard: React.FC<DashboardProps> = ({
     ["NPC", "怪物"].includes(c.role)
   );
 
+  const scrollRef = React.useRef<HTMLDivElement>(null);
+  const contentRef = React.useRef<HTMLDivElement>(null);
+  useElasticScroll(scrollRef, contentRef);
+
   return (
-    <div className="flex-1 overflow-y-auto p-4 md:p-8 custom-scrollbar animate-fade-in">
-      <div className="max-w-6xl mx-auto space-y-8 md:space-y-12 pb-12">
+    <div
+      ref={scrollRef}
+      className="flex-1 overflow-y-auto p-4 md:p-8 custom-scrollbar animate-fade-in overscroll-y-none"
+    >
+      <div
+        ref={contentRef}
+        className="max-w-6xl mx-auto space-y-8 md:space-y-12 pb-12"
+      >
         {/* Module Info - KP Only */}
         {isKP && (
           <section>

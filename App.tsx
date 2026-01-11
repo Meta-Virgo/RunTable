@@ -16,6 +16,7 @@ import {
   ConclusionModal,
 } from "./components/Modals";
 import { Button } from "./components/UI";
+import { MusicPlayer } from "./components/MusicPlayer";
 import { ModuleInfo, Character, Log } from "./types"; // Removed AppData as it might not be used anymore
 import { Menu, LogOut } from "lucide-react";
 import { parseDiceCommand } from "./utils/commandParser";
@@ -109,6 +110,7 @@ const App: React.FC = () => {
   );
   const [userNickname, setUserNickname] = useState<string>("");
   const [isVip, setIsVip] = useState(false);
+  const [bgMusicUrl, setBgMusicUrl] = useState<string | null>(null);
 
   // Load More Logs Logic
   const handleLoadMoreLogs = async () => {
@@ -319,6 +321,7 @@ const App: React.FC = () => {
       }
 
       setKpId(room.kp_id);
+      setBgMusicUrl(room.bg_music_url);
 
       // Clear URL to keep lobby clean on refresh, per your requirement
       window.history.replaceState(null, "", window.location.pathname);
@@ -693,8 +696,14 @@ const App: React.FC = () => {
                         : c.backstory,
                     skills:
                       safeInfo.skills || safeStats.skills || c.skills || {},
-                    items: safeInfo.items !== undefined ? safeInfo.items : c.items || [],
-                    spells: safeInfo.spells !== undefined ? safeInfo.spells : c.spells || [],
+                    items:
+                      safeInfo.items !== undefined
+                        ? safeInfo.items
+                        : c.items || [],
+                    spells:
+                      safeInfo.spells !== undefined
+                        ? safeInfo.spells
+                        : c.spells || [],
 
                     // Update mapped fields from stats
                     str: safeStats.str !== undefined ? safeStats.str : c.str,
@@ -816,6 +825,9 @@ const App: React.FC = () => {
         },
         (payload) => {
           const newRoom = payload.new as any;
+          if (newRoom.bg_music_url !== undefined) {
+            setBgMusicUrl(newRoom.bg_music_url);
+          }
           setModuleInfo((prev) => ({
             ...prev,
             title: newRoom.title !== undefined ? newRoom.title : prev.title,
@@ -902,6 +914,7 @@ const App: React.FC = () => {
       setActiveCharId(charId);
       setIsKP(userIsKP);
       setKpId(room.kp_id);
+      setBgMusicUrl(room.bg_music_url);
 
       // URL Persistence
       if (!isRestoring) {
@@ -1287,7 +1300,7 @@ const App: React.FC = () => {
     // 2. Find next available suffix
     const existingNames = new Set(characters.map((c) => c.name));
     let newName = "";
-    
+
     // Try suffixes in order
     for (const suffix of greekSuffixes) {
       const candidate = `${baseName} ${suffix}`;
@@ -1295,26 +1308,26 @@ const App: React.FC = () => {
         newName = candidate;
         break;
       }
-      // Also check numbered versions if simple suffix is taken? 
-      // Requirement says "add β... and so on". 
+      // Also check numbered versions if simple suffix is taken?
+      // Requirement says "add β... and so on".
       // It implies β, γ, δ...
       // If we run out of letters, we can loop or add numbers.
     }
 
     // If all single letters taken, try adding numbers to them?
     if (!newName) {
-       // Fallback: Try β2, β3...
-       let counter = 2;
-       while (!newName) {
-         const candidate = `${baseName} ${greekSuffixes[0]}${counter}`;
-         if (!existingNames.has(candidate)) {
-            newName = candidate;
-         }
-         counter++;
-         if (counter > 100) break; // Safety break
-       }
+      // Fallback: Try β2, β3...
+      let counter = 2;
+      while (!newName) {
+        const candidate = `${baseName} ${greekSuffixes[0]}${counter}`;
+        if (!existingNames.has(candidate)) {
+          newName = candidate;
+        }
+        counter++;
+        if (counter > 100) break; // Safety break
+      }
     }
-    
+
     if (!newName) newName = `${baseName} Copy`; // Ultimate fallback
 
     // 3. Prepare data
@@ -1507,7 +1520,10 @@ const App: React.FC = () => {
             hp: data.stats?.hp || 10,
             san: data.stats?.san || 50,
             mp: data.stats?.mp || 10,
-            ...calculateDBAndBuild(data.stats?.str || 50, data.stats?.siz || 50),
+            ...calculateDBAndBuild(
+              data.stats?.str || 50,
+              data.stats?.siz || 50
+            ),
           };
           // OPTIMIZATION: Do NOT manually update state here if Realtime is active.
           // Realtime subscription will handle the UI update to avoid duplication race conditions.
@@ -1795,7 +1811,7 @@ const App: React.FC = () => {
     });
 
     // 2. Replace Dice (NdM or dM)
-    evalString = evalString.replace(/(\d*)d(\d+)/g, (match, p1, p2) => {
+    evalString = evalString.replace(/(\d*)d(\d+)/g, (_, p1, p2) => {
       const count = p1 ? parseInt(p1) : 1;
       const sides = parseInt(p2);
       let total = 0;
@@ -1967,7 +1983,7 @@ const App: React.FC = () => {
 
   const handleCommand = (
     cmd: any,
-    originalText: string,
+    _originalText: string,
     recipientId?: string | null
   ) => {
     switch (cmd.type) {
@@ -2200,8 +2216,21 @@ const App: React.FC = () => {
     setModuleInfo(EMPTY_MODULE_INFO);
     setIsKP(false);
     setActiveCharId("pc");
+    setBgMusicUrl(null);
     setOnlineUsers(new Set());
     window.history.replaceState(null, "", window.location.pathname);
+  };
+
+  const handleUpdateMusic = async (url: string) => {
+    if (!currentRoomId || !isKP) return;
+    const { error } = await supabase
+      .from("rooms")
+      .update({ bg_music_url: url })
+      .eq("id", currentRoomId);
+    if (error) {
+      console.error("Failed to update background music:", error);
+      alert(`更新背景音乐失败: ${error.message || JSON.stringify(error)}`);
+    }
   };
 
   const derivedCharacters = characters.map((c) => ({
@@ -2303,7 +2332,7 @@ const App: React.FC = () => {
           </div>
         </header>
 
-        {view === "main" ? (
+        {view !== "setup" && view !== "music" ? (
           <ChatArea
             logs={logs}
             activeChar={activeChar}
@@ -2323,7 +2352,7 @@ const App: React.FC = () => {
             kpId={kpId}
             isVip={isVip}
           />
-        ) : (
+        ) : view === "setup" ? (
           <Dashboard
             moduleInfo={moduleInfo}
             characters={derivedCharacters}
@@ -2351,7 +2380,20 @@ const App: React.FC = () => {
             onConcludeGame={() => setShowConclusionModal(true)}
             isKP={isKP}
           />
-        )}
+        ) : null}
+
+        {/* Music Player (Persistent) */}
+        <MusicPlayer
+          url={bgMusicUrl}
+          isKP={isKP}
+          onUpdateUrl={handleUpdateMusic}
+          mode={view === "music" ? "sidebar" : "fixed"}
+          className={
+            view === "music" ? "absolute inset-0 z-10 bg-slate-900 pt-16" : ""
+          }
+          isMobile={isMobile}
+          isHidden={view === "setup"}
+        />
       </main>
 
       {/* Modals */}

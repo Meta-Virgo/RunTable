@@ -10,9 +10,11 @@ import {
   ChevronLeft,
   ChevronRight,
   Activity,
+  Music,
 } from "lucide-react";
 import { cn } from "./UI";
 import { Character } from "../types";
+import { useElasticScroll } from "../hooks/useElasticScroll";
 
 interface SidebarProps {
   isOpen: boolean;
@@ -39,17 +41,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onOpenStatusEdit,
   isMobile,
   isKP,
-  kpOnline = false,
+  // kpOnline = false, // Unused
 }) => {
   const pcCharacters = characters.filter((c) => c.role === "调查员");
   const npcCharacters = characters.filter((c) =>
     ["NPC", "怪物"].includes(c.role)
   );
 
-  // Filter visible characters: KP sees all, PC sees only Investigators
-  const visibleCharacters = isKP
-    ? [...pcCharacters, ...npcCharacters]
-    : pcCharacters;
+  const scrollContainerRef = React.useRef<HTMLDivElement>(null);
+  const contentRef = React.useRef<HTMLDivElement>(null);
+
+  useElasticScroll(scrollContainerRef, contentRef);
 
   const getCharIcon = (role: string, size = 18) => {
     if (role === "Keeper") return <Crown size={size} />;
@@ -223,6 +225,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               icon: Users,
               label: isKP ? "角色 & 模组" : "调查员名册",
             },
+            { id: "music", icon: Music, label: "背景音乐" },
           ].map((nav) => (
             <button
               key={nav.id}
@@ -253,131 +256,97 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </div>
 
         {/* Character/Role Lists */}
-        <div className="flex-1 overflow-y-auto custom-scrollbar px-3 pb-4 space-y-6">
-          {/* --- KP VIEW --- */}
-          {isKP && (
-            <>
-              {/* Role List (Keeper, NPC, Monster) */}
-              <div className="space-y-2">
-                {isOpen && (
-                  <div className="text-xs font-bold text-slate-500 uppercase tracking-wider px-1">
-                    角色列表
-                  </div>
-                )}
-
-                {/* Keeper Item */}
-                <div
-                  onClick={() => handleCharClick("pc")}
-                  className={cn(
-                    "relative group flex items-center gap-3 p-2 rounded-xl cursor-pointer transition-all duration-300 border",
-                    activeCharId === "pc"
-                      ? "bg-gradient-to-r from-indigo-500/20 to-transparent border-indigo-500/30 shadow-[inset_2px_0_0_0_#6366f1]"
-                      : "bg-transparent border-transparent hover:bg-white/5",
-                    !isOpen && "justify-center"
+        <div
+          ref={scrollContainerRef}
+          className="flex-1 overflow-y-auto custom-scrollbar px-3 pb-4 overscroll-y-none"
+        >
+          <div ref={contentRef} className="space-y-6">
+            {/* --- KP VIEW --- */}
+            {isKP && (
+              <>
+                {/* Role List (Keeper, NPC, Monster) */}
+                <div className="space-y-2">
+                  {isOpen && (
+                    <div className="text-xs font-bold text-slate-500 uppercase tracking-wider px-1">
+                      角色列表
+                    </div>
                   )}
-                >
+
+                  {/* Keeper Item */}
                   <div
+                    onClick={() => handleCharClick("pc")}
                     className={cn(
-                      "p-2 rounded-lg shrink-0 transition-colors",
+                      "relative group flex items-center gap-3 p-2 rounded-xl cursor-pointer transition-all duration-300 border",
                       activeCharId === "pc"
-                        ? "bg-indigo-500 text-white"
-                        : "bg-slate-800 text-slate-400 group-hover:bg-slate-700"
+                        ? "bg-gradient-to-r from-indigo-500/20 to-transparent border-indigo-500/30 shadow-[inset_2px_0_0_0_#6366f1]"
+                        : "bg-transparent border-transparent hover:bg-white/5",
+                      !isOpen && "justify-center"
                     )}
                   >
-                    <Crown size={18} />
-                  </div>
-                  {isOpen && (
-                    <div className="overflow-hidden animate-fade-in">
-                      <div
-                        className={cn(
-                          "font-bold text-sm truncate",
-                          activeCharId === "pc"
-                            ? "text-white"
-                            : "text-slate-300"
-                        )}
-                      >
-                        守秘人
-                      </div>
-                      <div className="text-[10px] text-slate-500 truncate">
-                        Game Master
-                      </div>
+                    <div
+                      className={cn(
+                        "p-2 rounded-lg shrink-0 transition-colors",
+                        activeCharId === "pc"
+                          ? "bg-indigo-500 text-white"
+                          : "bg-slate-800 text-slate-400 group-hover:bg-slate-700"
+                      )}
+                    >
+                      <Crown size={18} />
                     </div>
-                  )}
-                  {activeCharId === "pc" && isOpen && (
-                    <div className="absolute right-2 w-1.5 h-1.5 rounded-full bg-indigo-400 shadow-[0_0_10px_#6366f1]"></div>
-                  )}
-                </div>
-
-                {/* NPCs & Monsters */}
-                {npcCharacters.map((char) =>
-                  renderCharacterItem(char, true, false)
-                )}
-              </div>
-
-              {/* Investigators List (View Only) */}
-              <div className="space-y-2">
-                {isOpen && (
-                  <div className="text-xs font-bold text-slate-500 uppercase tracking-wider px-1 flex justify-between">
-                    <span>调查员</span>
-                    <span className="text-[10px] bg-slate-800 px-1.5 rounded text-slate-400">
-                      {pcCharacters.length}
-                    </span>
-                  </div>
-                )}
-                {pcCharacters.map((char) =>
-                  renderCharacterItem(char, false, true)
-                )}
-              </div>
-            </>
-          )}
-
-          {/* --- PC VIEW --- */}
-          {!isKP && (
-            <>
-              {/* Keeper (Static Display) */}
-              <div className="space-y-2">
-                <div
-                  className={cn(
-                    "relative group flex items-center gap-3 p-2 rounded-xl border bg-transparent border-transparent",
-                    !isOpen && "justify-center",
-                    !kpOnline && "opacity-50 grayscale"
-                  )}
-                >
-                  <div className="p-2 rounded-lg shrink-0 bg-slate-800 text-slate-400 relative">
-                    <Crown size={18} />
-                    {kpOnline && (
-                      <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-emerald-500 border-2 border-slate-900 rounded-full"></div>
+                    {isOpen && (
+                      <div className="overflow-hidden animate-fade-in">
+                        <div
+                          className={cn(
+                            "font-bold text-sm truncate",
+                            activeCharId === "pc"
+                              ? "text-white"
+                              : "text-slate-300"
+                          )}
+                        >
+                          守秘人
+                        </div>
+                        <div className="text-[10px] text-slate-500 truncate">
+                          Game Master
+                        </div>
+                      </div>
+                    )}
+                    {activeCharId === "pc" && isOpen && (
+                      <div className="absolute right-2 w-1.5 h-1.5 rounded-full bg-indigo-400 shadow-[0_0_10px_#6366f1]"></div>
                     )}
                   </div>
-                  {isOpen && (
-                    <div className="overflow-hidden animate-fade-in">
-                      <div className="font-bold text-sm truncate text-slate-300">
-                        守秘人
-                      </div>
-                      <div className="text-[10px] text-slate-500 truncate">
-                        Game Master
-                      </div>
-                    </div>
+
+                  {/* NPCs & Monsters */}
+                  {npcCharacters.map((char) =>
+                    renderCharacterItem(char, true, false)
                   )}
                 </div>
-              </div>
 
-              {/* Investigators List */}
+                {/* Investigators List (View Only) */}
+                <div className="space-y-2">
+                  {isOpen && (
+                    <div className="text-xs font-bold text-slate-500 uppercase tracking-wider px-1 flex justify-between">
+                      <span>调查员</span>
+                      <span className="text-[10px] bg-slate-800 px-1.5 rounded text-slate-400">
+                        {pcCharacters.length}
+                      </span>
+                    </div>
+                  )}
+                  {pcCharacters.map((char) =>
+                    renderCharacterItem(char, false, true)
+                  )}
+                </div>
+              </>
+            )}
+
+            {/* --- PC VIEW (Only Investigators) --- */}
+            {!isKP && (
               <div className="space-y-2">
-                {isOpen && (
-                  <div className="text-xs font-bold text-slate-500 uppercase tracking-wider px-1 flex justify-between">
-                    <span>调查员</span>
-                    <span className="text-[10px] bg-slate-800 px-1.5 rounded text-slate-400">
-                      {visibleCharacters.length}
-                    </span>
-                  </div>
-                )}
-                {visibleCharacters.map((char) =>
-                  renderCharacterItem(char, false, true)
+                {pcCharacters.map((char) =>
+                  renderCharacterItem(char, char.id === "pc", true)
                 )}
               </div>
-            </>
-          )}
+            )}
+          </div>
         </div>
 
         <div className="p-4 border-t border-white/5 hidden md:block">

@@ -33,6 +33,7 @@ export interface Room {
   room_number?: number;
   password?: string | null;
   last_active_at?: string;
+  bg_music_url?: string | null;
 }
 
 export interface GameHistory {
@@ -92,7 +93,7 @@ export interface Character {
   pow: number;
   edu: number;
   luck: number;
-  
+
   // Computed stats
   db?: string;
   build?: number;
@@ -209,6 +210,7 @@ export interface PostComment {
   user_id: string;
   content: string;
   created_at: string;
+  quote_id?: string | null;
 
   // Joined Data
   profiles?: {
@@ -216,6 +218,18 @@ export interface PostComment {
     avatar_url: string;
     is_vip: boolean;
   };
+  quote?: {
+    id: string;
+    content: string;
+    user_id: string;
+    profiles?: {
+      nickname: string;
+    };
+  };
+
+  // Frontend Helpers
+  like_count?: number;
+  is_liked?: boolean;
 }
 
 export interface Notification {

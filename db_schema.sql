@@ -35,7 +35,8 @@ CREATE TABLE public.rooms (
     description text, 
     status text DEFAULT 'open'::text,
     room_number serial, -- 新增：房间编号 (自动递增)
-    password text       -- 新增：房间密码
+    password text,       -- 新增：房间密码
+    bg_music_url text    -- 新增：背景音乐
 ); 
 
 -- ========================================================= 

@@ -20,6 +20,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { AvatarUpload } from "./AvatarUpload";
+import { useElasticScroll } from "../hooks/useElasticScroll";
 
 interface FriendsProps {
   currentUser: Profile | null;
@@ -50,6 +51,14 @@ export const Friends: React.FC<FriendsProps> = ({ currentUser }) => {
   // Delete Modal State
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
+
+  const resumeScrollRef = React.useRef<HTMLDivElement>(null);
+  const resumeContentRef = React.useRef<HTMLDivElement>(null);
+  useElasticScroll(resumeScrollRef, resumeContentRef);
+
+  const historyScrollRef = React.useRef<HTMLDivElement>(null);
+  const historyContentRef = React.useRef<HTMLDivElement>(null);
+  useElasticScroll(historyScrollRef, historyContentRef);
 
   useEffect(() => {
     if (currentUser) {
@@ -679,129 +688,184 @@ export const Friends: React.FC<FriendsProps> = ({ currentUser }) => {
             </div>
 
             {/* History List */}
-            <div className="bg-slate-950/30 border-t border-white/5 p-4 max-h-[40vh] overflow-y-auto custom-scrollbar">
-              {historyLoading ? (
-                <div className="flex justify-center py-8">
-                  <Loader2 className="animate-spin text-indigo-500" />
-                </div>
-              ) : historyTab === "player" ? (
-                <div className="space-y-3">
-                  {playerHistory.map((item) => {
-                    const snapshot = item.character_snapshot;
-                    const latest = (item as any).latest_character;
-                    const char = latest || snapshot;
+            <div
+              ref={resumeScrollRef}
+              className="bg-slate-950/30 border-t border-white/5 p-4 max-h-[40vh] overflow-y-auto custom-scrollbar overscroll-y-none"
+            >
+              <div ref={resumeContentRef}>
+                {historyLoading ? (
+                  <div className="flex justify-center py-8">
+                    <Loader2 className="animate-spin text-indigo-500" />
+                  </div>
+                ) : historyTab === "player" ? (
+                  <div className="space-y-3">
+                    {playerHistory.length === 0 && (
+                      <div className="text-center py-8 text-slate-500 text-sm">
+                        暂无记录
+                      </div>
+                    )}
+                    {playerHistory.map((item) => {
+                      const snapshot = item.character_snapshot;
+                      const latest = (item as any).latest_character;
+                      const char = latest || snapshot;
 
-                    // Safely extract data from either structure
-                    const name = char.name;
-                    const avatarUrl =
-                      char.info?.avatar_url ||
-                      char.avatar_url ||
-                      snapshot.info?.avatar_url ||
-                      snapshot.avatar_url;
-                    const job =
-                      char.info?.job ||
-                      char.job ||
-                      snapshot.info?.job ||
-                      snapshot.job ||
-                      "无职业";
-                    const sex =
-                      char.info?.sex ||
-                      char.sex ||
-                      snapshot.info?.sex ||
-                      snapshot.sex ||
-                      "未知";
+                      // Safely extract data from either structure
+                      const name = char.name;
+                      const avatarUrl =
+                        char.info?.avatar_url ||
+                        char.avatar_url ||
+                        snapshot.info?.avatar_url ||
+                        snapshot.avatar_url;
+                      const job =
+                        char.info?.job ||
+                        char.job ||
+                        snapshot.info?.job ||
+                        snapshot.job ||
+                        "无职业";
+                      const sex =
+                        char.info?.sex ||
+                        char.sex ||
+                        snapshot.info?.sex ||
+                        snapshot.sex ||
+                        "未知";
 
-                    const isDead = item.outcome === "死亡";
-                    const isLost = item.outcome === "失踪";
-                    const isCrazy = item.outcome === "疯狂";
+                      const isDead = item.outcome === "死亡";
+                      const isLost = item.outcome === "失踪";
+                      const isCrazy = item.outcome === "疯狂";
 
-                    return (
+                      return (
+                        <div
+                          key={item.id}
+                          className={`relative p-3 rounded-xl border transition-all ${
+                            isDead
+                              ? "bg-slate-950 border-slate-800 grayscale"
+                              : "bg-slate-800/50 border-slate-700/50 hover:border-indigo-500/30"
+                          }`}
+                        >
+                          <div className="flex justify-between items-start mb-2">
+                            <div>
+                              <h4 className="font-bold text-white text-sm line-clamp-1">
+                                {item.game_history.room_title}
+                              </h4>
+                              <div className="text-[10px] text-slate-500 flex items-center gap-1 mt-0.5">
+                                <History size={10} />
+                                {new Date(
+                                  item.game_history.created_at
+                                ).toLocaleDateString()}
+                                <span className="w-0.5 h-0.5 rounded-full bg-slate-600"></span>
+                                KP: {item.game_history.kp_nickname}
+                              </div>
+                            </div>
+                            <div
+                              className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                                isDead
+                                  ? "bg-red-950 text-red-500 border border-red-900"
+                                  : isLost
+                                  ? "bg-yellow-950 text-yellow-500 border border-yellow-900"
+                                  : isCrazy
+                                  ? "bg-purple-950 text-purple-500 border border-purple-900"
+                                  : "bg-emerald-950 text-emerald-500 border border-emerald-900"
+                              }`}
+                            >
+                              {item.outcome}
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2 bg-slate-900/50 p-1.5 rounded-lg">
+                            <div className="w-6 h-6 flex items-center justify-center">
+                              <AvatarUpload
+                                url={avatarUrl}
+                                onUpload={() => {}}
+                                editable={false}
+                                size={24}
+                              />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="text-xs font-medium text-slate-300 truncate">
+                                {name}
+                              </div>
+                              <div className="text-[10px] text-slate-500">
+                                {job} · {sex}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {kpHistory.length === 0 && (
+                      <div className="text-center py-8 text-slate-500 text-sm">
+                        暂无记录
+                      </div>
+                    )}
+                    {kpHistory.map((history) => (
                       <div
-                        key={item.id}
-                        className={`relative p-3 rounded-xl border transition-all ${
-                          isDead
-                            ? "bg-slate-950 border-slate-800 grayscale"
-                            : "bg-slate-800/50 border-slate-700/50 hover:border-indigo-500/30"
-                        }`}
+                        key={history.id}
+                        className="bg-slate-800/50 border border-slate-700/50 p-3 rounded-xl hover:border-indigo-500/30 transition-all"
                       >
-                        <div className="flex justify-between items-start mb-2">
-                          <div>
-                            <h4 className="font-bold text-white text-sm line-clamp-1">
-                              {item.game_history.room_title}
-                            </h4>
-                            <div className="text-[10px] text-slate-500 flex items-center gap-1 mt-0.5">
-                              <History size={10} />
-                              {new Date(
-                                item.game_history.created_at
-                              ).toLocaleDateString()}
-                              <span className="w-0.5 h-0.5 rounded-full bg-slate-600"></span>
-                              KP: {item.game_history.kp_nickname}
-                            </div>
-                          </div>
-                          <div
-                            className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
-                              isDead
-                                ? "bg-red-950 text-red-500 border border-red-900"
-                                : isLost
-                                ? "bg-yellow-950 text-yellow-500 border border-yellow-900"
-                                : isCrazy
-                                ? "bg-purple-950 text-purple-500 border border-purple-900"
-                                : "bg-emerald-950 text-emerald-500 border border-emerald-900"
-                            }`}
-                          >
-                            {item.outcome}
-                          </div>
+                        <div className="flex justify-between items-start mb-1">
+                          <h4 className="font-bold text-white text-sm">
+                            {history.room_title}
+                          </h4>
+                          <span className="text-[10px] text-slate-500 bg-slate-900 px-1.5 py-0.5 rounded">
+                            {new Date(history.created_at).toLocaleDateString()}
+                          </span>
                         </div>
+                        <div className="flex items-center gap-1 text-[10px] text-slate-400">
+                          <Crown size={10} className="text-yellow-500" />
+                          <span>主持人 (KP)</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
 
-                        <div className="flex items-center gap-2 bg-slate-900/50 p-1.5 rounded-lg">
-                          <div className="w-6 h-6 flex items-center justify-center">
-                            <AvatarUpload
-                              url={avatarUrl}
-                              onUpload={() => {}}
-                              editable={false}
-                              size={24}
-                            />
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="text-xs font-medium text-slate-300 truncate">
-                              {name}
-                            </div>
-                            <div className="text-[10px] text-slate-500">
-                              {job} · {sex}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {kpHistory.length === 0 && (
-                    <div className="text-center text-slate-500 py-4 text-sm">
-                      暂无主持记录
-                    </div>
-                  )}
-                  {kpHistory.map((history) => (
-                    <div
-                      key={history.id}
-                      className="bg-slate-800/50 border border-slate-700/50 p-3 rounded-xl hover:border-indigo-500/30 transition-all"
+            {/* Modal Footer Actions */}
+            <div className="p-4 border-t border-white/10 bg-slate-900/50 flex gap-3">
+              <Button
+                variant="ghost"
+                className="flex-1"
+                onClick={() => setShowResumeModal(false)}
+              >
+                关闭
+              </Button>
+              {currentUser && selectedUser.id !== currentUser.id && (
+                <>
+                  {friends.some(
+                    (f) => f.friend_profile?.id === selectedUser.id
+                  ) ? (
+                    <Button
+                      className="flex-1 bg-red-500/10 text-red-400 hover:bg-red-500/20 border-red-500/20"
+                      icon={UserX}
+                      onClick={() => {
+                        const friendship = friends.find(
+                          (f) => f.friend_profile?.id === selectedUser.id
+                        );
+                        if (friendship) {
+                          handleDeleteFriend(friendship.id);
+                          setShowResumeModal(false);
+                        }
+                      }}
                     >
-                      <div className="flex justify-between items-start mb-1">
-                        <h4 className="font-bold text-white text-sm">
-                          {history.room_title}
-                        </h4>
-                        <span className="text-[10px] text-slate-500 bg-slate-900 px-1.5 py-0.5 rounded">
-                          {new Date(history.created_at).toLocaleDateString()}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-1 text-[10px] text-slate-400">
-                        <Crown size={10} className="text-yellow-500" />
-                        <span>主持人 (KP)</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                      删除好友
+                    </Button>
+                  ) : (
+                    <Button
+                      variant="primary"
+                      className="flex-1"
+                      icon={UserPlus}
+                      onClick={() => {
+                        sendFriendRequest(selectedUser.id);
+                      }}
+                    >
+                      添加好友
+                    </Button>
+                  )}
+                </>
               )}
             </div>
           </div>
@@ -838,133 +902,138 @@ export const Friends: React.FC<FriendsProps> = ({ currentUser }) => {
             </button>
           </div>
 
-          <div className="p-4 max-h-[60vh] overflow-y-auto custom-scrollbar">
-            {historyTab === "player" ? (
-              <div className="space-y-3">
-                {playerHistory.length === 0 && (
-                  <div className="text-center text-slate-500 py-4 text-sm">
-                    暂无参与记录
-                  </div>
-                )}
-                {playerHistory.map((item) => {
-                  const snapshot = item.character_snapshot;
-                  const latest = (item as any).latest_character;
-                  const char = latest || snapshot;
+          <div
+            ref={historyScrollRef}
+            className="p-4 max-h-[60vh] overflow-y-auto custom-scrollbar overscroll-y-none"
+          >
+            <div ref={historyContentRef}>
+              {historyTab === "player" ? (
+                <div className="space-y-3">
+                  {playerHistory.length === 0 && (
+                    <div className="text-center text-slate-500 py-4 text-sm">
+                      暂无参与记录
+                    </div>
+                  )}
+                  {playerHistory.map((item) => {
+                    const snapshot = item.character_snapshot;
+                    const latest = (item as any).latest_character;
+                    const char = latest || snapshot;
 
-                  // Safely extract data from either structure
-                  const name = char.name;
-                  const avatarUrl =
-                    char.info?.avatar_url ||
-                    char.avatar_url ||
-                    snapshot.info?.avatar_url ||
-                    snapshot.avatar_url;
-                  const job =
-                    char.info?.job ||
-                    char.job ||
-                    snapshot.info?.job ||
-                    snapshot.job ||
-                    "无职业";
-                  const sex =
-                    char.info?.sex ||
-                    char.sex ||
-                    snapshot.info?.sex ||
-                    snapshot.sex ||
-                    "未知";
+                    // Safely extract data from either structure
+                    const name = char.name;
+                    const avatarUrl =
+                      char.info?.avatar_url ||
+                      char.avatar_url ||
+                      snapshot.info?.avatar_url ||
+                      snapshot.avatar_url;
+                    const job =
+                      char.info?.job ||
+                      char.job ||
+                      snapshot.info?.job ||
+                      snapshot.job ||
+                      "无职业";
+                    const sex =
+                      char.info?.sex ||
+                      char.sex ||
+                      snapshot.info?.sex ||
+                      snapshot.sex ||
+                      "未知";
 
-                  const isDead = item.outcome === "死亡";
-                  const isLost = item.outcome === "失踪";
-                  const isCrazy = item.outcome === "疯狂";
+                    const isDead = item.outcome === "死亡";
+                    const isLost = item.outcome === "失踪";
+                    const isCrazy = item.outcome === "疯狂";
 
-                  return (
+                    return (
+                      <div
+                        key={item.id}
+                        className={`relative p-4 rounded-xl border transition-all ${
+                          isDead
+                            ? "bg-slate-950 border-slate-800 grayscale"
+                            : "bg-slate-800/50 border-slate-700/50 hover:border-indigo-500/30"
+                        }`}
+                      >
+                        <div className="flex justify-between items-start mb-3">
+                          <div>
+                            <h4 className="font-bold text-white text-base line-clamp-1">
+                              {item.game_history.room_title}
+                            </h4>
+                            <div className="text-xs text-slate-500 flex items-center gap-2 mt-1">
+                              <History size={12} />
+                              {new Date(
+                                item.game_history.created_at
+                              ).toLocaleDateString()}
+                              <span className="w-1 h-1 rounded-full bg-slate-600"></span>
+                              KP: {item.game_history.kp_nickname}
+                            </div>
+                          </div>
+                          <div
+                            className={`px-2 py-0.5 rounded text-[10px] font-bold border uppercase tracking-wider flex items-center gap-1 ${
+                              isDead
+                                ? "bg-slate-800 text-slate-400 border-slate-700"
+                                : isLost
+                                ? "bg-amber-900/20 text-amber-400 border-amber-500/20"
+                                : isCrazy
+                                ? "bg-purple-900/20 text-purple-400 border-purple-500/20"
+                                : "bg-emerald-900/20 text-emerald-400 border-emerald-500/20"
+                            }`}
+                          >
+                            {isDead && <Skull size={10} />}
+                            {item.outcome}
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-3 bg-slate-950/30 p-2 rounded-lg border border-white/5">
+                          <AvatarUpload
+                            url={avatarUrl}
+                            onUpload={() => {}}
+                            editable={false}
+                            size={40}
+                          />
+                          <div>
+                            <div className="font-bold text-sm text-slate-200">
+                              {name}
+                            </div>
+                            <div className="text-[10px] text-slate-500">
+                              {job} · {sex}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {kpHistory.map((item) => (
                     <div
                       key={item.id}
-                      className={`relative p-4 rounded-xl border transition-all ${
-                        isDead
-                          ? "bg-slate-950 border-slate-800 grayscale"
-                          : "bg-slate-800/50 border-slate-700/50 hover:border-indigo-500/30"
-                      }`}
+                      className="bg-slate-800/50 border border-slate-700/50 p-4 rounded-xl hover:border-indigo-500/30 transition-all"
                     >
-                      <div className="flex justify-between items-start mb-3">
-                        <div>
-                          <h4 className="font-bold text-white text-base line-clamp-1">
-                            {item.game_history.room_title}
-                          </h4>
-                          <div className="text-xs text-slate-500 flex items-center gap-2 mt-1">
-                            <History size={12} />
-                            {new Date(
-                              item.game_history.created_at
-                            ).toLocaleDateString()}
-                            <span className="w-1 h-1 rounded-full bg-slate-600"></span>
-                            KP: {item.game_history.kp_nickname}
-                          </div>
-                        </div>
-                        <div
-                          className={`px-2 py-0.5 rounded text-[10px] font-bold border uppercase tracking-wider flex items-center gap-1 ${
-                            isDead
-                              ? "bg-slate-800 text-slate-400 border-slate-700"
-                              : isLost
-                              ? "bg-amber-900/20 text-amber-400 border-amber-500/20"
-                              : isCrazy
-                              ? "bg-purple-900/20 text-purple-400 border-purple-500/20"
-                              : "bg-emerald-900/20 text-emerald-400 border-emerald-500/20"
-                          }`}
-                        >
-                          {isDead && <Skull size={10} />}
-                          {item.outcome}
+                      <div className="flex justify-between items-start mb-2">
+                        <h4 className="font-bold text-white text-base">
+                          {item.room_title}
+                        </h4>
+                        <div className="px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 flex items-center gap-1">
+                          <Crown size={10} />
+                          Keeper
                         </div>
                       </div>
-
-                      <div className="flex items-center gap-3 bg-slate-950/30 p-2 rounded-lg border border-white/5">
-                        <AvatarUpload
-                          url={avatarUrl}
-                          onUpload={() => {}}
-                          editable={false}
-                          size={40}
-                        />
-                        <div>
-                          <div className="font-bold text-sm text-slate-200">
-                            {name}
-                          </div>
-                          <div className="text-[10px] text-slate-500">
-                            {job} · {sex}
-                          </div>
-                        </div>
+                      <p className="text-xs text-slate-400 line-clamp-2 mb-3">
+                        {item.room_description || "暂无描述..."}
+                      </p>
+                      <div className="text-[10px] text-slate-500 font-mono bg-slate-950/50 px-2 py-1 rounded inline-block">
+                        结团于: {new Date(item.created_at).toLocaleString()}
                       </div>
                     </div>
-                  );
-                })}
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {kpHistory.map((item) => (
-                  <div
-                    key={item.id}
-                    className="bg-slate-800/50 border border-slate-700/50 p-4 rounded-xl hover:border-indigo-500/30 transition-all"
-                  >
-                    <div className="flex justify-between items-start mb-2">
-                      <h4 className="font-bold text-white text-base">
-                        {item.room_title}
-                      </h4>
-                      <div className="px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 flex items-center gap-1">
-                        <Crown size={10} />
-                        Keeper
-                      </div>
+                  ))}
+                  {kpHistory.length === 0 && (
+                    <div className="text-center py-8 text-slate-500 text-sm">
+                      暂无主持记录
                     </div>
-                    <p className="text-xs text-slate-400 line-clamp-2 mb-3">
-                      {item.room_description || "暂无描述..."}
-                    </p>
-                    <div className="text-[10px] text-slate-500 font-mono bg-slate-950/50 px-2 py-1 rounded inline-block">
-                      结团于: {new Date(item.created_at).toLocaleString()}
-                    </div>
-                  </div>
-                ))}
-                {kpHistory.length === 0 && (
-                  <div className="text-center py-8 text-slate-500 text-sm">
-                    暂无主持记录
-                  </div>
-                )}
-              </div>
-            )}
+                  )}
+                </div>
+              )}
+            </div>
           </div>
           <div className="px-6 py-4 border-t border-white/10 bg-white/5 flex justify-end">
             <Button variant="ghost" onClick={() => setShowHistoryModal(false)}>
