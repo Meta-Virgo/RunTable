@@ -226,33 +226,38 @@ export const Sidebar: React.FC<SidebarProps> = ({
               label: isKP ? "角色 & 模组" : "调查员名册",
             },
             { id: "music", icon: Music, label: "背景音乐" },
-          ].map((nav) => (
-            <button
-              key={nav.id}
-              onClick={() => handleNavClick(nav.id)}
-              className={cn(
-                "w-full flex items-center gap-3 px-3 py-3 rounded-xl transition-all duration-300 group",
-                view === nav.id
-                  ? "bg-indigo-600/10 text-indigo-300 border border-indigo-500/20"
-                  : "text-slate-400 hover:text-white hover:bg-white/5 border border-transparent",
-                !isOpen && "justify-center"
-              )}
-              title={nav.label}
-            >
-              <nav.icon
-                size={20}
+          ]
+            .filter((nav) => {
+              if (nav.id === "music") return isKP;
+              return true;
+            })
+            .map((nav) => (
+              <button
+                key={nav.id}
+                onClick={() => handleNavClick(nav.id)}
                 className={cn(
-                  "transition-colors",
+                  "w-full flex items-center gap-3 px-3 py-3 rounded-xl transition-all duration-300 group",
                   view === nav.id
-                    ? "text-indigo-400"
-                    : "text-slate-500 group-hover:text-slate-300"
+                    ? "bg-indigo-600/10 text-indigo-300 border border-indigo-500/20"
+                    : "text-slate-400 hover:text-white hover:bg-white/5 border border-transparent",
+                  !isOpen && "justify-center"
                 )}
-              />
-              {isOpen && (
-                <span className="font-medium text-sm">{nav.label}</span>
-              )}
-            </button>
-          ))}
+                title={nav.label}
+              >
+                <nav.icon
+                  size={20}
+                  className={cn(
+                    "transition-colors",
+                    view === nav.id
+                      ? "text-indigo-400"
+                      : "text-slate-500 group-hover:text-slate-300"
+                  )}
+                />
+                {isOpen && (
+                  <span className="font-medium text-sm">{nav.label}</span>
+                )}
+              </button>
+            ))}
         </div>
 
         {/* Character/Role Lists */}

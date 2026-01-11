@@ -442,10 +442,10 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
 
           if (!realUrl || realUrl.includes("404")) {
             console.warn("Song appears unavailable:", trackId);
-            if (parsedType === 0) {
-              // Skip to next after a short delay to prevent rapid looping
-              setTimeout(() => playNext(), 1000);
-            }
+            // if (parsedType === 0) {
+            //   // Skip to next after a short delay to prevent rapid looping
+            //   setTimeout(() => playNext(), 1000);
+            // }
             return;
           }
 
@@ -660,10 +660,10 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
         onEnded={onEnded}
         onError={(e) => {
           console.error("Audio Load Error", e);
-          if (parsedType === 0) {
-            // Try next song if current fails
-            setTimeout(() => playNext(), 1000);
-          }
+          // if (parsedType === 0) {
+          //   // Try next song if current fails
+          //   setTimeout(() => playNext(), 1000);
+          // }
         }}
         className="hidden"
       />
@@ -763,17 +763,6 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
                       <Volume2 size={14} />
                     )}
                   </button>
-                  <input
-                    type="range"
-                    min="0"
-                    max="1"
-                    step="0.05"
-                    value={volume}
-                    onChange={(e) =>
-                      handleVolumeChange(parseFloat(e.target.value))
-                    }
-                    className="flex-1 h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-indigo-500 hover:accent-indigo-400"
-                  />
                 </div>
 
                 <div className="flex justify-end gap-2">
