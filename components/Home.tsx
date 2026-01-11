@@ -248,7 +248,9 @@ export const Home: React.FC<HomeProps> = ({
   const mainRef = React.useRef<HTMLElement>(null);
   const mainContentRef = React.useRef<HTMLDivElement>(null);
 
-  useElasticScroll(mainRef, mainContentRef, { disabled: activeTab === "square" });
+  useElasticScroll(mainRef, mainContentRef, {
+    disabled: activeTab === "square",
+  });
 
   const lastScrollTop = React.useRef(0);
 
@@ -268,14 +270,20 @@ export const Home: React.FC<HomeProps> = ({
         setShowBackToTop(scrollTop > 300);
 
         const diff = scrollTop - lastScrollTop.current;
-        // Threshold to avoid jitter
-        if (Math.abs(diff) > 10) {
-          if (diff > 0 && scrollTop > 50) {
-            // Only hide when scrolling down and not at very top
+        const isScrollingDown = diff > 0;
+        const threshold = isScrollingDown ? 10 : 300; // 向下敏感(10)，向上大幅增加阈值(300)
+
+        if (Math.abs(diff) > threshold) {
+          if (isScrollingDown && scrollTop > 50) {
             setShowHeader(false);
-          } else if (diff < 0) {
+          } else if (!isScrollingDown || scrollTop < 20) {
+            // 向上滚动超过阈值 或 在顶部区域 -> 显示
             setShowHeader(true);
           }
+          lastScrollTop.current = scrollTop;
+        } else if (scrollTop < 20) {
+          // 强制处理回到顶部的情况，防止累积距离不够导致不显示
+          setShowHeader(true);
           lastScrollTop.current = scrollTop;
         }
       }

@@ -27,6 +27,10 @@ interface MusicPlayerProps {
   className?: string;
   isMobile?: boolean;
   isHidden?: boolean;
+  globalMute?: boolean;
+  syncedIsPlaying?: boolean;
+  syncedTrackIndex?: number;
+  onUpdateSyncState?: (isPlaying: boolean, trackIndex: number) => void;
 }
 
 export const MusicPlayer: React.FC<MusicPlayerProps> = ({
@@ -37,6 +41,10 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
   className = "",
   isMobile = false,
   isHidden = false,
+  globalMute = false,
+  syncedIsPlaying,
+  syncedTrackIndex,
+  onUpdateSyncState,
 }) => {
   const [isMuted, setIsMuted] = useState(false); // Local mute (sets volume to 0 / pauses)
   const [showInput, setShowInput] = useState(false);
@@ -65,6 +73,42 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
   const [currentTrackIndex, setCurrentTrackIndex] = useState(0);
   const [visualTrackIndex, setVisualTrackIndex] = useState(0);
   const [showPlaylist] = useState(!isMobile || mode === "sidebar");
+
+  // --- Sync Effects ---
+
+  // 1. Sync Props -> Internal State (PC Only)
+  useEffect(() => {
+    if (!isKP) {
+      if (syncedIsPlaying !== undefined && syncedIsPlaying !== isPlaying) {
+        setIsPlaying(syncedIsPlaying);
+        if (audioRef.current) {
+          if (syncedIsPlaying) audioRef.current.play().catch(console.error);
+          else audioRef.current.pause();
+        }
+      }
+      if (
+        syncedTrackIndex !== undefined &&
+        syncedTrackIndex !== currentTrackIndex
+      ) {
+        setCurrentTrackIndex(syncedTrackIndex);
+        setVisualTrackIndex(syncedTrackIndex);
+      }
+    }
+  }, [syncedIsPlaying, syncedTrackIndex, isKP]);
+
+  // 2. Sync Internal State -> DB (KP Only)
+  useEffect(() => {
+    if (isKP && onUpdateSyncState) {
+      onUpdateSyncState(isPlaying, currentTrackIndex);
+    }
+  }, [isPlaying, currentTrackIndex, isKP]);
+
+  // 3. Global Mute
+  useEffect(() => {
+    if (audioRef.current) {
+      audioRef.current.muted = isMuted || globalMute;
+    }
+  }, [isMuted, globalMute]);
 
   // Sync visual track index with current track index
   useEffect(() => {
@@ -579,9 +623,6 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
     return `${m}:${s.toString().padStart(2, "0")}`;
   };
 
-  // If no music and not KP, render nothing (only in fixed mode)
-  if (mode === "fixed" && !parsedId && !isKP) return null;
-
   const containerClass =
     mode === "sidebar"
       ? `w-full h-full flex flex-col ${className}`
@@ -628,9 +669,10 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
       />
     ) : null;
 
-  const uiContent = (
-    <div className={containerClass} style={containerStyle}>
-      <style>{`
+  const uiContent =
+    !isKP && mode === "fixed" ? null : (
+      <div className={containerClass} style={containerStyle}>
+        <style>{`
         @keyframes marquee {
           0% { transform: translateX(0); }
           100% { transform: translateX(-50%); }
@@ -645,665 +687,680 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
         }
       `}</style>
 
-      {/* Audio used to be here, now moved out to persist */}
+        {/* Audio used to be here, now moved out to persist */}
 
-      <div className={innerClass}>
-        {/* Control Panel (KP Only) */}
-        {isKP && showInput && (
-          <div
-            className={`bg-slate-900/95 backdrop-blur border border-slate-700 p-3 rounded-xl shadow-2xl animate-slide-up ${
-              mode === "sidebar"
-                ? "w-full shrink-0"
-                : isMobile
-                ? "w-[calc(100vw-32px)] max-w-[280px] mb-2"
-                : "w-72 mb-2"
-            }`}
-          >
-            <div className="flex justify-between items-center mb-3">
-              <span className="text-xs font-bold text-slate-400 flex items-center gap-1">
-                <Music size={12} />
-                背景音乐设置
-              </span>
-              <button
-                onClick={() => setShowInput(false)}
-                className="text-slate-500 hover:text-white transition-colors"
-              >
-                <X size={14} />
-              </button>
-            </div>
-
-            <div className="flex bg-slate-800 rounded-lg p-1 mb-2">
-              <button
-                onClick={() => setMusicType("song")}
-                className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 text-xs font-medium rounded-md transition-all ${
-                  musicType === "song"
-                    ? "bg-indigo-600 text-white shadow-sm"
-                    : "text-slate-400 hover:text-slate-200"
-                }`}
-              >
-                <Disc size={12} /> 单曲
-              </button>
-              <button
-                onClick={() => setMusicType("playlist")}
-                className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 text-xs font-medium rounded-md transition-all ${
-                  musicType === "playlist"
-                    ? "bg-indigo-600 text-white shadow-sm"
-                    : "text-slate-400 hover:text-slate-200"
-                }`}
-              >
-                <ListMusic size={12} /> 歌单
-              </button>
-            </div>
-
-            <div className="space-y-2">
-              <input
-                value={inputUrl}
-                onChange={(e) => handleInputChange(e.target.value)}
-                placeholder={
-                  musicType === "playlist"
-                    ? "输入歌单ID或链接..."
-                    : "输入单曲ID或链接..."
-                }
-                className="w-full bg-slate-950 border border-slate-700 rounded-lg px-2 py-1.5 text-xs text-white focus:border-indigo-500 outline-none transition-all placeholder-slate-600 font-mono"
-                onKeyDown={(e) => e.key === "Enter" && handleSave()}
-              />
-
-              {/* Volume Control */}
-              <div className="flex items-center gap-2 px-1 py-1">
+        <div className={innerClass}>
+          {/* Control Panel (KP Only) */}
+          {isKP && showInput && (
+            <div
+              className={`bg-slate-900/95 backdrop-blur border border-slate-700 p-3 rounded-xl shadow-2xl animate-slide-up ${
+                mode === "sidebar"
+                  ? "w-full shrink-0"
+                  : isMobile
+                  ? "w-[calc(100vw-32px)] max-w-[280px] mb-2"
+                  : "w-72 mb-2"
+              }`}
+            >
+              <div className="flex justify-between items-center mb-3">
+                <span className="text-xs font-bold text-slate-400 flex items-center gap-1">
+                  <Music size={12} />
+                  背景音乐设置
+                </span>
                 <button
-                  onClick={() => handleVolumeChange(volume === 0 ? 0.5 : 0)}
-                  className="text-slate-400 hover:text-white transition-colors"
-                  title={volume === 0 ? "取消静音" : "静音"}
+                  onClick={() => setShowInput(false)}
+                  className="text-slate-500 hover:text-white transition-colors"
                 >
-                  {volume === 0 ? <VolumeX size={14} /> : <Volume2 size={14} />}
+                  <X size={14} />
                 </button>
+              </div>
+
+              <div className="flex bg-slate-800 rounded-lg p-1 mb-2">
+                <button
+                  onClick={() => setMusicType("song")}
+                  className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 text-xs font-medium rounded-md transition-all ${
+                    musicType === "song"
+                      ? "bg-indigo-600 text-white shadow-sm"
+                      : "text-slate-400 hover:text-slate-200"
+                  }`}
+                >
+                  <Disc size={12} /> 单曲
+                </button>
+                <button
+                  onClick={() => setMusicType("playlist")}
+                  className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 text-xs font-medium rounded-md transition-all ${
+                    musicType === "playlist"
+                      ? "bg-indigo-600 text-white shadow-sm"
+                      : "text-slate-400 hover:text-slate-200"
+                  }`}
+                >
+                  <ListMusic size={12} /> 歌单
+                </button>
+              </div>
+
+              <div className="space-y-2">
                 <input
-                  type="range"
-                  min="0"
-                  max="1"
-                  step="0.05"
-                  value={volume}
-                  onChange={(e) =>
-                    handleVolumeChange(parseFloat(e.target.value))
+                  value={inputUrl}
+                  onChange={(e) => handleInputChange(e.target.value)}
+                  placeholder={
+                    musicType === "playlist"
+                      ? "输入歌单ID或链接..."
+                      : "输入单曲ID或链接..."
                   }
-                  className="flex-1 h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-indigo-500 hover:accent-indigo-400"
+                  className="w-full bg-slate-950 border border-slate-700 rounded-lg px-2 py-1.5 text-xs text-white focus:border-indigo-500 outline-none transition-all placeholder-slate-600 font-mono"
+                  onKeyDown={(e) => e.key === "Enter" && handleSave()}
                 />
-              </div>
 
-              <div className="flex justify-end gap-2">
-                <Button
-                  size="xs"
-                  variant="ghost"
-                  onClick={() => {
-                    onUpdateUrl(""); // Stop music
-                    setShowInput(false);
-                  }}
-                  className="text-rose-400 hover:text-rose-300 hover:bg-rose-500/10"
-                >
-                  停止播放
-                </Button>
-                <Button
-                  size="xs"
-                  onClick={handleSave}
-                  className="bg-indigo-600 hover:bg-indigo-500"
-                >
-                  同步播放
-                </Button>
-              </div>
-            </div>
-            <p className="text-[10px] text-slate-600 mt-2 leading-relaxed">
-              * 支持输入 ID (如 571246314) 或完整链接。
-              <br />* 仅支持网易云音乐免费资源。
-            </p>
-          </div>
-        )}
+                {/* Volume Control */}
+                <div className="flex items-center gap-2 px-1 py-1">
+                  <button
+                    onClick={() => handleVolumeChange(volume === 0 ? 0.5 : 0)}
+                    className="text-slate-400 hover:text-white transition-colors"
+                    title={volume === 0 ? "取消静音" : "静音"}
+                  >
+                    {volume === 0 ? (
+                      <VolumeX size={14} />
+                    ) : (
+                      <Volume2 size={14} />
+                    )}
+                  </button>
+                  <input
+                    type="range"
+                    min="0"
+                    max="1"
+                    step="0.05"
+                    value={volume}
+                    onChange={(e) =>
+                      handleVolumeChange(parseFloat(e.target.value))
+                    }
+                    className="flex-1 h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-indigo-500 hover:accent-indigo-400"
+                  />
+                </div>
 
-        {/* Player UI */}
-        <div
-          className={`flex gap-2 ${
-            mode === "sidebar"
-              ? "flex-col w-full flex-1 min-h-0 gap-4"
-              : "items-end"
-          }`}
-        >
-          {/* Toggle Button for Fixed Mode */}
-          {mode === "fixed" && parsedId && (
-            <div className="relative group/btn pointer-events-auto">
-              {/* Progress Ring */}
-              <svg
-                className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[52px] h-[52px] -rotate-90 pointer-events-none"
-                viewBox="0 0 52 52"
-              >
-                <circle
-                  cx="26"
-                  cy="26"
-                  r="24"
-                  fill="none"
-                  stroke="#334155"
-                  strokeWidth="2"
-                  className="opacity-50"
-                />
-                <circle
-                  cx="26"
-                  cy="26"
-                  r="24"
-                  fill="none"
-                  stroke="#c084fc" // Purple-400
-                  strokeWidth="2"
-                  strokeDasharray={2 * Math.PI * 24}
-                  strokeDashoffset={
-                    2 * Math.PI * 24 * (1 - currentTime / (duration || 1))
-                  }
-                  strokeLinecap="round"
-                  className="transition-all duration-200 ease-linear"
-                />
-              </svg>
-
-              <div
-                onMouseDown={handleMouseDown}
-                onClick={() => !hasMoved && setIsCollapsed(!isCollapsed)}
-                className={`p-3 rounded-full border shadow-lg backdrop-blur transition-all shrink-0 active:cursor-grabbing flex items-center justify-center relative z-10 ${
-                  isCollapsed
-                    ? "bg-slate-900/90 border-slate-700 text-slate-400 hover:text-white hover:bg-slate-800 cursor-pointer"
-                    : "bg-indigo-600 border-indigo-500 text-white cursor-pointer hover:bg-indigo-500"
-                }`}
-              >
-                <Music
-                  size={20}
-                  className={isPlaying ? "animate-pulse text-indigo-100" : ""}
-                />
+                <div className="flex justify-end gap-2">
+                  <Button
+                    size="xs"
+                    variant="ghost"
+                    onClick={() => {
+                      onUpdateUrl(""); // Stop music
+                      setShowInput(false);
+                    }}
+                    className="text-rose-400 hover:text-rose-300 hover:bg-rose-500/10"
+                  >
+                    停止播放
+                  </Button>
+                  <Button
+                    size="xs"
+                    onClick={handleSave}
+                    className="bg-indigo-600 hover:bg-indigo-500"
+                  >
+                    同步播放
+                  </Button>
+                </div>
               </div>
+              <p className="text-[10px] text-slate-600 mt-2 leading-relaxed">
+                * 支持输入 ID (如 571246314) 或完整链接。
+                <br />* 仅支持网易云音乐免费资源。
+              </p>
             </div>
           )}
 
-          {parsedId &&
-            (mode === "sidebar" ? (
-              // Sidebar Mode: Standard List Layout
-              <div
-                className={`transition-all duration-300 overflow-hidden bg-slate-900/90 backdrop-blur rounded-xl shadow-xl border border-slate-700/50 flex flex-col ${playerWidthClass} h-full`}
-              >
-                {/* Custom UI for Songs & Playlist Header */}
-                <div className="p-3 flex items-center gap-3 bg-slate-800/50 shrink-0">
-                  {/* Album Art Placeholder */}
-                  <div
-                    className="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center border border-slate-700 shrink-0 animate-spin-slow overflow-hidden"
-                    style={{
-                      animationPlayState: isPlaying ? "running" : "paused",
-                    }}
-                  >
-                    {parsedType === 0 &&
-                    playlistTracks[currentTrackIndex]?.album?.picUrl ? (
-                      <img
-                        src={playlistTracks[currentTrackIndex].album.picUrl}
-                        alt="cover"
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <Music size={18} className="text-indigo-400" />
-                    )}
-                  </div>
+          {/* Player UI */}
+          <div
+            className={`flex gap-2 ${
+              mode === "sidebar"
+                ? "flex-col w-full flex-1 min-h-0 gap-4"
+                : "items-end"
+            }`}
+          >
+            {/* Toggle Button for Fixed Mode */}
+            {mode === "fixed" && parsedId && (
+              <div className="relative group/btn pointer-events-auto">
+                {/* Progress Ring */}
+                <svg
+                  className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[52px] h-[52px] -rotate-90 pointer-events-none"
+                  viewBox="0 0 52 52"
+                >
+                  <circle
+                    cx="26"
+                    cy="26"
+                    r="24"
+                    fill="none"
+                    stroke="#334155"
+                    strokeWidth="2"
+                    className="opacity-50"
+                  />
+                  <circle
+                    cx="26"
+                    cy="26"
+                    r="24"
+                    fill="none"
+                    stroke="#c084fc" // Purple-400
+                    strokeWidth="2"
+                    strokeDasharray={2 * Math.PI * 24}
+                    strokeDashoffset={
+                      2 * Math.PI * 24 * (1 - currentTime / (duration || 1))
+                    }
+                    strokeLinecap="round"
+                    className="transition-all duration-200 ease-linear"
+                  />
+                </svg>
 
-                  <div className="flex-1 min-w-0 overflow-hidden">
-                    <div className="flex justify-between items-center mb-1">
-                      <div className="flex-1 overflow-hidden mr-2 relative h-4">
-                        {(() => {
-                          const trackName =
-                            parsedType === 0 && playlistTracks.length > 0
-                              ? playlistTracks[currentTrackIndex].name
-                              : "背景音乐";
-                          // Calculate visual length (Chinese ~ 2, English ~ 1)
-                          const visualLength = trackName
-                            .split("")
-                            .reduce(
-                              (acc: number, char: string) =>
-                                acc + (char.charCodeAt(0) > 127 ? 2 : 1),
-                              0
-                            );
-                          const shouldScroll = visualLength > 12; // > 6 Chinese chars or 12 English chars
-                          return (
-                            <div
-                              className={`text-xs font-bold text-slate-200 absolute top-0 left-0 ${
-                                shouldScroll
-                                  ? "animate-marquee"
-                                  : "truncate w-full"
-                              }`}
-                            >
-                              <span className="pr-8">{trackName}</span>
-                              {shouldScroll && (
-                                <span className="pr-8">{trackName}</span>
-                              )}
-                            </div>
-                          );
-                        })()}
-                      </div>
-                      <span className="text-[10px] text-slate-500 font-mono">
-                        {formatTime(currentTime)} / {formatTime(duration)}
-                      </span>
-                    </div>
+                <div
+                  onMouseDown={handleMouseDown}
+                  onClick={() => !hasMoved && setIsCollapsed(!isCollapsed)}
+                  className={`p-3 rounded-full border shadow-lg backdrop-blur transition-all shrink-0 active:cursor-grabbing flex items-center justify-center relative z-10 ${
+                    isCollapsed
+                      ? "bg-slate-900/90 border-slate-700 text-slate-400 hover:text-white hover:bg-slate-800 cursor-pointer"
+                      : "bg-indigo-600 border-indigo-500 text-white cursor-pointer hover:bg-indigo-500"
+                  }`}
+                >
+                  <Music
+                    size={20}
+                    className={isPlaying ? "animate-pulse text-indigo-100" : ""}
+                  />
+                </div>
+              </div>
+            )}
 
-                    {/* Progress Bar */}
+            {parsedId &&
+              (mode === "sidebar" ? (
+                // Sidebar Mode: Standard List Layout
+                <div
+                  className={`transition-all duration-300 overflow-hidden bg-slate-900/90 backdrop-blur rounded-xl shadow-xl border border-slate-700/50 flex flex-col ${playerWidthClass} h-full`}
+                >
+                  {/* Custom UI for Songs & Playlist Header */}
+                  <div className="p-3 flex items-center gap-3 bg-slate-800/50 shrink-0">
+                    {/* Album Art Placeholder */}
                     <div
-                      className="h-1 bg-slate-700 rounded-full overflow-hidden cursor-pointer group"
-                      onClick={(e) => {
-                        if (!audioRef.current || !duration) return;
-                        const rect = e.currentTarget.getBoundingClientRect();
-                        const x = e.clientX - rect.left;
-                        const percent = x / rect.width;
-                        audioRef.current.currentTime = percent * duration;
+                      className="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center border border-slate-700 shrink-0 animate-spin-slow overflow-hidden"
+                      style={{
+                        animationPlayState: isPlaying ? "running" : "paused",
                       }}
                     >
-                      <div
-                        className="h-full bg-indigo-500 group-hover:bg-indigo-400 transition-all relative"
-                        style={{ width: `${(currentTime / duration) * 100}%` }}
-                      ></div>
-                    </div>
-                  </div>
-
-                  {/* Controls */}
-                  <div className="flex items-center gap-1">
-                    {parsedType === 0 && (
-                      <>
-                        <button
-                          onClick={togglePlayMode}
-                          className="w-6 h-6 rounded-full text-slate-400 hover:text-white flex items-center justify-center transition-all mr-1"
-                          title={
-                            playMode === "sequence"
-                              ? "顺序播放"
-                              : playMode === "shuffle"
-                              ? "随机播放"
-                              : "单曲循环"
-                          }
-                        >
-                          {playMode === "sequence" ? (
-                            <Repeat size={14} fill="currentColor" />
-                          ) : playMode === "shuffle" ? (
-                            <Shuffle size={14} fill="currentColor" />
-                          ) : (
-                            <Repeat1 size={14} fill="currentColor" />
-                          )}
-                        </button>
-                        <button
-                          onClick={playPrev}
-                          className="w-6 h-6 rounded-full text-slate-400 hover:text-white flex items-center justify-center transition-all"
-                        >
-                          <SkipBack size={14} fill="currentColor" />
-                        </button>
-                      </>
-                    )}
-
-                    <button
-                      onClick={togglePlay}
-                      className="w-8 h-8 rounded-full bg-indigo-600 hover:bg-indigo-500 text-white flex items-center justify-center transition-all shadow-lg shrink-0"
-                    >
-                      {isPlaying ? (
-                        <Pause size={14} fill="currentColor" />
-                      ) : (
-                        <Play
-                          size={14}
-                          fill="currentColor"
-                          className="ml-0.5"
+                      {parsedType === 0 &&
+                      playlistTracks[currentTrackIndex]?.album?.picUrl ? (
+                        <img
+                          src={playlistTracks[currentTrackIndex].album.picUrl}
+                          alt="cover"
+                          className="w-full h-full object-cover"
                         />
-                      )}
-                    </button>
-
-                    {parsedType === 0 && (
-                      <button
-                        onClick={() => playNext()}
-                        className="w-6 h-6 rounded-full text-slate-400 hover:text-white flex items-center justify-center transition-all"
-                      >
-                        <SkipForward size={14} fill="currentColor" />
-                      </button>
-                    )}
-                  </div>
-                </div>
-
-                {/* Playlist Tracks List */}
-                {parsedType === 0 && (
-                  <div
-                    ref={playlistScrollRef}
-                    className="flex-1 overflow-y-auto custom-scrollbar bg-slate-900/50 border-t border-slate-700/50 overscroll-y-none"
-                  >
-                    <div ref={playlistContentRef}>
-                      {isLoadingPlaylist ? (
-                        <div className="p-4 text-center text-xs text-slate-500">
-                          正在加载歌单...
-                        </div>
-                      ) : playlistTracks.length > 0 ? (
-                        <div className="divide-y divide-slate-800/50">
-                          {playlistTracks.map((track, idx) => (
-                            <div
-                              key={track.id}
-                              ref={
-                                currentTrackIndex === idx
-                                  ? activeTrackRef
-                                  : null
-                              }
-                              onClick={() => setCurrentTrackIndex(idx)}
-                              className={`p-2 flex items-center gap-2 cursor-pointer transition-colors hover:bg-slate-800/50 group ${
-                                currentTrackIndex === idx
-                                  ? "bg-indigo-500/10"
-                                  : ""
-                              }`}
-                            >
-                              {/* Track Number / Play Icon */}
-                              <span
-                                className={`text-[10px] w-6 text-center shrink-0 ${
-                                  currentTrackIndex === idx
-                                    ? "text-indigo-400 font-bold"
-                                    : "text-slate-600 group-hover:text-slate-400"
-                                }`}
-                              >
-                                {currentTrackIndex === idx ? (
-                                  <div className="w-2 h-2 rounded-full bg-indigo-500 mx-auto animate-pulse shadow-[0_0_8px_rgba(99,102,241,0.5)]" />
-                                ) : (
-                                  idx + 1
-                                )}
-                              </span>
-
-                              {/* Album Art (Small) */}
-                              <div className="w-8 h-8 rounded bg-slate-800 overflow-hidden shrink-0 border border-slate-700/50">
-                                {track.album?.picUrl || track.al?.picUrl ? (
-                                  <img
-                                    src={
-                                      track.album?.picUrl || track.al?.picUrl
-                                    }
-                                    alt=""
-                                    className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity"
-                                  />
-                                ) : (
-                                  <div className="w-full h-full flex items-center justify-center text-slate-600">
-                                    <Disc size={12} />
-                                  </div>
-                                )}
-                              </div>
-
-                              <div className="flex-1 min-w-0">
-                                <div
-                                  className={`text-xs truncate font-medium ${
-                                    currentTrackIndex === idx
-                                      ? "text-indigo-300"
-                                      : "text-slate-300 group-hover:text-slate-200"
-                                  }`}
-                                >
-                                  {track.name}
-                                </div>
-                                <div className="text-[10px] text-slate-500 truncate group-hover:text-slate-400">
-                                  {track.artists
-                                    ?.map((a: any) => a.name)
-                                    .join(", ") ||
-                                    track.ar
-                                      ?.map((a: any) => a.name)
-                                      .join(", ")}
-                                </div>
-                              </div>
-                              <span className="text-[10px] text-slate-600 font-mono shrink-0">
-                                {formatTime(
-                                  track.duration / 1000 || track.dt / 1000
-                                )}
-                              </span>
-                            </div>
-                          ))}
-
-                          {/* Sentinel / Load More Indicator */}
-                          {playlistTracks.length < allTrackIds.length && (
-                            <div
-                              ref={loadMoreRef}
-                              onClick={loadMoreTracks}
-                              className="p-3 text-center text-[10px] text-slate-500 hover:text-indigo-400 cursor-pointer transition-colors"
-                            >
-                              {isLoadingMore ? (
-                                <span className="flex items-center justify-center gap-2">
-                                  <div
-                                    className="w-1.5 h-1.5 bg-indigo-500 rounded-full animate-bounce"
-                                    style={{ animationDelay: "0ms" }}
-                                  />
-                                  <div
-                                    className="w-1.5 h-1.5 bg-indigo-500 rounded-full animate-bounce"
-                                    style={{ animationDelay: "150ms" }}
-                                  />
-                                  <div
-                                    className="w-1.5 h-1.5 bg-indigo-500 rounded-full animate-bounce"
-                                    style={{ animationDelay: "300ms" }}
-                                  />
-                                </span>
-                              ) : (
-                                "滚动或点击加载更多"
-                              )}
-                            </div>
-                          )}
-                        </div>
                       ) : (
-                        <div className="p-4 text-center flex flex-col items-center gap-2">
-                          <span className="text-xs text-slate-500">
-                            无法加载歌单信息
-                          </span>
-                          <Button
-                            size="xs"
-                            variant="ghost"
-                            onClick={() => parsedId && fetchPlaylist(parsedId)}
-                            className="text-indigo-400 hover:text-indigo-300"
-                          >
-                            点击重试
-                          </Button>
-                        </div>
+                        <Music size={18} className="text-indigo-400" />
                       )}
                     </div>
-                  </div>
-                )}
-              </div>
-            ) : (
-              // Fixed Mode: Radial / Stair Layout
-              <div
-                className={`absolute bottom-[26px] right-[26px] pointer-events-none transition-all duration-500 cubic-bezier(0.34, 1.56, 0.64, 1) origin-bottom-right ${
-                  isCollapsed
-                    ? "opacity-0 scale-0 rotate-45"
-                    : "opacity-100 scale-100 rotate-0"
-                }`}
-              >
-                {parsedType === 0 && playlistTracks.length > 0
-                  ? (() => {
-                      // Calculate visible range: Current + Neighbors (No Looping for start/end)
-                      const total = playlistTracks.length;
-                      const VISIBLE_COUNT = 6;
-                      const items = [];
 
-                      for (let i = 0; i < VISIBLE_COUNT; i++) {
-                        const offset = i - 2;
-                        const targetIndex = visualTrackIndex + offset;
-                        if (targetIndex >= 0 && targetIndex < total) {
-                          items.push({
-                            track: playlistTracks[targetIndex],
-                            index: targetIndex,
-                          });
-                        } else {
-                          items.push(null);
-                        }
-                      }
-
-                      return (
-                        <div className="relative w-0 h-0">
-                          {items.map((item, i) => {
-                            if (!item) return null;
-                            const { track, index: realIndex } = item;
-
-                            // Logic to determine if this is the active one (center of our window)
-                            // We picked 6 items, starting from current-2. So index 2 is current.
-                            const isVisualCenter = i === 2;
-                            const distanceFromCenter = i - 2; // -2, -1, 0, 1, 2, 3
-                            const isPlayingTrack =
-                              realIndex === currentTrackIndex;
-
-                            // Calculate position based on fan/stair
-                            // Angle: 0 is right, -90 is top, 180 is left.
-                            // We want them top-leftish. Button is at bottom-right of this container.
-                            // Let's span from 180 (left) to 270 (top).
-                            // Center item (current) at 225 deg (top-left diagonal)
-                            const baseAngle = 225;
-                            const angleStep = 18; // Even tighter spacing
-                            const angle =
-                              baseAngle + distanceFromCenter * angleStep;
-                            const rad = (angle * Math.PI) / 180;
-
-                            // Further radius as requested
-                            const radius =
-                              105 + Math.abs(distanceFromCenter) * 6;
-
-                            // Adjust center to button center (origin is now at button center)
-                            const x = Math.cos(rad) * radius;
-                            const y = Math.sin(rad) * radius;
-
-                            // Size scaling
-                            const size = isVisualCenter ? 80 : 60; // Rectangular/Square cards need more space
-                            const zIndex = isVisualCenter
-                              ? 50
-                              : 40 - Math.abs(distanceFromCenter);
-
-                            // Rotation for fan effect (bottom points to center)
-                            // At 270 (top), we want 0 deg rotation (upright) -> 270 + 90 = 360
-                            const rotation = angle + 90;
-
+                    <div className="flex-1 min-w-0 overflow-hidden">
+                      <div className="flex justify-between items-center mb-1">
+                        <div className="flex-1 overflow-hidden mr-2 relative h-4">
+                          {(() => {
+                            const trackName =
+                              parsedType === 0 && playlistTracks.length > 0
+                                ? playlistTracks[currentTrackIndex].name
+                                : "背景音乐";
+                            // Calculate visual length (Chinese ~ 2, English ~ 1)
+                            const visualLength = trackName
+                              .split("")
+                              .reduce(
+                                (acc: number, char: string) =>
+                                  acc + (char.charCodeAt(0) > 127 ? 2 : 1),
+                                0
+                              );
+                            const shouldScroll = visualLength > 12; // > 6 Chinese chars or 12 English chars
                             return (
                               <div
+                                className={`text-xs font-bold text-slate-200 absolute top-0 left-0 ${
+                                  shouldScroll
+                                    ? "animate-marquee"
+                                    : "truncate w-full"
+                                }`}
+                              >
+                                <span className="pr-8">{trackName}</span>
+                                {shouldScroll && (
+                                  <span className="pr-8">{trackName}</span>
+                                )}
+                              </div>
+                            );
+                          })()}
+                        </div>
+                        <span className="text-[10px] text-slate-500 font-mono">
+                          {formatTime(currentTime)} / {formatTime(duration)}
+                        </span>
+                      </div>
+
+                      {/* Progress Bar */}
+                      <div
+                        className="h-1 bg-slate-700 rounded-full overflow-hidden cursor-pointer group"
+                        onClick={(e) => {
+                          if (!audioRef.current || !duration) return;
+                          const rect = e.currentTarget.getBoundingClientRect();
+                          const x = e.clientX - rect.left;
+                          const percent = x / rect.width;
+                          audioRef.current.currentTime = percent * duration;
+                        }}
+                      >
+                        <div
+                          className="h-full bg-indigo-500 group-hover:bg-indigo-400 transition-all relative"
+                          style={{
+                            width: `${(currentTime / duration) * 100}%`,
+                          }}
+                        ></div>
+                      </div>
+                    </div>
+
+                    {/* Controls */}
+                    <div className="flex items-center gap-1">
+                      {parsedType === 0 && (
+                        <>
+                          <button
+                            onClick={togglePlayMode}
+                            className="w-6 h-6 rounded-full text-slate-400 hover:text-white flex items-center justify-center transition-all mr-1"
+                            title={
+                              playMode === "sequence"
+                                ? "顺序播放"
+                                : playMode === "shuffle"
+                                ? "随机播放"
+                                : "单曲循环"
+                            }
+                          >
+                            {playMode === "sequence" ? (
+                              <Repeat size={14} fill="currentColor" />
+                            ) : playMode === "shuffle" ? (
+                              <Shuffle size={14} fill="currentColor" />
+                            ) : (
+                              <Repeat1 size={14} fill="currentColor" />
+                            )}
+                          </button>
+                          <button
+                            onClick={playPrev}
+                            className="w-6 h-6 rounded-full text-slate-400 hover:text-white flex items-center justify-center transition-all"
+                          >
+                            <SkipBack size={14} fill="currentColor" />
+                          </button>
+                        </>
+                      )}
+
+                      <button
+                        onClick={togglePlay}
+                        className="w-8 h-8 rounded-full bg-indigo-600 hover:bg-indigo-500 text-white flex items-center justify-center transition-all shadow-lg shrink-0"
+                      >
+                        {isPlaying ? (
+                          <Pause size={14} fill="currentColor" />
+                        ) : (
+                          <Play
+                            size={14}
+                            fill="currentColor"
+                            className="ml-0.5"
+                          />
+                        )}
+                      </button>
+
+                      {parsedType === 0 && (
+                        <button
+                          onClick={() => playNext()}
+                          className="w-6 h-6 rounded-full text-slate-400 hover:text-white flex items-center justify-center transition-all"
+                        >
+                          <SkipForward size={14} fill="currentColor" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Playlist Tracks List */}
+                  {parsedType === 0 && (
+                    <div
+                      ref={playlistScrollRef}
+                      className="flex-1 overflow-y-auto custom-scrollbar bg-slate-900/50 border-t border-slate-700/50 overscroll-y-none"
+                    >
+                      <div ref={playlistContentRef}>
+                        {isLoadingPlaylist ? (
+                          <div className="p-4 text-center text-xs text-slate-500">
+                            正在加载歌单...
+                          </div>
+                        ) : playlistTracks.length > 0 ? (
+                          <div className="divide-y divide-slate-800/50">
+                            {playlistTracks.map((track, idx) => (
+                              <div
                                 key={track.id}
-                                className={`absolute rounded-[24px] shadow-xl border-2 transition-all duration-300 flex items-center justify-center overflow-hidden pointer-events-auto cursor-pointer group/item
+                                ref={
+                                  currentTrackIndex === idx
+                                    ? activeTrackRef
+                                    : null
+                                }
+                                onClick={() => setCurrentTrackIndex(idx)}
+                                className={`p-2 flex items-center gap-2 cursor-pointer transition-colors hover:bg-slate-800/50 group ${
+                                  currentTrackIndex === idx
+                                    ? "bg-indigo-500/10"
+                                    : ""
+                                }`}
+                              >
+                                {/* Track Number / Play Icon */}
+                                <span
+                                  className={`text-[10px] w-6 text-center shrink-0 ${
+                                    currentTrackIndex === idx
+                                      ? "text-indigo-400 font-bold"
+                                      : "text-slate-600 group-hover:text-slate-400"
+                                  }`}
+                                >
+                                  {currentTrackIndex === idx ? (
+                                    <div className="w-2 h-2 rounded-full bg-indigo-500 mx-auto animate-pulse shadow-[0_0_8px_rgba(99,102,241,0.5)]" />
+                                  ) : (
+                                    idx + 1
+                                  )}
+                                </span>
+
+                                {/* Album Art (Small) */}
+                                <div className="w-8 h-8 rounded bg-slate-800 overflow-hidden shrink-0 border border-slate-700/50">
+                                  {track.album?.picUrl || track.al?.picUrl ? (
+                                    <img
+                                      src={
+                                        track.album?.picUrl || track.al?.picUrl
+                                      }
+                                      alt=""
+                                      className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity"
+                                    />
+                                  ) : (
+                                    <div className="w-full h-full flex items-center justify-center text-slate-600">
+                                      <Disc size={12} />
+                                    </div>
+                                  )}
+                                </div>
+
+                                <div className="flex-1 min-w-0">
+                                  <div
+                                    className={`text-xs truncate font-medium ${
+                                      currentTrackIndex === idx
+                                        ? "text-indigo-300"
+                                        : "text-slate-300 group-hover:text-slate-200"
+                                    }`}
+                                  >
+                                    {track.name}
+                                  </div>
+                                  <div className="text-[10px] text-slate-500 truncate group-hover:text-slate-400">
+                                    {track.artists
+                                      ?.map((a: any) => a.name)
+                                      .join(", ") ||
+                                      track.ar
+                                        ?.map((a: any) => a.name)
+                                        .join(", ")}
+                                  </div>
+                                </div>
+                                <span className="text-[10px] text-slate-600 font-mono shrink-0">
+                                  {formatTime(
+                                    track.duration / 1000 || track.dt / 1000
+                                  )}
+                                </span>
+                              </div>
+                            ))}
+
+                            {/* Sentinel / Load More Indicator */}
+                            {playlistTracks.length < allTrackIds.length && (
+                              <div
+                                ref={loadMoreRef}
+                                onClick={loadMoreTracks}
+                                className="p-3 text-center text-[10px] text-slate-500 hover:text-indigo-400 cursor-pointer transition-colors"
+                              >
+                                {isLoadingMore ? (
+                                  <span className="flex items-center justify-center gap-2">
+                                    <div
+                                      className="w-1.5 h-1.5 bg-indigo-500 rounded-full animate-bounce"
+                                      style={{ animationDelay: "0ms" }}
+                                    />
+                                    <div
+                                      className="w-1.5 h-1.5 bg-indigo-500 rounded-full animate-bounce"
+                                      style={{ animationDelay: "150ms" }}
+                                    />
+                                    <div
+                                      className="w-1.5 h-1.5 bg-indigo-500 rounded-full animate-bounce"
+                                      style={{ animationDelay: "300ms" }}
+                                    />
+                                  </span>
+                                ) : (
+                                  "滚动或点击加载更多"
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <div className="p-4 text-center flex flex-col items-center gap-2">
+                            <span className="text-xs text-slate-500">
+                              无法加载歌单信息
+                            </span>
+                            <Button
+                              size="xs"
+                              variant="ghost"
+                              onClick={() =>
+                                parsedId && fetchPlaylist(parsedId)
+                              }
+                              className="text-indigo-400 hover:text-indigo-300"
+                            >
+                              点击重试
+                            </Button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                // Fixed Mode: Radial / Stair Layout
+                <div
+                  className={`absolute bottom-[26px] right-[26px] pointer-events-none transition-all duration-500 cubic-bezier(0.34, 1.56, 0.64, 1) origin-bottom-right ${
+                    isCollapsed
+                      ? "opacity-0 scale-0 rotate-45"
+                      : "opacity-100 scale-100 rotate-0"
+                  }`}
+                >
+                  {parsedType === 0 && playlistTracks.length > 0
+                    ? (() => {
+                        // Calculate visible range: Current + Neighbors (No Looping for start/end)
+                        const total = playlistTracks.length;
+                        const VISIBLE_COUNT = 6;
+                        const items = [];
+
+                        for (let i = 0; i < VISIBLE_COUNT; i++) {
+                          const offset = i - 2;
+                          const targetIndex = visualTrackIndex + offset;
+                          if (targetIndex >= 0 && targetIndex < total) {
+                            items.push({
+                              track: playlistTracks[targetIndex],
+                              index: targetIndex,
+                            });
+                          } else {
+                            items.push(null);
+                          }
+                        }
+
+                        return (
+                          <div className="relative w-0 h-0">
+                            {items.map((item, i) => {
+                              if (!item) return null;
+                              const { track, index: realIndex } = item;
+
+                              // Logic to determine if this is the active one (center of our window)
+                              // We picked 6 items, starting from current-2. So index 2 is current.
+                              const isVisualCenter = i === 2;
+                              const distanceFromCenter = i - 2; // -2, -1, 0, 1, 2, 3
+                              const isPlayingTrack =
+                                realIndex === currentTrackIndex;
+
+                              // Calculate position based on fan/stair
+                              // Angle: 0 is right, -90 is top, 180 is left.
+                              // We want them top-leftish. Button is at bottom-right of this container.
+                              // Let's span from 180 (left) to 270 (top).
+                              // Center item (current) at 225 deg (top-left diagonal)
+                              const baseAngle = 225;
+                              const angleStep = 18; // Even tighter spacing
+                              const angle =
+                                baseAngle + distanceFromCenter * angleStep;
+                              const rad = (angle * Math.PI) / 180;
+
+                              // Further radius as requested
+                              const radius =
+                                105 + Math.abs(distanceFromCenter) * 6;
+
+                              // Adjust center to button center (origin is now at button center)
+                              const x = Math.cos(rad) * radius;
+                              const y = Math.sin(rad) * radius;
+
+                              // Size scaling
+                              const size = isVisualCenter ? 80 : 60; // Rectangular/Square cards need more space
+                              const zIndex = isVisualCenter
+                                ? 50
+                                : 40 - Math.abs(distanceFromCenter);
+
+                              // Rotation for fan effect (bottom points to center)
+                              // At 270 (top), we want 0 deg rotation (upright) -> 270 + 90 = 360
+                              const rotation = angle + 90;
+
+                              return (
+                                <div
+                                  key={track.id}
+                                  className={`absolute rounded-[24px] shadow-xl border-2 transition-all duration-300 flex items-center justify-center overflow-hidden pointer-events-auto cursor-pointer group/item
                                     ${
                                       isVisualCenter
                                         ? "border-indigo-500 z-50 ring-2 ring-indigo-500/20"
                                         : "border-slate-700 hover:border-slate-500 bg-slate-800"
                                     }
                                 `}
-                                style={{
-                                  width: size,
-                                  height: size,
-                                  transform: `translate(${x}px, ${y}px) translate(-50%, -50%) rotate(${rotation}deg)`,
-                                  zIndex,
-                                  opacity:
-                                    1 - Math.abs(distanceFromCenter) * 0.1, // Less fade
-                                }}
-                                onWheel={(e) => {
-                                  e.stopPropagation();
-                                  const now = Date.now();
-                                  if (now - lastScrollRef.current < 100) return; // Faster throttle for smooth preview
-                                  lastScrollRef.current = now;
-                                  if (e.deltaY > 0) {
-                                    if (visualTrackIndex < total - 1) {
-                                      setVisualTrackIndex((prev) => prev + 1);
+                                  style={{
+                                    width: size,
+                                    height: size,
+                                    transform: `translate(${x}px, ${y}px) translate(-50%, -50%) rotate(${rotation}deg)`,
+                                    zIndex,
+                                    opacity:
+                                      1 - Math.abs(distanceFromCenter) * 0.1, // Less fade
+                                  }}
+                                  onWheel={(e) => {
+                                    e.stopPropagation();
+                                    const now = Date.now();
+                                    if (now - lastScrollRef.current < 100)
+                                      return; // Faster throttle for smooth preview
+                                    lastScrollRef.current = now;
+                                    if (e.deltaY > 0) {
+                                      if (visualTrackIndex < total - 1) {
+                                        setVisualTrackIndex((prev) => prev + 1);
+                                      }
+                                    } else {
+                                      if (visualTrackIndex > 0) {
+                                        setVisualTrackIndex((prev) => prev - 1);
+                                      }
                                     }
-                                  } else {
-                                    if (visualTrackIndex > 0) {
-                                      setVisualTrackIndex((prev) => prev - 1);
+                                  }}
+                                  onClick={() => {
+                                    if (isPlayingTrack) {
+                                      togglePlay();
+                                    } else {
+                                      setCurrentTrackIndex(realIndex);
                                     }
-                                  }
-                                }}
-                                onClick={() => {
-                                  if (isPlayingTrack) {
-                                    togglePlay();
-                                  } else {
-                                    setCurrentTrackIndex(realIndex);
-                                  }
-                                }}
-                                title={track.name}
-                              >
-                                {track.album?.picUrl || track.al?.picUrl ? (
-                                  <img
-                                    src={
-                                      track.album?.picUrl || track.al?.picUrl
-                                    }
-                                    alt={track.name}
-                                    className={`w-full h-full object-cover ${
-                                      !isPlayingTrack && isVisualCenter
-                                        ? "grayscale-[50%]"
-                                        : ""
-                                    }`}
-                                  />
-                                ) : (
-                                  <Music
-                                    size={size / 2}
-                                    className="text-slate-500"
-                                  />
-                                )}
-
-                                {/* Play/Pause Overlay */}
-                                <div
-                                  className={`absolute inset-0 bg-black/30 flex items-center justify-center transition-opacity ${
-                                    isVisualCenter || isPlayingTrack
-                                      ? "opacity-100"
-                                      : "opacity-0 group-hover/item:opacity-100"
-                                  }`}
+                                  }}
+                                  title={track.name}
                                 >
-                                  {isPlayingTrack ? (
-                                    isPlaying ? (
-                                      <Pause size={20} className="text-white" />
-                                    ) : (
-                                      <Play size={20} className="text-white" />
-                                    )
+                                  {track.album?.picUrl || track.al?.picUrl ? (
+                                    <img
+                                      src={
+                                        track.album?.picUrl || track.al?.picUrl
+                                      }
+                                      alt={track.name}
+                                      className={`w-full h-full object-cover ${
+                                        !isPlayingTrack && isVisualCenter
+                                          ? "grayscale-[50%]"
+                                          : ""
+                                      }`}
+                                    />
                                   ) : (
-                                    // Show play icon on hover or if it's the focused card (to indicate "click to play")
-                                    isVisualCenter && (
-                                      <Play
-                                        size={20}
-                                        className="text-white/70"
+                                    <Music
+                                      size={size / 2}
+                                      className="text-slate-500"
+                                    />
+                                  )}
+
+                                  {/* Play/Pause Overlay */}
+                                  <div
+                                    className={`absolute inset-0 bg-black/30 flex items-center justify-center transition-opacity ${
+                                      isVisualCenter || isPlayingTrack
+                                        ? "opacity-100"
+                                        : "opacity-0 group-hover/item:opacity-100"
+                                    }`}
+                                  >
+                                    {isPlayingTrack ? (
+                                      isPlaying ? (
+                                        <Pause
+                                          size={20}
+                                          className="text-white"
+                                        />
+                                      ) : (
+                                        <Play
+                                          size={20}
+                                          className="text-white"
+                                        />
+                                      )
+                                    ) : (
+                                      // Show play icon on hover or if it's the focused card (to indicate "click to play")
+                                      isVisualCenter && (
+                                        <Play
+                                          size={20}
+                                          className="text-white/70"
+                                        />
+                                      )
+                                    )}
+                                  </div>
+
+                                  {/* Progress Bar for Current - Only if Playing */}
+                                  {isPlayingTrack && (
+                                    <div
+                                      className="absolute -bottom-3 left-1/2 -translate-x-1/2 w-16 h-1 bg-slate-700/80 rounded-full overflow-hidden pointer-events-auto"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        if (!audioRef.current || !duration)
+                                          return;
+                                        const rect =
+                                          e.currentTarget.getBoundingClientRect();
+                                        const x = e.clientX - rect.left;
+                                        const percent = x / rect.width;
+                                        audioRef.current.currentTime =
+                                          percent * duration;
+                                      }}
+                                    >
+                                      <div
+                                        className="h-full bg-indigo-500"
+                                        style={{
+                                          width: `${
+                                            (currentTime / duration) * 100
+                                          }%`,
+                                        }}
                                       />
-                                    )
+                                    </div>
                                   )}
                                 </div>
+                              );
+                            })}
+                          </div>
+                        );
+                      })()
+                    : null}
+                </div>
+              ))}
 
-                                {/* Progress Bar for Current - Only if Playing */}
-                                {isPlayingTrack && (
-                                  <div
-                                    className="absolute -bottom-3 left-1/2 -translate-x-1/2 w-16 h-1 bg-slate-700/80 rounded-full overflow-hidden pointer-events-auto"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      if (!audioRef.current || !duration)
-                                        return;
-                                      const rect =
-                                        e.currentTarget.getBoundingClientRect();
-                                      const x = e.clientX - rect.left;
-                                      const percent = x / rect.width;
-                                      audioRef.current.currentTime =
-                                        percent * duration;
-                                    }}
-                                  >
-                                    <div
-                                      className="h-full bg-indigo-500"
-                                      style={{
-                                        width: `${
-                                          (currentTime / duration) * 100
-                                        }%`,
-                                      }}
-                                    />
-                                  </div>
-                                )}
-                              </div>
-                            );
-                          })}
-                        </div>
-                      );
-                    })()
-                  : null}
+            {/* Controls */}
+            {mode === "sidebar" && isKP && (
+              <div className="flex shrink-0 flex-row w-full justify-end items-center mt-2">
+                <button
+                  onClick={() => setShowInput(!showInput)}
+                  className={`p-3 rounded-full shadow-lg transition-all border border-white/5 ${
+                    showInput
+                      ? "bg-indigo-600 text-white"
+                      : "bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-white"
+                  }`}
+                  title="设置背景音乐"
+                >
+                  <Music size={20} />
+                </button>
               </div>
-            ))}
-
-          {/* Controls */}
-          {mode === "sidebar" && isKP && (
-            <div className="flex shrink-0 flex-row w-full justify-end items-center mt-2">
-              <button
-                onClick={() => setShowInput(!showInput)}
-                className={`p-3 rounded-full shadow-lg transition-all border border-white/5 ${
-                  showInput
-                    ? "bg-indigo-600 text-white"
-                    : "bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-white"
-                }`}
-                title="设置背景音乐"
-              >
-                <Music size={20} />
-              </button>
-            </div>
-          )}
+            )}
+          </div>
         </div>
       </div>
-    </div>
-  );
+    );
 
   if (mode === "fixed" && !isMobile) {
     return (

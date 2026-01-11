@@ -18,7 +18,7 @@ import {
 import { Button } from "./components/UI";
 import { MusicPlayer } from "./components/MusicPlayer";
 import { ModuleInfo, Character, Log } from "./types"; // Removed AppData as it might not be used anymore
-import { Menu, LogOut } from "lucide-react";
+import { Menu, LogOut, Volume2, VolumeX } from "lucide-react";
 import { parseDiceCommand } from "./utils/commandParser";
 import { useLevelSystem } from "./hooks/useLevelSystem";
 import { calculateDBAndBuild } from "./utils/cocRules";
@@ -111,6 +111,9 @@ const App: React.FC = () => {
   const [userNickname, setUserNickname] = useState<string>("");
   const [isVip, setIsVip] = useState(false);
   const [bgMusicUrl, setBgMusicUrl] = useState<string | null>(null);
+  const [isMusicPlaying, setIsMusicPlaying] = useState(false);
+  const [musicTrackIndex, setMusicTrackIndex] = useState(0);
+  const [globalMute, setGlobalMute] = useState(false);
 
   // Load More Logs Logic
   const handleLoadMoreLogs = async () => {
@@ -828,6 +831,12 @@ const App: React.FC = () => {
           if (newRoom.bg_music_url !== undefined) {
             setBgMusicUrl(newRoom.bg_music_url);
           }
+          if (newRoom.is_music_playing !== undefined) {
+            setIsMusicPlaying(newRoom.is_music_playing);
+          }
+          if (newRoom.music_track_index !== undefined) {
+            setMusicTrackIndex(newRoom.music_track_index);
+          }
           setModuleInfo((prev) => ({
             ...prev,
             title: newRoom.title !== undefined ? newRoom.title : prev.title,
@@ -915,6 +924,8 @@ const App: React.FC = () => {
       setIsKP(userIsKP);
       setKpId(room.kp_id);
       setBgMusicUrl(room.bg_music_url);
+      setIsMusicPlaying(room.is_music_playing || false);
+      setMusicTrackIndex(room.music_track_index || 0);
 
       // URL Persistence
       if (!isRestoring) {
@@ -2233,6 +2244,22 @@ const App: React.FC = () => {
     }
   };
 
+  const handleUpdateMusicState = async (
+    isPlaying: boolean,
+    trackIndex: number
+  ) => {
+    if (!currentRoomId || !isKP) return;
+    const { error } = await supabase
+      .from("rooms")
+      .update({
+        is_music_playing: isPlaying,
+        music_track_index: trackIndex,
+      })
+      .eq("id", currentRoomId);
+
+    if (error) console.error("Failed to update music state:", error);
+  };
+
   const derivedCharacters = characters.map((c) => ({
     ...c,
     isOnline: c.user_id ? onlineUsers.has(c.user_id) : false,
@@ -2323,6 +2350,15 @@ const App: React.FC = () => {
             <Button
               variant="ghost"
               size={isMobile ? "icon" : "sm"}
+              icon={globalMute ? VolumeX : Volume2}
+              onClick={() => setGlobalMute(!globalMute)}
+              title={globalMute ? "取消静音" : "静音"}
+            >
+              {!isMobile && (globalMute ? "已静音" : "静音")}
+            </Button>
+            <Button
+              variant="ghost"
+              size={isMobile ? "icon" : "sm"}
               icon={LogOut}
               onClick={handleLeaveRoom}
               title="退出房间"
@@ -2393,6 +2429,10 @@ const App: React.FC = () => {
           }
           isMobile={isMobile}
           isHidden={view === "setup"}
+          globalMute={globalMute}
+          syncedIsPlaying={isMusicPlaying}
+          syncedTrackIndex={musicTrackIndex}
+          onUpdateSyncState={handleUpdateMusicState}
         />
       </main>
 

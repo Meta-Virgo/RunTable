@@ -201,14 +201,18 @@ export const Square: React.FC<SquareProps> = ({ onScrollChange }) => {
 
         if (onScrollChange) {
           const diff = scrollTop - lastScrollTop.current;
-          // Threshold to avoid jitter
-          if (Math.abs(diff) > 10) {
-            if (diff > 0 && scrollTop > 50) {
-              // Only hide when scrolling down and not at very top
+          const isScrollingDown = diff > 0;
+          const threshold = isScrollingDown ? 10 : 300;
+
+          if (Math.abs(diff) > threshold) {
+            if (isScrollingDown && scrollTop > 50) {
               onScrollChange("down");
-            } else if (diff < 0) {
+            } else if (!isScrollingDown || scrollTop < 20) {
               onScrollChange("up");
             }
+            lastScrollTop.current = scrollTop;
+          } else if (scrollTop < 20) {
+            onScrollChange("up");
             lastScrollTop.current = scrollTop;
           }
         }

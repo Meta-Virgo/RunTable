@@ -115,19 +115,47 @@ export const useElasticScroll = (
       ) {
         if (e.cancelable && state.current.overscroll !== 0) {
           e.preventDefault(); // Lock scroll if we are strictly in overscroll mode
-        } else if (
-          e.cancelable &&
-          ((isAtTop && delta > 0) || (isAtBottom && delta < 0))
-        ) {
-          // Usually we don't prevent default immediately to allow native scroll to start?
-          // But to do custom overscroll we must prevent native overscroll
-          // e.preventDefault();
-          // Chrome treats touchmove as passive by default, so we can't preventDefault unless we add listener with passive: false
         }
 
-        const resistanceFactor =
-          1 / (1 + Math.abs(state.current.overscroll) * 0.005);
-        state.current.overscroll += delta * resistanceFactor * resistance;
+        // Check if we are returning to neutral (opposing the overscroll)
+        const isReturning =
+          (state.current.overscroll > 0 && delta < 0) ||
+          (state.current.overscroll < 0 && delta > 0);
+
+        if (isReturning) {
+          // Accelerate the return to 0 to make it feel "responsive"
+          // User wants to start scrolling immediately without waiting for long overscroll recovery
+          const returnSpeed = 4; // 4x speed for recovery
+          const change = delta * returnSpeed;
+          const newOverscroll = state.current.overscroll + change;
+
+          if (
+            (state.current.overscroll > 0 && newOverscroll < 0) ||
+            (state.current.overscroll < 0 && newOverscroll > 0)
+          ) {
+            // We crossed 0.
+            const oldOverscroll = state.current.overscroll;
+            state.current.overscroll = 0;
+
+            // Calculate how much delta was "unused" by the overscroll recovery
+            // The part of delta that brought overscroll to exactly 0 is `deltaToZero`.
+            // deltaToZero * returnSpeed = -oldOverscroll
+            // deltaToZero = -oldOverscroll / returnSpeed
+            const deltaToZero = -oldOverscroll / returnSpeed;
+            const remainingDelta = delta - deltaToZero;
+
+            // Apply remaining delta to scrollTop (1:1 physics)
+            scrollEl.scrollTop -= remainingDelta;
+          } else {
+            state.current.overscroll = newOverscroll;
+          }
+        } else {
+          // Apply resistance when pulling away
+          const resistanceFactor =
+            1 / (1 + Math.abs(state.current.overscroll) * 0.005);
+          state.current.overscroll += delta * resistanceFactor * resistance;
+        }
+
         updateTransform();
       }
     };
