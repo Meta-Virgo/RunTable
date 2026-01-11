@@ -202,7 +202,7 @@ export const Square: React.FC<SquareProps> = ({ onScrollChange }) => {
         if (onScrollChange) {
           const diff = scrollTop - lastScrollTop.current;
           const isScrollingDown = diff > 0;
-          const threshold = isScrollingDown ? 10 : 300;
+          const threshold = isScrollingDown ? 10 : 800;
 
           if (Math.abs(diff) > threshold) {
             if (isScrollingDown && scrollTop > 50) {

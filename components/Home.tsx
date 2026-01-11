@@ -271,7 +271,7 @@ export const Home: React.FC<HomeProps> = ({
 
         const diff = scrollTop - lastScrollTop.current;
         const isScrollingDown = diff > 0;
-        const threshold = isScrollingDown ? 10 : 300; // 向下敏感(10)，向上大幅增加阈值(300)
+        const threshold = isScrollingDown ? 10 : 800; // 向下敏感(10)，向上极大阈值(800)防止误触
 
         if (Math.abs(diff) > threshold) {
           if (isScrollingDown && scrollTop > 50) {
