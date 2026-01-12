@@ -15,9 +15,11 @@ import {
   Package,
   Plus,
   Minus,
+  Edit,
 } from "lucide-react";
 import { Modal, Input, Textarea, Button, NumberStepper, cn } from "./UI";
 import { AvatarUpload } from "./AvatarUpload";
+import { AttributeRadar } from "./AttributeRadar";
 import { ModuleInfo, Character, InventoryItem } from "../types";
 import { calculateDBAndBuild } from "../utils/cocRules";
 
@@ -176,23 +178,47 @@ const ItemListEditor: React.FC<{
   const [newItemQty, setNewItemQty] = useState(1);
   const [newItemDesc, setNewItemDesc] = useState("");
   const [isAdding, setIsAdding] = useState(false);
+  const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [expandedIndex, setExpandedIndex] = useState<number | null>(null);
   const inputRef = React.useRef<HTMLInputElement>(null);
 
   const handleAdd = () => {
     if (!newItemName.trim()) return;
-    onChange([
-      ...items,
-      {
+
+    if (editingIndex !== null) {
+      const newItems = [...items];
+      newItems[editingIndex] = {
         name: newItemName.trim(),
         quantity: newItemQty,
         description: newItemDesc.trim(),
-      },
-    ]);
+      };
+      onChange(newItems);
+    } else {
+      onChange([
+        ...items,
+        {
+          name: newItemName.trim(),
+          quantity: newItemQty,
+          description: newItemDesc.trim(),
+        },
+      ]);
+    }
+
     setNewItemName("");
     setNewItemDesc("");
     setNewItemQty(1);
+    setEditingIndex(null);
     setIsAdding(false);
+  };
+
+  const handleEdit = (index: number) => {
+    const item = items[index];
+    setNewItemName(item.name);
+    setNewItemQty(item.quantity);
+    setNewItemDesc(item.description || "");
+    setEditingIndex(index);
+    setIsAdding(true);
+    setTimeout(() => inputRef.current?.focus(), 100);
   };
 
   const handleRemove = (index: number) => {
@@ -223,6 +249,10 @@ const ItemListEditor: React.FC<{
         {!disabled && !isAdding && (
           <Button
             onClick={() => {
+              setNewItemName("");
+              setNewItemQty(1);
+              setNewItemDesc("");
+              setEditingIndex(null);
               setIsAdding(true);
               setTimeout(() => inputRef.current?.focus(), 100);
             }}
@@ -251,7 +281,10 @@ const ItemListEditor: React.FC<{
                   // But for now let's just submit if description is empty or user wants to.
                   // Actually, better to let them tab to description.
                 }
-                if (e.key === "Escape") setIsAdding(false);
+                if (e.key === "Escape") {
+                  setIsAdding(false);
+                  setEditingIndex(null);
+                }
               }}
             />
             <div className="flex items-center gap-1 border-l border-white/10 pl-2">
@@ -278,9 +311,24 @@ const ItemListEditor: React.FC<{
                 e.preventDefault();
                 handleAdd();
               }
+              if (e.key === "Escape") {
+                setIsAdding(false);
+                setEditingIndex(null);
+              }
             }}
           />
-          <div className="flex justify-end">
+          <div className="flex justify-end gap-2">
+            <Button
+              onClick={() => {
+                setIsAdding(false);
+                setEditingIndex(null);
+              }}
+              variant="ghost"
+              size="sm"
+              className="shrink-0 shadow-none h-7 py-0"
+            >
+              取消
+            </Button>
             <Button
               onClick={handleAdd}
               variant="primary"
@@ -288,7 +336,7 @@ const ItemListEditor: React.FC<{
               className="shrink-0 shadow-none h-7 py-0"
               disabled={!newItemName.trim()}
             >
-              确定
+              {editingIndex !== null ? "保存" : "确定"}
             </Button>
           </div>
         </div>
@@ -322,18 +370,39 @@ const ItemListEditor: React.FC<{
                     className="flex gap-1 opacity-100 transition-opacity"
                     onClick={(e) => e.stopPropagation()}
                   >
-                    <button
-                      onClick={() => handleUpdateQty(idx, 1)}
-                      className="p-1 hover:text-indigo-400 text-slate-500 transition-colors"
-                    >
-                      <Plus size={12} />
-                    </button>
-                    <button
-                      onClick={() => handleUpdateQty(idx, -1)}
-                      className="p-1 hover:text-red-400 text-slate-500 transition-colors"
-                    >
-                      <Minus size={12} />
-                    </button>
+                    {title === "法术 / 能力" ? (
+                      <>
+                        <button
+                          onClick={() => handleEdit(idx)}
+                          className="p-1 hover:text-indigo-400 text-slate-500 transition-colors"
+                          title="编辑"
+                        >
+                          <Edit size={12} />
+                        </button>
+                        <button
+                          onClick={() => handleRemove(idx)}
+                          className="p-1 hover:text-red-400 text-slate-500 transition-colors"
+                          title="删除"
+                        >
+                          <Trash2 size={12} />
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <button
+                          onClick={() => handleUpdateQty(idx, 1)}
+                          className="p-1 hover:text-indigo-400 text-slate-500 transition-colors"
+                        >
+                          <Plus size={12} />
+                        </button>
+                        <button
+                          onClick={() => handleUpdateQty(idx, -1)}
+                          className="p-1 hover:text-red-400 text-slate-500 transition-colors"
+                        >
+                          <Minus size={12} />
+                        </button>
+                      </>
+                    )}
                   </div>
                 )}
               </div>
@@ -587,6 +656,11 @@ export const CharacterModal: React.FC<{
                 </div>
               )}
             </div>
+
+            <AttributeRadar
+              character={form}
+              className="mt-6 border-t border-white/5 pt-6"
+            />
           </div>
           <div className="md:col-span-1 bg-slate-900/40 p-5 rounded-2xl border border-white/5 flex flex-col h-full">
             <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-4 flex items-center gap-2">

@@ -2246,6 +2246,8 @@ const App: React.FC = () => {
     }
   };
 
+  const hasWarnedSchemaRef = useRef(false);
+
   const handleUpdateMusicState = async (
     isPlaying: boolean,
     trackIndex: number
@@ -2265,6 +2267,12 @@ const App: React.FC = () => {
         console.warn(
           "PGRST204 Error: The 'is_music_playing' column is missing in Supabase schema cache. Please reload the schema cache in Supabase Dashboard."
         );
+        if (!hasWarnedSchemaRef.current) {
+          alert(
+            "【系统警告】检测到数据库配置未同步，背景音乐同步功能失效。\n请前往 Supabase 后台刷新 Schema Cache (Settings -> API -> Reload schema cache)。"
+          );
+          hasWarnedSchemaRef.current = true;
+        }
       }
     }
   };

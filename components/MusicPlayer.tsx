@@ -2,10 +2,6 @@ import React, { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import {
   Music,
-  Volume2,
-  VolumeX,
-  X,
-  ListMusic,
   Disc,
   Play,
   Pause,
@@ -14,6 +10,8 @@ import {
   Repeat,
   Repeat1,
   Shuffle,
+  X,
+  ListMusic,
 } from "lucide-react";
 import { Button } from "./UI";
 import { useElasticScroll } from "../hooks/useElasticScroll";
@@ -46,7 +44,7 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
   syncedTrackIndex,
   onUpdateSyncState,
 }) => {
-  const [isMuted, setIsMuted] = useState(false); // Local mute (sets volume to 0 / pauses)
+  // const [isMuted, setIsMuted] = useState(false); // Local mute (sets volume to 0 / pauses)
   const [showInput, setShowInput] = useState(false);
   const [inputUrl, setInputUrl] = useState("");
   const [musicType, setMusicType] = useState<"song" | "playlist">("song");
@@ -63,7 +61,7 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
   const lastScrollRef = useRef(0);
   const isFirstMount = useRef(true);
   const [isPlaying, setIsPlaying] = useState(false);
-  const [volume, setVolume] = useState(0.5);
+  // const [volume, setVolume] = useState(0.5);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
 
@@ -106,9 +104,9 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
   // 3. Global Mute
   useEffect(() => {
     if (audioRef.current) {
-      audioRef.current.muted = isMuted || globalMute;
+      audioRef.current.muted = globalMute;
     }
-  }, [isMuted, globalMute]);
+  }, [globalMute]);
 
   // Sync visual track index with current track index
   useEffect(() => {
@@ -133,10 +131,10 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
 
   useEffect(() => {
     // Restore volume from local storage
-    const savedVol = localStorage.getItem("runtable_bgm_volume");
-    if (savedVol) {
-      setVolume(parseFloat(savedVol));
-    }
+    // const savedVol = localStorage.getItem("runtable_bgm_volume");
+    // if (savedVol) {
+    //   // setVolume(parseFloat(savedVol));
+    // }
   }, []);
 
   // Sync input state when not editing
@@ -186,6 +184,63 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
           previousPlaylistIdRef.current = id;
           fetchPlaylist(id);
         }
+      } else if (type === 2 && id) {
+        // Fetch single song detail
+        const fetchSingleSong = async () => {
+          setIsLoadingPlaylist(true);
+          setPlaylistTracks([]);
+          setAllTrackIds([{ id }]); // Pseudo track ID
+
+          // Set single loop mode
+          setPlayMode("single");
+          setCurrentTrackIndex(0);
+          setVisualTrackIndex(0);
+
+          const endpoints = [
+            {
+              url: `https://corsproxy.io/?${encodeURIComponent(
+                `https://music.163.com/api/song/detail?ids=[${id}]`
+              )}`,
+              name: "corsproxy-v6",
+            },
+            {
+              url: `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(
+                `https://music.163.com/api/song/detail?ids=[${id}]`
+              )}`,
+              name: "codetabs-v6",
+            },
+          ];
+
+          let success = false;
+          for (const endpoint of endpoints) {
+            try {
+              const res = await fetch(endpoint.url);
+              if (!res.ok) continue;
+              const data = await res.json();
+              const songs = data.songs || [];
+              if (songs.length > 0) {
+                setPlaylistTracks(songs);
+                success = true;
+                break;
+              }
+            } catch (e) {
+              console.warn(
+                `Failed to fetch song detail via ${endpoint.name}`,
+                e
+              );
+            }
+          }
+
+          if (!success) {
+            // If fetch fails, we might still want to try playing it (metadata might load from audio)
+            // But we won't have cover art.
+            console.warn("Failed to fetch song details for UI");
+          }
+          setIsLoadingPlaylist(false);
+        };
+
+        fetchSingleSong();
+        previousPlaylistIdRef.current = null;
       } else {
         setPlaylistTracks([]);
         previousPlaylistIdRef.current = null;
@@ -295,19 +350,52 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
 
       console.log(`Loading more tracks: ${nextIds.length} items`);
 
-      // Use song/detail API via corsproxy
-      const url = `https://corsproxy.io/?${encodeURIComponent(
-        `https://music.163.com/api/song/detail?ids=[${nextIds.join(",")}]`
-      )}`;
+      // Use song/detail API via corsproxy (with fallback)
+      const endpoints = [
+        // Strategy 1: V6 API via corsproxy.io (usually most robust)
+        {
+          url: `https://corsproxy.io/?${encodeURIComponent(
+            `https://music.163.com/api/song/detail?ids=[${nextIds.join(",")}]`
+          )}`,
+          name: "corsproxy-v6",
+        },
+        // Strategy 2: CodeTabs Proxy (Backup)
+        {
+          url: `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(
+            `https://music.163.com/api/song/detail?ids=[${nextIds.join(",")}]`
+          )}`,
+          name: "codetabs-v6",
+        },
+      ];
 
-      const res = await fetch(url);
-      if (!res.ok) throw new Error("Fetch failed");
+      let success = false;
+      let lastError = null;
 
-      const data = await res.json();
-      const newTracks = data.songs || [];
+      for (const endpoint of endpoints) {
+        try {
+          console.log(`Loading more tracks via ${endpoint.name}...`);
+          const res = await fetch(endpoint.url);
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
-      if (newTracks.length > 0) {
-        setPlaylistTracks((prev) => [...prev, ...newTracks]);
+          const data = await res.json();
+          const newTracks = data.songs || [];
+
+          if (newTracks.length > 0) {
+            setPlaylistTracks((prev) => [...prev, ...newTracks]);
+            success = true;
+            break; // Stop if successful
+          }
+        } catch (error) {
+          console.warn(
+            `Failed to load more tracks via ${endpoint.name}:`,
+            error
+          );
+          lastError = error;
+        }
+      }
+
+      if (!success) {
+        console.error("All load more strategies failed", lastError);
       }
     } catch (e) {
       console.error("Failed to load more tracks", e);
@@ -454,23 +542,23 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
           audioRef.current.dataset.currentId = String(trackId);
 
           // Auto play if not muted locally
-          if (!isMuted) {
-            const shouldPlay =
-              !isFirstMount.current || (!isKP && syncedIsPlaying);
+          // if (!isMuted) {
+          const shouldPlay =
+            !isFirstMount.current || (!isKP && syncedIsPlaying);
 
-            if (shouldPlay) {
-              const playPromise = audioRef.current.play();
-              if (playPromise !== undefined) {
-                playPromise.catch((e) => console.warn("Auto-play blocked:", e));
-              }
-              setIsPlaying(true);
+          if (shouldPlay) {
+            const playPromise = audioRef.current.play();
+            if (playPromise !== undefined) {
+              playPromise.catch((e) => console.warn("Auto-play blocked:", e));
             }
-
-            // Always clear first mount flag after first load attempt
-            if (isFirstMount.current) {
-              isFirstMount.current = false;
-            }
+            setIsPlaying(true);
           }
+
+          // Always clear first mount flag after first load attempt
+          if (isFirstMount.current) {
+            isFirstMount.current = false;
+          }
+          // }
         } catch (e) {
           console.error("Error loading audio:", e);
         }
@@ -487,7 +575,6 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
     parsedType,
     playlistTracks,
     currentTrackIndex,
-    isMuted,
     syncedIsPlaying,
     isKP,
   ]);
@@ -560,18 +647,18 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
   };
 
   // Handle Volume
-  const handleVolumeChange = (newVol: number) => {
-    setVolume(newVol);
-    localStorage.setItem("runtable_bgm_volume", newVol.toString());
-    if (audioRef.current) {
-      audioRef.current.volume = newVol;
-    }
-    if (newVol === 0) {
-      setIsMuted(true);
-    } else if (isMuted) {
-      setIsMuted(false);
-    }
-  };
+  // const handleVolumeChange = (newVol: number) => {
+  //   setVolume(newVol);
+  //   localStorage.setItem("runtable_bgm_volume", newVol.toString());
+  //   if (audioRef.current) {
+  //     audioRef.current.volume = newVol;
+  //   }
+  //   if (newVol === 0) {
+  //     setIsMuted(true);
+  //   } else if (isMuted) {
+  //     setIsMuted(false);
+  //   }
+  // };
 
   // Sync Audio Events
   const onTimeUpdate = () => {
@@ -652,7 +739,7 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
 
   const innerClass =
     mode === "sidebar"
-      ? "flex flex-col gap-4 w-full h-full p-4 overflow-hidden" // Standard flex-col for sidebar
+      ? "flex flex-col gap-4 w-full h-full p-4 overflow-hidden relative" // Standard flex-col for sidebar
       : "pointer-events-auto relative flex items-center justify-center"; // Relative for fixed mode to anchor absolute panel
 
   const playerWidthClass =
@@ -675,10 +762,11 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
         onEnded={onEnded}
         onError={(e) => {
           console.error("Audio Load Error", e);
-          // if (parsedType === 0) {
-          //   // Try next song if current fails
-          //   setTimeout(() => playNext(), 1000);
-          // }
+          if (parsedType === 0) {
+            // Try next song if current fails
+            console.log("Track failed to load, skipping to next...");
+            setTimeout(() => playNext(true), 1500);
+          }
         }}
         className="hidden"
       />
@@ -708,9 +796,9 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
           {/* Control Panel (KP Only) - Only show in Sidebar mode */}
           {isKP && showInput && mode === "sidebar" && (
             <div
-              className={`bg-slate-900/95 backdrop-blur border border-slate-700 p-3 rounded-xl shadow-2xl animate-slide-up ${
+              className={`bg-slate-900/95 backdrop-blur border border-slate-700 p-3 rounded-xl shadow-2xl animate-slide-up z-50 ${
                 mode === "sidebar"
-                  ? "w-full shrink-0"
+                  ? "absolute top-4 left-4 right-4"
                   : isMobile
                   ? "w-[calc(100vw-32px)] max-w-[280px] mb-2"
                   : "w-72 mb-2"
@@ -855,24 +943,49 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
               (mode === "sidebar" ? (
                 // Sidebar Mode: Standard List Layout
                 <div
-                  className={`transition-all duration-300 overflow-hidden bg-slate-900/90 backdrop-blur rounded-xl shadow-xl border border-slate-700/50 flex flex-col ${playerWidthClass} h-full`}
+                  className={`transition-all duration-300 overflow-hidden flex flex-col ${playerWidthClass} h-full ${
+                    parsedType === 2
+                      ? "bg-transparent border-none shadow-none"
+                      : "bg-slate-900/90 backdrop-blur rounded-xl shadow-xl border border-slate-700/50"
+                  }`}
                 >
                   {/* Custom UI for Songs & Playlist Header */}
-                  <div className="p-3 flex items-center gap-3 bg-slate-800/50 shrink-0">
+                  <div
+                    className={`p-3 flex items-center gap-3 shrink-0 ${
+                      parsedType === 2
+                        ? "bg-transparent hidden"
+                        : "bg-slate-800/50"
+                    }`}
+                  >
                     {/* Album Art Placeholder */}
                     <div
-                      className="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center border border-slate-700 shrink-0 animate-spin-slow overflow-hidden"
+                      onClick={() => parsedType === 2 && togglePlay()}
+                      className={`w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center border border-slate-700 shrink-0 animate-spin-slow overflow-hidden ${
+                        parsedType === 2
+                          ? "cursor-pointer hover:scale-105 transition-transform"
+                          : ""
+                      }`}
                       style={{
                         animationPlayState: isPlaying ? "running" : "paused",
                       }}
                     >
-                      {parsedType === 0 &&
-                      playlistTracks[currentTrackIndex]?.album?.picUrl ? (
-                        <img
-                          src={playlistTracks[currentTrackIndex].album.picUrl}
-                          alt="cover"
-                          className="w-full h-full object-cover"
-                        />
+                      {(parsedType === 0 || parsedType === 2) &&
+                      (playlistTracks[currentTrackIndex]?.album?.picUrl ||
+                        playlistTracks[currentTrackIndex]?.al?.picUrl) ? (
+                        <div className="relative w-full h-full">
+                          <img
+                            src={
+                              playlistTracks[currentTrackIndex].album?.picUrl ||
+                              playlistTracks[currentTrackIndex].al?.picUrl
+                            }
+                            alt="cover"
+                            className="w-full h-full object-cover"
+                          />
+                          {/* Vinyl center hole for single song */}
+                          {parsedType === 2 && (
+                            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-1.5 h-1.5 bg-slate-800 rounded-full border border-slate-600"></div>
+                          )}
+                        </div>
                       ) : (
                         <Music size={18} className="text-indigo-400" />
                       )}
@@ -883,8 +996,10 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
                         <div className="flex-1 overflow-hidden mr-2 relative h-4">
                           {(() => {
                             const trackName =
-                              parsedType === 0 && playlistTracks.length > 0
-                                ? playlistTracks[currentTrackIndex].name
+                              (parsedType === 0 || parsedType === 2) &&
+                              playlistTracks.length > 0
+                                ? playlistTracks[currentTrackIndex]?.name ||
+                                  "未知歌曲"
                                 : "背景音乐";
                             // Calculate visual length (Chinese ~ 2, English ~ 1)
                             const visualLength = trackName
@@ -1126,6 +1241,76 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
                             </Button>
                           </div>
                         )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Single Song Mode: Large Record Player */}
+                  {parsedType === 2 && (
+                    <div className="flex-1 flex items-center justify-center relative overflow-hidden">
+                      {/* Record Player Container */}
+                      <div
+                        onClick={togglePlay}
+                        className="relative z-10 cursor-pointer group scale-90 sm:scale-100 transition-transform duration-300 active:scale-95"
+                        title={isPlaying ? "点击暂停" : "点击播放"}
+                      >
+                        {/* Vinyl Disc */}
+                        <div
+                          className={`w-64 h-64 rounded-full bg-[#111] shadow-2xl flex items-center justify-center relative animate-spin`}
+                          style={{
+                            animationDuration: "8s",
+                            animationPlayState: isPlaying
+                              ? "running"
+                              : "paused",
+                            background:
+                              "radial-gradient(circle, #1a1a1a 0%, #111 30%, #000 31%, #111 32%, #000 33%, #111 34%, #000 35%, #111 36%, #000 37%, #111 38%, #000 39%, #111 40%, #000 41%, #111 42%, #000 43%, #111 44%, #000 45%, #111 46%, #000 47%, #111 48%, #000 49%, #111 50%, #000 51%, #111 52%, #000 53%, #111 54%, #000 55%, #111 56%, #000 57%, #111 58%, #000 59%, #111 60%, #000 61%, #111 62%, #000 63%, #111 64%, #000 65%, #111 66%, #000 67%, #111 68%, #000 69%, #111 70%, #181818 100%)",
+                            boxShadow:
+                              "0 0 20px rgba(0,0,0,0.8), inset 0 0 0 2px #222",
+                          }}
+                        >
+                          {/* Inner Label / Cover */}
+                          <div className="w-28 h-28 rounded-full overflow-hidden border-4 border-[#222] relative shadow-inner">
+                            {playlistTracks[currentTrackIndex]?.album?.picUrl ||
+                            playlistTracks[currentTrackIndex]?.al?.picUrl ? (
+                              <img
+                                src={
+                                  playlistTracks[currentTrackIndex].album
+                                    ?.picUrl ||
+                                  playlistTracks[currentTrackIndex].al?.picUrl
+                                }
+                                alt="cover"
+                                className="w-full h-full object-cover"
+                              />
+                            ) : (
+                              <div className="w-full h-full bg-slate-800 flex items-center justify-center text-slate-500">
+                                <Music size={32} />
+                              </div>
+                            )}
+                            {/* Center Hole */}
+                            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-3 h-3 bg-[#e5e5e5] rounded-full border border-[#999]"></div>
+                          </div>
+                        </div>
+
+                        {/* Tonearm */}
+                        <div
+                          className="absolute top-[-30px] right-[-30px] w-24 h-44 pointer-events-none transition-transform duration-700 ease-in-out origin-[24px_24px]"
+                          style={{
+                            transform: isPlaying
+                              ? "rotate(24deg)"
+                              : "rotate(0deg)",
+                          }}
+                        >
+                          {/* Base */}
+                          <div className="absolute top-0 left-0 w-12 h-12 rounded-full bg-neutral-800 shadow-xl border border-white/5 z-20 flex items-center justify-center">
+                            <div className="w-4 h-4 rounded-full bg-neutral-600 shadow-inner"></div>
+                          </div>
+
+                          {/* Rod */}
+                          <div className="absolute top-6 left-6 w-2 h-32 bg-neutral-700 origin-top transform -rotate-12 rounded-full shadow-lg z-10"></div>
+
+                          {/* Head */}
+                          <div className="absolute bottom-6 right-7 w-6 h-9 bg-neutral-800 rounded shadow-xl transform rotate-[18deg] z-20 border border-white/5"></div>
+                        </div>
                       </div>
                     </div>
                   )}

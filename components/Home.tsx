@@ -950,7 +950,7 @@ export const Home: React.FC<HomeProps> = ({
               <button
                 onClick={() => setActiveTab("square")}
                 className={`flex-1 py-2 rounded-md text-sm font-medium ${
-                  activeTab === "square"
+                  (activeTab as string) === "square"
                     ? "bg-indigo-600 text-white"
                     : "text-slate-400"
                 }`}

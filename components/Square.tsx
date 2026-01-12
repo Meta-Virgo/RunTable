@@ -31,7 +31,6 @@ import { AvatarUpload } from "./AvatarUpload";
 import { useElasticScroll } from "../hooks/useElasticScroll";
 
 const MAX_POST_LENGTH = 140;
-const MAX_COMMENT_LENGTH = 100;
 
 const formatTime = (dateStr: string) => {
   const date = new Date(dateStr);
@@ -134,26 +133,6 @@ const PostContent: React.FC<{ content: string }> = ({ content }) => {
   );
 };
 
-const CommentContent: React.FC<{ content: string }> = ({ content }) => {
-  const [expanded, setExpanded] = useState(false);
-  const shouldTruncate = content.length > MAX_COMMENT_LENGTH;
-
-  return (
-    <div className="text-sm text-slate-400 leading-relaxed whitespace-pre-wrap">
-      {shouldTruncate && !expanded
-        ? content.slice(0, MAX_COMMENT_LENGTH) + "..."
-        : content}
-      {shouldTruncate && (
-        <button
-          className="ml-1 text-indigo-400 hover:text-indigo-300 text-xs font-bold hover:underline"
-          onClick={() => setExpanded(!expanded)}
-        >
-          {expanded ? "收起" : "展开"}
-        </button>
-      )}
-    </div>
-  );
-};
 
 interface SquareProps {
   onScrollChange?: (direction: "up" | "down") => void;
@@ -1840,8 +1819,8 @@ const PostDetailModal: React.FC<{
   post,
   currentUser,
   onClose,
-  onLike,
-  onDeletePost,
+  onLike: _onLike,
+  onDeletePost: _onDeletePost,
   onDeleteComment,
   comments,
   loadingComments,

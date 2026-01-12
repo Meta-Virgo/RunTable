@@ -1,4 +1,6 @@
 $ErrorActionPreference = "Stop"
+Set-Location "$PSScriptRoot/.."
+
 
 Write-Host "Checking Supabase CLI..."
 if (!(Get-Command "supabase" -ErrorAction SilentlyContinue)) {
