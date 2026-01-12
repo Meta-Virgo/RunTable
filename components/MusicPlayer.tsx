@@ -403,7 +403,7 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
         if (!res.ok) continue;
         const data = await res.json();
         const songUrl = data.data?.[0]?.url;
-        if (songUrl) return songUrl;
+        if (songUrl) return songUrl.replace(/^http:/, "https:");
       } catch (e) {
         console.warn(`Failed to fetch song url via ${strategy.name}`, e);
       }
@@ -442,10 +442,11 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
 
           if (!realUrl || realUrl.includes("404")) {
             console.warn("Song appears unavailable:", trackId);
-            // if (parsedType === 0) {
-            //   // Skip to next after a short delay to prevent rapid looping
-            //   setTimeout(() => playNext(), 1000);
-            // }
+            if (parsedType === 0) {
+              // Auto skip unavailable songs in playlist
+              console.log("Auto-skipping unavailable track...");
+              setTimeout(() => playNext(), 1500);
+            }
             return;
           }
 

@@ -2259,7 +2259,14 @@ const App: React.FC = () => {
       })
       .eq("id", currentRoomId);
 
-    if (error) console.error("Failed to update music state:", error);
+    if (error) {
+      console.error("Failed to update music state:", error);
+      if (error.code === "PGRST204") {
+        console.warn(
+          "PGRST204 Error: The 'is_music_playing' column is missing in Supabase schema cache. Please reload the schema cache in Supabase Dashboard."
+        );
+      }
+    }
   };
 
   const derivedCharacters = characters.map((c) => ({
