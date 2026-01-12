@@ -12,6 +12,7 @@ import {
   Shuffle,
   X,
   ListMusic,
+  Loader2,
 } from "lucide-react";
 import { Button } from "./UI";
 import { useElasticScroll } from "../hooks/useElasticScroll";
@@ -64,6 +65,8 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
   // const [volume, setVolume] = useState(0.5);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
+  const [retryCount, setRetryCount] = useState(0);
+  const [isLoadingSong, setIsLoadingSong] = useState(false);
 
   // Playlist State
   const [playlistTracks, setPlaylistTracks] = useState<any[]>([]);
@@ -80,8 +83,13 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
       if (syncedIsPlaying !== undefined && syncedIsPlaying !== isPlaying) {
         setIsPlaying(syncedIsPlaying);
         if (audioRef.current) {
-          if (syncedIsPlaying) audioRef.current.play().catch(console.error);
-          else audioRef.current.pause();
+          if (syncedIsPlaying) {
+            audioRef.current.play().catch((e) => {
+              if (e.name !== "AbortError") console.error(e);
+            });
+          } else {
+            audioRef.current.pause();
+          }
         }
       }
       if (
@@ -498,6 +506,7 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
     }
 
     // Fallback to standard outer URL if API fails (last resort)
+    // Use direct outer link which usually works fine and avoids ORB/CORS proxy issues for media
     return `https://music.163.com/song/media/outer/url?id=${id}.mp3`;
   };
 
@@ -523,6 +532,8 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
         // New track detected: Stop old track immediately
         audioRef.current.pause();
         setIsPlaying(false);
+        setRetryCount(0);
+        setIsLoadingSong(true);
 
         try {
           const realUrl = await fetchSongUrl(String(trackId));
@@ -533,7 +544,7 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
             if (parsedType === 0) {
               // Auto skip unavailable songs in playlist
               console.log("Auto-skipping unavailable track...");
-              setTimeout(() => playNext(), 1500);
+              setTimeout(() => playNext(true), 1500);
             }
             return;
           }
@@ -549,7 +560,11 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
           if (shouldPlay) {
             const playPromise = audioRef.current.play();
             if (playPromise !== undefined) {
-              playPromise.catch((e) => console.warn("Auto-play blocked:", e));
+              playPromise.catch((e) => {
+                if (e.name !== "AbortError") {
+                  console.warn("Auto-play blocked:", e);
+                }
+              });
             }
             setIsPlaying(true);
           }
@@ -561,6 +576,8 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
           // }
         } catch (e) {
           console.error("Error loading audio:", e);
+        } finally {
+          if (isMounted) setIsLoadingSong(false);
         }
       }
     };
@@ -588,21 +605,27 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
 
   // Handle Play/Pause
   const togglePlay = () => {
+    if (isLoadingSong) return;
     if (!audioRef.current) return;
     if (isPlaying) {
       audioRef.current.pause();
     } else {
-      audioRef.current.play();
+      audioRef.current.play().catch((e) => {
+        if (e.name !== "AbortError") console.error("Play error:", e);
+      });
     }
     setIsPlaying(!isPlaying);
   };
 
   const playNext = (isAuto = false) => {
+    if (isLoadingSong && !isAuto) return;
     if (parsedType === 0 && playlistTracks.length > 0) {
       if (isAuto && playMode === "single") {
         if (audioRef.current) {
           audioRef.current.currentTime = 0;
-          audioRef.current.play();
+          audioRef.current.play().catch((e) => {
+            if (e.name !== "AbortError") console.error("Play error:", e);
+          });
           setIsPlaying(true);
         }
         return;
@@ -622,6 +645,7 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
   };
 
   const playPrev = () => {
+    if (isLoadingSong) return;
     if (parsedType === 0 && playlistTracks.length > 0) {
       if (playMode === "shuffle") {
         let prevIndex = Math.floor(Math.random() * playlistTracks.length);
@@ -677,7 +701,9 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
       // Loop single song
       if (audioRef.current) {
         audioRef.current.currentTime = 0;
-        audioRef.current.play();
+        audioRef.current.play().catch((e) => {
+          if (e.name !== "AbortError") console.error("Play error:", e);
+        });
         setIsPlaying(true);
       }
     }
@@ -754,6 +780,8 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
     parsedType === 2 || parsedType === 0 ? (
       <audio
         ref={audioRef}
+        // @ts-ignore
+        referrerPolicy="no-referrer"
         onTimeUpdate={onTimeUpdate}
         onLoadedMetadata={(e) => {
           const d = e.currentTarget.duration;
@@ -761,7 +789,29 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
         }}
         onEnded={onEnded}
         onError={(e) => {
-          console.error("Audio Load Error", e);
+          const error = e.currentTarget.error;
+          // Ignore abort errors (code 1) which happen during track switching
+          if (error && error.code === 1) return;
+
+          console.error("Audio Load Error", error || e);
+
+          // Retry logic for single song
+          if (parsedType === 2 && parsedId) {
+            if (retryCount === 0) {
+              console.log("Primary URL failed, trying fallback outer URL...");
+              setRetryCount(1);
+              // Use direct outer link for fallback
+              const fallbackUrl = `https://music.163.com/song/media/outer/url?id=${parsedId}.mp3`;
+              if (audioRef.current) {
+                audioRef.current.src = fallbackUrl;
+                audioRef.current
+                  .play()
+                  .catch((err) => console.error("Fallback play error:", err));
+              }
+              return;
+            }
+          }
+
           if (parsedType === 0) {
             // Try next song if current fails
             console.log("Track failed to load, skipping to next...");
@@ -890,7 +940,7 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
             }`}
           >
             {/* Toggle Button for Fixed Mode */}
-            {mode === "fixed" && parsedId && (
+            {mode === "fixed" && parsedId && parsedType !== 2 && (
               <div className="relative group/btn pointer-events-auto">
                 {/* Progress Ring */}
                 <svg
@@ -1130,12 +1180,14 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
                                     ? activeTrackRef
                                     : null
                                 }
-                                onClick={() => setCurrentTrackIndex(idx)}
+                                onClick={() => {
+                                  if (!isLoadingSong) setCurrentTrackIndex(idx);
+                                }}
                                 className={`p-2 flex items-center gap-2 cursor-pointer transition-colors hover:bg-slate-800/50 group ${
                                   currentTrackIndex === idx
                                     ? "bg-indigo-500/10"
                                     : ""
-                                }`}
+                                } ${isLoadingSong ? "cursor-not-allowed" : ""}`}
                               >
                                 {/* Track Number / Play Icon */}
                                 <span
@@ -1145,7 +1197,13 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
                                       : "text-slate-600 group-hover:text-slate-400"
                                   }`}
                                 >
-                                  {currentTrackIndex === idx ? (
+                                  {currentTrackIndex === idx &&
+                                  isLoadingSong ? (
+                                    <Loader2
+                                      size={10}
+                                      className="mx-auto animate-spin text-indigo-500"
+                                    />
+                                  ) : currentTrackIndex === idx ? (
                                     <div className="w-2 h-2 rounded-full bg-indigo-500 mx-auto animate-pulse shadow-[0_0_8px_rgba(99,102,241,0.5)]" />
                                   ) : (
                                     idx + 1
@@ -1286,8 +1344,16 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
                                 <Music size={32} />
                               </div>
                             )}
+                            {isLoadingSong && (
+                              <div className="absolute inset-0 bg-black/40 flex items-center justify-center z-20">
+                                <Loader2
+                                  size={24}
+                                  className="text-white animate-spin"
+                                />
+                              </div>
+                            )}
                             {/* Center Hole */}
-                            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-3 h-3 bg-[#e5e5e5] rounded-full border border-[#999]"></div>
+                            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-3 h-3 bg-[#e5e5e5] rounded-full border border-[#999] z-30"></div>
                           </div>
                         </div>
 
@@ -1421,6 +1487,7 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
                                     }
                                   }}
                                   onClick={() => {
+                                    if (isLoadingSong) return;
                                     if (isPlayingTrack) {
                                       togglePlay();
                                     } else {
@@ -1454,9 +1521,16 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
                                       isVisualCenter || isPlayingTrack
                                         ? "opacity-100"
                                         : "opacity-0 group-hover/item:opacity-100"
+                                    } ${
+                                      isLoadingSong ? "cursor-not-allowed" : ""
                                     }`}
                                   >
-                                    {isPlayingTrack ? (
+                                    {isPlayingTrack && isLoadingSong ? (
+                                      <Loader2
+                                        size={20}
+                                        className="text-white animate-spin"
+                                      />
+                                    ) : isPlayingTrack ? (
                                       isPlaying ? (
                                         <Pause
                                           size={20}

@@ -424,9 +424,10 @@ export const Home: React.FC<HomeProps> = ({
   }, [currentUserId]);
 
   const fetchFriendRequestCount = async (userId: string) => {
+    // Remove head: true to avoid ERR_ABORTED on some clients/proxies
     const { count, error } = await supabase
       .from("friendships")
-      .select("*", { count: "exact", head: true })
+      .select("id", { count: "exact" })
       .eq("friend_id", userId)
       .eq("status", "pending");
 

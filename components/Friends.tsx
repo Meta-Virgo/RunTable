@@ -30,7 +30,6 @@ export const Friends: React.FC<FriendsProps> = ({ currentUser }) => {
   const [activeTab, setActiveTab] = useState<"list" | "requests">("list");
   const [friends, setFriends] = useState<Friendship[]>([]);
   const [requests, setRequests] = useState<Friendship[]>([]);
-  const [loading, setLoading] = useState(false);
 
   // Search State
   const [searchQuery, setSearchQuery] = useState("");
@@ -69,7 +68,6 @@ export const Friends: React.FC<FriendsProps> = ({ currentUser }) => {
 
   const fetchFriends = async () => {
     if (!currentUser) return;
-    setLoading(true);
 
     // Fetch accepted friendships where I am user_id OR friend_id
     const { data } = await supabase
@@ -77,8 +75,8 @@ export const Friends: React.FC<FriendsProps> = ({ currentUser }) => {
       .select(
         `
         *,
-        friend_profile:friend_id (*),
-        user_profile:user_id (*)
+        friend_profile:friend_id (id, nickname, avatar_url, user_code, bio, is_vip, level, created_at),
+        user_profile:user_id (id, nickname, avatar_url, user_code, bio, is_vip, level, created_at)
       `
       )
       .or(`user_id.eq.${currentUser.id},friend_id.eq.${currentUser.id}`)
@@ -95,7 +93,6 @@ export const Friends: React.FC<FriendsProps> = ({ currentUser }) => {
       });
       setFriends(normalized);
     }
-    setLoading(false);
   };
 
   const fetchRequests = async () => {
@@ -106,7 +103,7 @@ export const Friends: React.FC<FriendsProps> = ({ currentUser }) => {
       .select(
         `
         *,
-        user_profile:user_id (*)
+        user_profile:user_id (id, nickname, avatar_url, user_code, bio, is_vip, level, created_at)
       `
       )
       .eq("friend_id", currentUser.id)
@@ -124,7 +121,12 @@ export const Friends: React.FC<FriendsProps> = ({ currentUser }) => {
     setIsSearching(true);
     setSearchResults([]);
 
-    let query = supabase.from("profiles").select("*").neq("id", currentUser.id); // Exclude self
+    let query = supabase
+      .from("profiles")
+      .select(
+        "id, nickname, avatar_url, user_code, bio, is_vip, level, created_at"
+      )
+      .neq("id", currentUser.id); // Exclude self
 
     // Check if query is numeric (UID) or string (Nickname)
     if (/^\d+$/.test(searchQuery)) {
