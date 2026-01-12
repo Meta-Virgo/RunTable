@@ -454,14 +454,20 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
 
           // Auto play if not muted locally
           if (!isMuted) {
-            if (isFirstMount.current) {
-              isFirstMount.current = false;
-            } else {
+            const shouldPlay =
+              !isFirstMount.current || (!isKP && syncedIsPlaying);
+
+            if (shouldPlay) {
               const playPromise = audioRef.current.play();
               if (playPromise !== undefined) {
                 playPromise.catch((e) => console.warn("Auto-play blocked:", e));
               }
               setIsPlaying(true);
+            }
+
+            // Always clear first mount flag after first load attempt
+            if (isFirstMount.current) {
+              isFirstMount.current = false;
             }
           }
         } catch (e) {
@@ -475,7 +481,15 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
     return () => {
       isMounted = false;
     };
-  }, [parsedId, parsedType, playlistTracks, currentTrackIndex, isMuted]);
+  }, [
+    parsedId,
+    parsedType,
+    playlistTracks,
+    currentTrackIndex,
+    isMuted,
+    syncedIsPlaying,
+    isKP,
+  ]);
 
   // Auto-open input in sidebar mode if no music playing
   useEffect(() => {
@@ -690,8 +704,8 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
         {/* Audio used to be here, now moved out to persist */}
 
         <div className={innerClass}>
-          {/* Control Panel (KP Only) */}
-          {isKP && showInput && (
+          {/* Control Panel (KP Only) - Only show in Sidebar mode */}
+          {isKP && showInput && mode === "sidebar" && (
             <div
               className={`bg-slate-900/95 backdrop-blur border border-slate-700 p-3 rounded-xl shadow-2xl animate-slide-up ${
                 mode === "sidebar"
@@ -749,21 +763,6 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
                   className="w-full bg-slate-950 border border-slate-700 rounded-lg px-2 py-1.5 text-xs text-white focus:border-indigo-500 outline-none transition-all placeholder-slate-600 font-mono"
                   onKeyDown={(e) => e.key === "Enter" && handleSave()}
                 />
-
-                {/* Volume Control */}
-                <div className="flex items-center gap-2 px-1 py-1">
-                  <button
-                    onClick={() => handleVolumeChange(volume === 0 ? 0.5 : 0)}
-                    className="text-slate-400 hover:text-white transition-colors"
-                    title={volume === 0 ? "取消静音" : "静音"}
-                  >
-                    {volume === 0 ? (
-                      <VolumeX size={14} />
-                    ) : (
-                      <Volume2 size={14} />
-                    )}
-                  </button>
-                </div>
 
                 <div className="flex justify-end gap-2">
                   <Button

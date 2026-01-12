@@ -1253,7 +1253,7 @@ export const Square: React.FC<SquareProps> = ({ onScrollChange }) => {
                     onChange={(e) => setNewPostContent(e.target.value)}
                     onPaste={handlePaste}
                   />
-                  <div className="flex justify-between items-center mt-2 pt-2 border-t border-white/5 relative z-10">
+                  <div className="flex justify-between items-center mt-2 pt-2 border-t border-white/5 relative z-20">
                     <div className="flex gap-2">
                       <input
                         type="file"
