@@ -325,6 +325,8 @@ const App: React.FC = () => {
 
       setKpId(room.kp_id);
       setBgMusicUrl(room.bg_music_url);
+      setIsMusicPlaying(room.is_music_playing || false);
+      setMusicTrackIndex(room.music_track_index || 0);
 
       // Clear URL to keep lobby clean on refresh, per your requirement
       window.history.replaceState(null, "", window.location.pathname);

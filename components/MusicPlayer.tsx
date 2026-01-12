@@ -94,7 +94,7 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
         setVisualTrackIndex(syncedTrackIndex);
       }
     }
-  }, [syncedIsPlaying, syncedTrackIndex, isKP]);
+  }, [syncedIsPlaying, syncedTrackIndex, isKP, isPlaying, currentTrackIndex]);
 
   // 2. Sync Internal State -> DB (KP Only)
   useEffect(() => {
