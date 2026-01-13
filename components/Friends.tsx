@@ -827,49 +827,7 @@ export const Friends: React.FC<FriendsProps> = ({ currentUser }) => {
             </div>
 
             {/* Modal Footer Actions */}
-            <div className="p-4 border-t border-white/10 bg-slate-900/50 flex gap-3">
-              <Button
-                variant="ghost"
-                className="flex-1"
-                onClick={() => setShowResumeModal(false)}
-              >
-                关闭
-              </Button>
-              {currentUser && selectedUser.id !== currentUser.id && (
-                <>
-                  {friends.some(
-                    (f) => f.friend_profile?.id === selectedUser.id
-                  ) ? (
-                    <Button
-                      className="flex-1 bg-red-500/10 text-red-400 hover:bg-red-500/20 border-red-500/20"
-                      icon={UserX}
-                      onClick={() => {
-                        const friendship = friends.find(
-                          (f) => f.friend_profile?.id === selectedUser.id
-                        );
-                        if (friendship) {
-                          handleDeleteFriend(friendship.id);
-                          setShowResumeModal(false);
-                        }
-                      }}
-                    >
-                      删除好友
-                    </Button>
-                  ) : (
-                    <Button
-                      variant="primary"
-                      className="flex-1"
-                      icon={UserPlus}
-                      onClick={() => {
-                        sendFriendRequest(selectedUser.id);
-                      }}
-                    >
-                      添加好友
-                    </Button>
-                  )}
-                </>
-              )}
-            </div>
+
           </div>
         </Modal>
       )}

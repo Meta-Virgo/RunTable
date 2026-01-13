@@ -351,7 +351,7 @@ const ATTR_DESCRIPTIONS: Record<
       {
         max: 999,
         title: "阿卡西记录",
-        desc: "真理之门为你敞开“过往皆为序章，知识在此汇流。”",
+        desc: "真理之门为你敞开。“过往皆为序章，知识在此汇流。”",
       },
     ],
   },

@@ -572,6 +572,37 @@ export const Square: React.FC<SquareProps> = ({ onScrollChange }) => {
     setUnreadCount((prev) => Math.max(0, prev - 1));
   };
 
+  const deleteNotification = async (
+    e: React.MouseEvent,
+    notificationId: string
+  ) => {
+    e.stopPropagation();
+    try {
+      const { error, count } = await supabase
+        .from("notifications")
+        .delete({ count: "exact" })
+        .eq("id", notificationId);
+
+      if (error) {
+        console.error("Delete notification error:", error);
+        alert("删除失败: " + error.message);
+        return;
+      }
+
+      // 如果没有报错，即使 count 为 0 (可能已经被删除了)，我们也从 UI 移除
+      setNotifications((prev) => {
+        const target = prev.find((n) => n.id === notificationId);
+        if (target && !target.is_read) {
+          setUnreadCount((count) => Math.max(0, count - 1));
+        }
+        return prev.filter((n) => n.id !== notificationId);
+      });
+    } catch (err) {
+      console.error("Delete notification exception:", err);
+      alert("删除时发生错误");
+    }
+  };
+
   const fetchComments = async (postId: string) => {
     setLoadingComments((prev) => ({ ...prev, [postId]: true }));
     const { data: rawComments } = await supabase
@@ -1125,7 +1156,7 @@ export const Square: React.FC<SquareProps> = ({ onScrollChange }) => {
                           <div
                             key={n.id}
                             className={cn(
-                              "p-3 border-b border-slate-700/50 hover:bg-slate-700/30 transition-colors cursor-pointer",
+                              "p-3 border-b border-slate-700/50 hover:bg-slate-700/30 transition-colors cursor-pointer group",
                               !n.is_read && "bg-slate-700/20"
                             )}
                             onClick={() => {
@@ -1163,9 +1194,18 @@ export const Square: React.FC<SquareProps> = ({ onScrollChange }) => {
                                   {new Date(n.created_at).toLocaleString()}
                                 </p>
                               </div>
-                              {!n.is_read && (
-                                <div className="w-2 h-2 rounded-full bg-indigo-500 mt-1.5 shrink-0"></div>
-                              )}
+                              <div className="flex flex-col items-end gap-2 shrink-0">
+                                {!n.is_read && (
+                                  <div className="w-2 h-2 rounded-full bg-indigo-500 mt-1.5"></div>
+                                )}
+                                <button
+                                  className="text-slate-500 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity p-1"
+                                  onClick={(e) => deleteNotification(e, n.id)}
+                                  title="删除"
+                                >
+                                  <Trash2 size={14} />
+                                </button>
+                              </div>
                             </div>
                           </div>
                         ))
@@ -1407,36 +1447,48 @@ export const Square: React.FC<SquareProps> = ({ onScrollChange }) => {
                       </div>
 
                       {/* Comment Preview (One comment + view more) */}
-                      {post.latest_comments &&
-                        post.latest_comments.length > 0 && (
-                          <div className="mt-3 bg-slate-900/40 rounded-lg p-3 text-xs border border-white/5">
-                            {post.latest_comments.map((c) => (
-                              <div
-                                key={c.id}
-                                className="mb-1 last:mb-0 text-slate-300 flex items-start"
-                              >
-                                <span className="font-bold text-slate-200 mr-2 shrink-0">
-                                  {c.profiles?.nickname || "未知"}:
-                                </span>
-                                <span className="line-clamp-2 break-all whitespace-pre-wrap">
-                                  {c.content}
-                                </span>
+                      {(post.comment_count || 0) > 0 && (
+                        <>
+                          {post.latest_comments === undefined ? (
+                            <div className="mt-3 bg-slate-900/20 rounded-lg p-3 border border-white/5 flex flex-col gap-2 animate-pulse">
+                              <div className="flex items-center gap-2">
+                                <div className="w-12 h-3 bg-slate-700/50 rounded"></div>
+                                <div className="flex-1 h-3 bg-slate-700/30 rounded"></div>
                               </div>
-                            ))}
-                            {(post.comment_count || 0) > 1 && (
-                              <button
-                                className="text-indigo-400 mt-2 hover:text-indigo-300 font-medium flex items-center gap-1"
-                                onClick={() => {
-                                  setSelectedPostId(post.id);
-                                  fetchComments(post.id);
-                                }}
-                              >
-                                查看全部 {post.comment_count} 条评论
-                                <CornerDownRight size={12} />
-                              </button>
-                            )}
-                          </div>
-                        )}
+                            </div>
+                          ) : (
+                            post.latest_comments.length > 0 && (
+                              <div className="mt-3 bg-slate-900/40 rounded-lg p-3 text-xs border border-white/5 animate-fade-in">
+                                {post.latest_comments.map((c) => (
+                                  <div
+                                    key={c.id}
+                                    className="mb-1 last:mb-0 text-slate-300 flex items-start"
+                                  >
+                                    <span className="font-bold text-slate-200 mr-2 shrink-0">
+                                      {c.profiles?.nickname || "未知"}:
+                                    </span>
+                                    <span className="line-clamp-2 break-all whitespace-pre-wrap">
+                                      {c.content}
+                                    </span>
+                                  </div>
+                                ))}
+                                {(post.comment_count || 0) > 1 && (
+                                  <button
+                                    className="text-indigo-400 mt-2 hover:text-indigo-300 font-medium flex items-center gap-1"
+                                    onClick={() => {
+                                      setSelectedPostId(post.id);
+                                      fetchComments(post.id);
+                                    }}
+                                  >
+                                    查看全部 {post.comment_count} 条评论
+                                    <CornerDownRight size={12} />
+                                  </button>
+                                )}
+                              </div>
+                            )
+                          )}
+                        </>
+                      )}
                     </div>
                   </div>
                 ))

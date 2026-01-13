@@ -1085,23 +1085,30 @@ export const Home: React.FC<HomeProps> = ({
                 )}
 
                 {/* Rooms Grid */}
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {filteredRooms.map((room) => (
-                    <RoomCard
-                      key={room.id}
-                      room={room}
-                      currentUserId={currentUserId}
-                      myCharacters={myCharacters}
-                      onJoinRoom={onJoinRoom}
-                    />
-                  ))}
-                  {filteredRooms.length === 0 && (
-                    <div className="col-span-full py-12 text-center text-slate-500">
-                      <Users size={48} className="mx-auto mb-3 opacity-20" />
-                      <p>暂无公开房间，快来创建一个吧！</p>
-                    </div>
-                  )}
-                </div>
+                {loading ? (
+                  <div className="flex flex-col items-center justify-center py-24 text-slate-500 animate-fade-in">
+                    <Loader2 className="w-12 h-12 animate-spin mb-4 text-indigo-500" />
+                    <p className="text-slate-400 font-medium">正在加载房间...</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 animate-fade-in">
+                    {filteredRooms.map((room) => (
+                      <RoomCard
+                        key={room.id}
+                        room={room}
+                        currentUserId={currentUserId}
+                        myCharacters={myCharacters}
+                        onJoinRoom={onJoinRoom}
+                      />
+                    ))}
+                    {filteredRooms.length === 0 && (
+                      <div className="col-span-full py-12 text-center text-slate-500">
+                        <Users size={48} className="mx-auto mb-3 opacity-20" />
+                        <p>暂无房间</p>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             ) : activeTab === "characters" ? (
               <div className="space-y-6">
