@@ -62,7 +62,13 @@ const VoiceIndicator = ({ name }: { name: string }) => {
     (p) => p.name === name || p.identity === name
   );
 
-  if (!participant) return null;
+  if (!participant) {
+    return (
+      <div className="absolute -top-1 -right-1 z-20">
+        <div className="w-3 h-3 rounded-full border-2 border-slate-900 transition-colors bg-slate-600" />
+      </div>
+    );
+  }
 
   return <VoiceIndicatorContent participant={participant} />;
 };
@@ -138,7 +144,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onOpenStatusEdit,
   isMobile,
   isKP,
-  kpOnline = false,
+  // kpOnline = false, // Unused
   roomType = "text",
   userNickname,
   isVoiceConnected,
@@ -225,25 +231,26 @@ export const Sidebar: React.FC<SidebarProps> = ({
           showOnline && !isOnline && "opacity-50 grayscale"
         )}
       >
-        <div
-          className={cn(
-            "shrink-0 transition-colors relative flex items-center justify-center",
-            char.avatar_url
-              ? "w-[34px] h-[34px] rounded-lg border border-white/10 bg-slate-900"
-              : "p-2 rounded-lg",
-            !char.avatar_url && iconBg
-          )}
-        >
-          {char.avatar_url ? (
-            <img
-              src={char.avatar_url}
-              alt={char.name}
-              className="w-full h-full object-cover rounded-lg"
-            />
-          ) : (
-            getCharIcon(char.role, 18)
-          )}
-
+        <div className="relative shrink-0">
+          <div
+            className={cn(
+              "transition-colors flex items-center justify-center",
+              char.avatar_url
+                ? "w-[34px] h-[34px] rounded-lg overflow-hidden border border-white/10 bg-slate-900"
+                : "p-2 rounded-lg",
+              !char.avatar_url && iconBg
+            )}
+          >
+            {char.avatar_url ? (
+              <img
+                src={char.avatar_url}
+                alt={char.name}
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              getCharIcon(char.role, 18)
+            )}
+          </div>
           {roomType === "voice" && isVoiceConnected && (
             <VoiceIndicator name={char.name} />
           )}
@@ -288,8 +295,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         activeCharId === "pc"
           ? "bg-gradient-to-r from-indigo-500/20 to-transparent border-indigo-500/30 shadow-[inset_2px_0_0_0_#6366f1]"
           : "bg-transparent border-transparent hover:bg-white/5",
-        !isOpen && "justify-center",
-        !kpOnline && "opacity-50 grayscale"
+        !isOpen && "justify-center"
       )}
     >
       <div
@@ -301,11 +307,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
         )}
       >
         <Crown size={18} />
-        {kpOnline && (
-          <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-emerald-500 border-2 border-slate-900 rounded-full z-10"></div>
-        )}
-        {roomType === "voice" && isVoiceConnected && (
-          <VoiceIndicator name={"守秘人"} />
+        {roomType === "voice" && isVoiceConnected && isKP && (
+          <VoiceIndicator name={userNickname || "守秘人"} />
         )}
       </div>
       {isOpen && (
