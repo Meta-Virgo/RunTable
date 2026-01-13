@@ -2596,6 +2596,10 @@ const App: React.FC = () => {
         video={false}
         data-lk-theme="default"
         onDisconnected={handleLeaveRoom}
+        onError={(error) => {
+          console.error("LiveKit Error:", error);
+          // 可以在这里处理全局错误，或者让组件自己处理
+        }}
       >
         {appContent}
       </LiveKitRoom>

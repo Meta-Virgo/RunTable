@@ -94,10 +94,32 @@ const MicrophoneButton = ({ isOpen }: { isOpen: boolean }) => {
     initialState: false,
   });
 
+  const handleToggle = async () => {
+    try {
+      await toggle();
+    } catch (error: any) {
+      console.error("Microphone toggle error:", error);
+      // 处理常见的权限错误
+      if (
+        error.name === "NotAllowedError" ||
+        error.name === "PermissionDeniedError" ||
+        error.message?.includes("Permission denied") ||
+        error.message?.includes("device") ||
+        error.message?.includes("权限")
+      ) {
+        alert(
+          "无法开启麦克风：权限被拒绝。"
+        );
+      } else {
+        alert("麦克风开启失败: " + (error.message || "未知错误"));
+      }
+    }
+  };
+
   return (
     <button
       {...buttonProps}
-      onClick={() => toggle()}
+      onClick={handleToggle}
       className={cn(
         "w-full flex items-center gap-3 px-3 py-3 rounded-xl transition-all duration-300 group border",
         enabled
@@ -144,7 +166,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onOpenStatusEdit,
   isMobile,
   isKP,
-  // kpOnline = false, // Unused
+  kpOnline = false,
   roomType = "text",
   userNickname,
   isVoiceConnected,
@@ -295,7 +317,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
         activeCharId === "pc"
           ? "bg-gradient-to-r from-indigo-500/20 to-transparent border-indigo-500/30 shadow-[inset_2px_0_0_0_#6366f1]"
           : "bg-transparent border-transparent hover:bg-white/5",
-        !isOpen && "justify-center"
+        !isOpen && "justify-center",
+        !kpOnline && "opacity-50 grayscale"
       )}
     >
       <div
