@@ -1190,7 +1190,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
             <div className="flex items-center justify-between p-4 border-b border-slate-800 bg-slate-900/50">
               <h3 className="text-lg font-bold text-white flex items-center gap-2">
                 <Sparkles size={20} className="text-purple-400" />
-                AI 跑团助手 (DeepSeek)
+                AI 跑团助手
               </h3>
               <button
                 onClick={() => setShowAIModal(false)}

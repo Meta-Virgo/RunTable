@@ -17,6 +17,8 @@ import {
 } from "./components/Modals";
 import { Button } from "./components/UI";
 import { MusicPlayer } from "./components/MusicPlayer";
+import { LiveKitRoom, RoomAudioRenderer } from "@livekit/components-react";
+import "@livekit/components-styles";
 import { ModuleInfo, Character, Log } from "./types"; // Removed AppData as it might not be used anymore
 import { Menu, LogOut, Volume2, VolumeX } from "lucide-react";
 import { parseDiceCommand } from "./utils/commandParser";
@@ -91,7 +93,9 @@ const App: React.FC = () => {
 
   // Application State
   const [currentRoomId, setCurrentRoomId] = useState<string | null>(null);
+  const [roomType, setRoomType] = useState<"text" | "voice">("text");
   const [view, setView] = useState("main");
+  const [token, setToken] = useState("");
 
   // ✅ 初始化为空数组/空对象，不再使用 DEFAULT_DATA
   const [characters, setCharacters] = useState<Character[]>([]);
@@ -114,6 +118,37 @@ const App: React.FC = () => {
   const [isMusicPlaying, setIsMusicPlaying] = useState(false);
   const [musicTrackIndex, setMusicTrackIndex] = useState(0);
   const [globalMute, setGlobalMute] = useState(false);
+
+  useEffect(() => {
+    if (roomType === "voice" && currentRoomId) {
+      (async () => {
+        try {
+          const participantName =
+            activeCharId === "pc"
+              ? userNickname || "守秘人"
+              : characters.find((c) => c.id === activeCharId)?.name ||
+                "未知用户";
+
+          const resp = await fetch(`/api/token`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              roomName: currentRoomId,
+              participantName,
+            }),
+          });
+          const data = await resp.json();
+          setToken(data.token);
+        } catch (e) {
+          console.error(e);
+        }
+      })();
+    } else {
+      setToken("");
+    }
+  }, [roomType, currentRoomId, activeCharId, userNickname, characters]);
 
   // Load More Logs Logic
   const handleLoadMoreLogs = async () => {
@@ -325,6 +360,7 @@ const App: React.FC = () => {
 
       setKpId(room.kp_id);
       setBgMusicUrl(room.bg_music_url);
+      setRoomType(room.type || "text");
       setIsMusicPlaying(room.is_music_playing || false);
       setMusicTrackIndex(room.music_track_index || 0);
 
@@ -920,6 +956,7 @@ const App: React.FC = () => {
         description: room.description || "",
         notes: "",
       });
+      setRoomType(room.type || "text");
       setRoomPassword(room.password || "");
       setCurrentRoomId(roomId);
       setActiveCharId(charId);
@@ -1388,7 +1425,7 @@ const App: React.FC = () => {
       if (error) throw error;
 
       if (data) {
-        addLog("system", `守秘人 复制了 [${char.name}] -> [${newName}]`);
+        // addLog("system", `守秘人 复制了 [${char.name}] -> [${newName}]`);
         // State update handled by Realtime subscription
       }
     } catch (error: any) {
@@ -2313,7 +2350,7 @@ const App: React.FC = () => {
     );
   }
 
-  return (
+  const appContent = (
     <div className="flex h-screen text-slate-200 font-sans selection:bg-indigo-500/30 overflow-hidden bg-[#020617]">
       {/* Background Effects */}
       <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none z-0">
@@ -2343,6 +2380,9 @@ const App: React.FC = () => {
         isMobile={isMobile}
         isKP={isKP}
         kpOnline={kpId ? onlineUsers.has(kpId) : false}
+        userNickname={userNickname}
+        roomType={token ? roomType : "text"}
+        isVoiceConnected={!!token}
       />
 
       <main className="flex-1 flex flex-col relative min-w-0 z-10">
@@ -2364,15 +2404,17 @@ const App: React.FC = () => {
             </div>
           </div>
           <div className="flex items-center gap-2 md:gap-3">
-            <Button
-              variant="ghost"
-              size={isMobile ? "icon" : "sm"}
-              icon={globalMute ? VolumeX : Volume2}
-              onClick={() => setGlobalMute(!globalMute)}
-              title={globalMute ? "取消静音" : "静音"}
-            >
-              {!isMobile && (globalMute ? "已静音" : "静音")}
-            </Button>
+            {roomType !== "voice" && (
+              <Button
+                variant="ghost"
+                size={isMobile ? "icon" : "sm"}
+                icon={globalMute ? VolumeX : Volume2}
+                onClick={() => setGlobalMute(!globalMute)}
+                title={globalMute ? "取消静音" : "静音"}
+              >
+                {!isMobile && (globalMute ? "已静音" : "静音")}
+              </Button>
+            )}
             <Button
               variant="ghost"
               size={isMobile ? "icon" : "sm"}
@@ -2386,25 +2428,32 @@ const App: React.FC = () => {
         </header>
 
         {view !== "setup" && view !== "music" ? (
-          <ChatArea
-            logs={logs}
-            activeChar={activeChar}
-            activeCharId={activeCharId}
-            characters={derivedCharacters}
-            moduleInfo={moduleInfo}
-            onSend={(text, recipientId, type, quote) =>
-              handleSend(text, recipientId, type, quote)
-            }
-            onRollDice={rollDice}
-            onShowStory={handleShowStory}
-            onDeleteMessage={handleDeleteMessage}
-            onLoadMore={handleLoadMoreLogs}
-            hasMore={hasMoreLogs}
-            isLoading={isLoadingMore}
-            isKP={isKP}
-            kpId={kpId}
-            isVip={isVip}
-          />
+          <>
+            <ChatArea
+              logs={logs}
+              activeChar={activeChar}
+              activeCharId={activeCharId}
+              characters={derivedCharacters}
+              moduleInfo={moduleInfo}
+              onSend={(text, recipientId, type, quote) =>
+                handleSend(text, recipientId, type, quote)
+              }
+              onRollDice={rollDice}
+              onShowStory={handleShowStory}
+              onDeleteMessage={handleDeleteMessage}
+              onLoadMore={handleLoadMoreLogs}
+              hasMore={hasMoreLogs}
+              isLoading={isLoadingMore}
+              isKP={isKP}
+              kpId={kpId}
+              isVip={isVip}
+            />
+            {roomType === "voice" && token && (
+              <>
+                <RoomAudioRenderer />
+              </>
+            )}
+          </>
         ) : view === "setup" ? (
           <Dashboard
             moduleInfo={moduleInfo}
@@ -2445,7 +2494,7 @@ const App: React.FC = () => {
             view === "music" ? "absolute inset-0 z-10 bg-slate-900 pt-16" : ""
           }
           isMobile={isMobile}
-          isHidden={view === "setup"}
+          isHidden={view === "setup" || roomType === "voice"}
           globalMute={globalMute}
           syncedIsPlaying={isMusicPlaying}
           syncedTrackIndex={musicTrackIndex}
@@ -2531,6 +2580,24 @@ const App: React.FC = () => {
       )}
     </div>
   );
+
+  if (roomType === "voice" && token) {
+    return (
+      <LiveKitRoom
+        token={token}
+        serverUrl={import.meta.env.VITE_LIVEKIT_URL}
+        connect={true}
+        audio={false}
+        video={false}
+        data-lk-theme="default"
+        onDisconnected={handleLeaveRoom}
+      >
+        {appContent}
+      </LiveKitRoom>
+    );
+  }
+
+  return appContent;
 };
 
 export default App;

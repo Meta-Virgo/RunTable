@@ -578,7 +578,7 @@ export const Square: React.FC<SquareProps> = ({ onScrollChange }) => {
   ) => {
     e.stopPropagation();
     try {
-      const { error, count } = await supabase
+      const { error } = await supabase
         .from("notifications")
         .delete({ count: "exact" })
         .eq("id", notificationId);

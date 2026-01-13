@@ -17,6 +17,8 @@ import {
   Crown,
   Skull,
   ArrowUp,
+  Mic,
+  MessageSquare,
 } from "lucide-react";
 import { CharacterModal } from "./Modals";
 import { AvatarUpload } from "./AvatarUpload";
@@ -110,6 +112,11 @@ const RoomCard: React.FC<RoomCardProps> = ({
       <div className="flex justify-between items-start mb-2">
         <div className="flex-1 min-w-0 mr-2">
           <div className="flex items-center gap-2">
+            {room.type === "voice" ? (
+              <Mic size={18} className="text-pink-400 shrink-0" />
+            ) : (
+              <MessageSquare size={18} className="text-indigo-400 shrink-0" />
+            )}
             <h3 className="font-bold text-white text-lg line-clamp-1">
               {room.title}
             </h3>
@@ -205,6 +212,7 @@ export const Home: React.FC<HomeProps> = ({
   const [newRoomTitle, setNewRoomTitle] = useState("");
   const [newRoomDesc, setNewRoomDesc] = useState("");
   const [newRoomPassword, setNewRoomPassword] = useState("");
+  const [newRoomType, setNewRoomType] = useState<"text" | "voice">("text");
 
   const [editingRoom, setEditingRoom] = useState<Room | null>(null);
 
@@ -617,6 +625,7 @@ export const Home: React.FC<HomeProps> = ({
         kp_id: user.id,
         status: "open",
         password: newRoomPassword || null,
+        type: newRoomType,
       })
       .select()
       .single();
@@ -625,6 +634,7 @@ export const Home: React.FC<HomeProps> = ({
       setNewRoomTitle("");
       setNewRoomDesc("");
       setNewRoomPassword("");
+      setNewRoomType("text");
       setShowCreateRoom(false);
       onJoinRoom(data.id, "pc"); // Creator joins as KP (pc)
     }
@@ -772,9 +782,12 @@ export const Home: React.FC<HomeProps> = ({
   const myRoomIds = new Set(myCharacters.map((c) => c.room_id).filter(Boolean));
 
   const filteredRooms = rooms.filter((r: any) => {
+    const query = searchQuery.toLowerCase();
     const matchesSearch =
-      r.title.includes(searchQuery) ||
-      (r.description && r.description.includes(searchQuery));
+      r.title.toLowerCase().includes(query) ||
+      (r.description && r.description.toLowerCase().includes(query)) ||
+      (r.room_number && String(r.room_number).includes(query)) ||
+      (r.room_number && `#${r.room_number}`.toLowerCase().includes(query));
 
     if (!matchesSearch) return false;
 
@@ -1046,6 +1059,30 @@ export const Home: React.FC<HomeProps> = ({
                       新建跑团房间
                     </h3>
                     <div className="space-y-4">
+                      <div className="flex gap-4">
+                        <button
+                          onClick={() => setNewRoomType("text")}
+                          className={`flex-1 py-3 rounded-xl border flex flex-col items-center gap-2 transition-all ${
+                            newRoomType === "text"
+                              ? "bg-indigo-500/20 border-indigo-500 text-indigo-400"
+                              : "bg-slate-900/50 border-slate-700/50 text-slate-500 hover:border-slate-600"
+                          }`}
+                        >
+                          <MessageSquare size={24} />
+                          <span className="text-sm font-bold">文字团</span>
+                        </button>
+                        <button
+                          onClick={() => setNewRoomType("voice")}
+                          className={`flex-1 py-3 rounded-xl border flex flex-col items-center gap-2 transition-all ${
+                            newRoomType === "voice"
+                              ? "bg-pink-500/20 border-pink-500 text-pink-400"
+                              : "bg-slate-900/50 border-slate-700/50 text-slate-500 hover:border-slate-600"
+                          }`}
+                        >
+                          <Mic size={24} />
+                          <span className="text-sm font-bold">语音团</span>
+                        </button>
+                      </div>
                       <Input
                         label="房间标题"
                         value={newRoomTitle}
@@ -1088,7 +1125,9 @@ export const Home: React.FC<HomeProps> = ({
                 {loading ? (
                   <div className="flex flex-col items-center justify-center py-24 text-slate-500 animate-fade-in">
                     <Loader2 className="w-12 h-12 animate-spin mb-4 text-indigo-500" />
-                    <p className="text-slate-400 font-medium">正在加载房间...</p>
+                    <p className="text-slate-400 font-medium">
+                      正在加载房间...
+                    </p>
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 animate-fade-in">

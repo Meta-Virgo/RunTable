@@ -11,10 +11,18 @@ import {
   ChevronRight,
   Activity,
   Music,
+  Mic,
+  MicOff,
 } from "lucide-react";
+import {
+  useParticipants,
+  useIsSpeaking,
+  useTrackToggle,
+} from "@livekit/components-react";
 import { cn } from "./UI";
 import { Character } from "../types";
 import { useElasticScroll } from "../hooks/useElasticScroll";
+import { Track } from "livekit-client";
 
 interface SidebarProps {
   isOpen: boolean;
@@ -28,7 +36,96 @@ interface SidebarProps {
   isMobile: boolean;
   isKP: boolean;
   kpOnline?: boolean;
+  roomType?: "text" | "voice";
+  userNickname?: string;
+  isVoiceConnected?: boolean;
 }
+
+const VoiceIndicatorContent = ({ participant }: { participant: any }) => {
+  const isSpeaking = useIsSpeaking(participant);
+
+  return (
+    <div className="absolute -top-1 -right-1 z-20">
+      <div
+        className={cn(
+          "w-3 h-3 rounded-full border-2 border-slate-900 transition-colors",
+          isSpeaking ? "bg-green-500 animate-pulse" : "bg-slate-600"
+        )}
+      />
+    </div>
+  );
+};
+
+const VoiceIndicator = ({ name }: { name: string }) => {
+  const participants = useParticipants();
+  const participant = participants.find(
+    (p) => p.name === name || p.identity === name
+  );
+
+  if (!participant) return null;
+
+  return <VoiceIndicatorContent participant={participant} />;
+};
+
+const VoiceControls = ({
+  isOpen,
+  isConnected,
+}: {
+  isOpen: boolean;
+  isConnected?: boolean;
+}) => {
+  return (
+    <>
+      {/* Microphone Toggle - Only show if connected */}
+      {isConnected && <MicrophoneButton isOpen={isOpen} />}
+    </>
+  );
+};
+
+const MicrophoneButton = ({ isOpen }: { isOpen: boolean }) => {
+  const { toggle, enabled, buttonProps } = useTrackToggle({
+    source: Track.Source.Microphone,
+    initialState: false,
+  });
+
+  return (
+    <button
+      {...buttonProps}
+      onClick={() => toggle()}
+      className={cn(
+        "w-full flex items-center gap-3 px-3 py-3 rounded-xl transition-all duration-300 group border",
+        enabled
+          ? "bg-indigo-600/10 text-indigo-300 border-indigo-500/20"
+          : "text-rose-400 hover:text-white hover:bg-white/5 border-transparent",
+        !isOpen && "justify-center"
+      )}
+      title={enabled ? "静音" : "取消静音"}
+    >
+      {enabled ? (
+        <Mic
+          size={20}
+          className={cn(
+            "transition-colors",
+            enabled ? "text-indigo-400" : "text-rose-500"
+          )}
+        />
+      ) : (
+        <MicOff
+          size={20}
+          className={cn(
+            "transition-colors",
+            enabled ? "text-indigo-400" : "text-rose-500"
+          )}
+        />
+      )}
+      {isOpen && (
+        <span className="font-medium text-sm">
+          {enabled ? "麦克风已开" : "麦克风已关"}
+        </span>
+      )}
+    </button>
+  );
+};
 
 export const Sidebar: React.FC<SidebarProps> = ({
   isOpen,
@@ -42,6 +139,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
   isMobile,
   isKP,
   // kpOnline = false, // Unused
+  roomType = "text",
+  userNickname,
+  isVoiceConnected,
 }) => {
   const pcCharacters = characters.filter((c) => c.role === "调查员");
   const npcCharacters = characters.filter((c) =>
@@ -146,6 +246,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
           {showOnline && isOnline && (
             <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-emerald-500 border-2 border-slate-900 rounded-full z-10"></div>
           )}
+          {roomType === "voice" && isVoiceConnected && (
+            <VoiceIndicator name={char.name} />
+          )}
         </div>
         {isOpen && (
           <div className="flex-1 overflow-hidden animate-fade-in">
@@ -178,6 +281,49 @@ export const Sidebar: React.FC<SidebarProps> = ({
       </div>
     );
   };
+
+  const renderKeeperItem = () => (
+    <div
+      onClick={() => handleCharClick("pc")}
+      className={cn(
+        "relative group flex items-center gap-3 p-2 rounded-xl cursor-pointer transition-all duration-300 border",
+        activeCharId === "pc"
+          ? "bg-gradient-to-r from-indigo-500/20 to-transparent border-indigo-500/30 shadow-[inset_2px_0_0_0_#6366f1]"
+          : "bg-transparent border-transparent hover:bg-white/5",
+        !isOpen && "justify-center"
+      )}
+    >
+      <div
+        className={cn(
+          "p-2 rounded-lg shrink-0 transition-colors relative",
+          activeCharId === "pc"
+            ? "bg-indigo-500 text-white"
+            : "bg-slate-800 text-slate-400 group-hover:bg-slate-700"
+        )}
+      >
+        <Crown size={18} />
+        {roomType === "voice" && isVoiceConnected && isKP && (
+          <VoiceIndicator name={userNickname || "守秘人"} />
+        )}
+      </div>
+      {isOpen && (
+        <div className="overflow-hidden animate-fade-in">
+          <div
+            className={cn(
+              "font-bold text-sm truncate",
+              activeCharId === "pc" ? "text-white" : "text-slate-300"
+            )}
+          >
+            守秘人
+          </div>
+          <div className="text-[10px] text-slate-500 truncate">Game Master</div>
+        </div>
+      )}
+      {activeCharId === "pc" && isOpen && (
+        <div className="absolute right-2 w-1.5 h-1.5 rounded-full bg-indigo-400 shadow-[0_0_10px_#6366f1]"></div>
+      )}
+    </div>
+  );
 
   return (
     <>
@@ -228,7 +374,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             { id: "music", icon: Music, label: "背景音乐" },
           ]
             .filter((nav) => {
-              if (nav.id === "music") return isKP;
+              if (nav.id === "music") return isKP && roomType !== "voice";
               return true;
             })
             .map((nav) => (
@@ -258,6 +404,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 )}
               </button>
             ))}
+
+          {/* Voice Room Controls */}
+          {roomType === "voice" && (
+            <VoiceControls isOpen={isOpen} isConnected={isVoiceConnected} />
+          )}
         </div>
 
         {/* Character/Role Lists */}
@@ -278,47 +429,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   )}
 
                   {/* Keeper Item */}
-                  <div
-                    onClick={() => handleCharClick("pc")}
-                    className={cn(
-                      "relative group flex items-center gap-3 p-2 rounded-xl cursor-pointer transition-all duration-300 border",
-                      activeCharId === "pc"
-                        ? "bg-gradient-to-r from-indigo-500/20 to-transparent border-indigo-500/30 shadow-[inset_2px_0_0_0_#6366f1]"
-                        : "bg-transparent border-transparent hover:bg-white/5",
-                      !isOpen && "justify-center"
-                    )}
-                  >
-                    <div
-                      className={cn(
-                        "p-2 rounded-lg shrink-0 transition-colors",
-                        activeCharId === "pc"
-                          ? "bg-indigo-500 text-white"
-                          : "bg-slate-800 text-slate-400 group-hover:bg-slate-700"
-                      )}
-                    >
-                      <Crown size={18} />
-                    </div>
-                    {isOpen && (
-                      <div className="overflow-hidden animate-fade-in">
-                        <div
-                          className={cn(
-                            "font-bold text-sm truncate",
-                            activeCharId === "pc"
-                              ? "text-white"
-                              : "text-slate-300"
-                          )}
-                        >
-                          守秘人
-                        </div>
-                        <div className="text-[10px] text-slate-500 truncate">
-                          Game Master
-                        </div>
-                      </div>
-                    )}
-                    {activeCharId === "pc" && isOpen && (
-                      <div className="absolute right-2 w-1.5 h-1.5 rounded-full bg-indigo-400 shadow-[0_0_10px_#6366f1]"></div>
-                    )}
-                  </div>
+                  {renderKeeperItem()}
 
                   {/* NPCs & Monsters */}
                   {npcCharacters.map((char) =>
@@ -346,6 +457,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             {/* --- PC VIEW (Only Investigators) --- */}
             {!isKP && (
               <div className="space-y-2">
+                {renderKeeperItem()}
                 {pcCharacters.map((char) =>
                   renderCharacterItem(char, char.id === "pc", true)
                 )}

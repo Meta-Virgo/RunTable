@@ -14,7 +14,8 @@ interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
     | "danger"
     | "dangerActive"
     | "success"
-    | "active";
+    | "active"
+    | "primarySoft";
   size?: "xs" | "sm" | "md" | "lg" | "icon";
   icon?: LucideIcon;
   active?: boolean;
@@ -54,6 +55,8 @@ export const Button: React.FC<ButtonProps> = ({
     success:
       "bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg border border-emerald-500/50",
     active: "bg-indigo-500/20 text-indigo-300 border border-indigo-500/30",
+    primarySoft:
+      "bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 border border-indigo-500/20 hover:border-indigo-500/50",
   };
   return (
     <button

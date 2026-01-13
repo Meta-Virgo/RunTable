@@ -34,6 +34,7 @@ export interface Room {
   password?: string | null;
   last_active_at?: string;
   bg_music_url?: string | null;
+  type: "text" | "voice";
 }
 
 export interface GameHistory {

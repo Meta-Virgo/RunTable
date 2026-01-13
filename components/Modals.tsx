@@ -1143,9 +1143,11 @@ export const ConclusionModal: React.FC<{
     >
       <div className="p-6 space-y-6">
         <div className="bg-indigo-500/10 border border-indigo-500/20 p-4 rounded-xl text-sm text-indigo-300">
-          结团后，房间状态将变为“已完成”，并生成永久的跑团履历。
-          <br />
-          请确认每位玩家角色的最终结局，这将记录在他们的个人履历中。
+          结团后，房间状态将变为“已完成”，并生成永久的跑团履历。<br></br>
+          请确认每位玩家角色的最终结局，这将记录在他们的个人履历中。<br></br>
+          <span className="text-amber-400 font-bold">
+            注意：结团会删除房间数据，请务必提前留存好战报！
+          </span>
         </div>
 
         <div className="space-y-4">
