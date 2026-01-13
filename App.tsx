@@ -17,7 +17,11 @@ import {
 } from "./components/Modals";
 import { Button } from "./components/UI";
 import { MusicPlayer } from "./components/MusicPlayer";
-import { LiveKitRoom, RoomAudioRenderer } from "@livekit/components-react";
+import {
+  LiveKitRoom,
+  RoomAudioRenderer,
+  StartAudio,
+} from "@livekit/components-react";
 import "@livekit/components-styles";
 import { ModuleInfo, Character, Log } from "./types"; // Removed AppData as it might not be used anymore
 import { Menu, LogOut, Volume2, VolumeX } from "lucide-react";
@@ -2451,6 +2455,7 @@ const App: React.FC = () => {
             {roomType === "voice" && token && (
               <>
                 <RoomAudioRenderer />
+                <StartAudio label="点击开启声音" />
               </>
             )}
           </>

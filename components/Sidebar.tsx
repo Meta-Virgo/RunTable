@@ -138,7 +138,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onOpenStatusEdit,
   isMobile,
   isKP,
-  // kpOnline = false, // Unused
+  kpOnline = false,
   roomType = "text",
   userNickname,
   isVoiceConnected,
@@ -229,7 +229,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           className={cn(
             "shrink-0 transition-colors relative flex items-center justify-center",
             char.avatar_url
-              ? "w-[34px] h-[34px] rounded-lg overflow-hidden border border-white/10 bg-slate-900"
+              ? "w-[34px] h-[34px] rounded-lg border border-white/10 bg-slate-900"
               : "p-2 rounded-lg",
             !char.avatar_url && iconBg
           )}
@@ -238,14 +238,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <img
               src={char.avatar_url}
               alt={char.name}
-              className="w-full h-full object-cover"
+              className="w-full h-full object-cover rounded-lg"
             />
           ) : (
             getCharIcon(char.role, 18)
           )}
-          {showOnline && isOnline && (
-            <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-emerald-500 border-2 border-slate-900 rounded-full z-10"></div>
-          )}
+
           {roomType === "voice" && isVoiceConnected && (
             <VoiceIndicator name={char.name} />
           )}
@@ -290,7 +288,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
         activeCharId === "pc"
           ? "bg-gradient-to-r from-indigo-500/20 to-transparent border-indigo-500/30 shadow-[inset_2px_0_0_0_#6366f1]"
           : "bg-transparent border-transparent hover:bg-white/5",
-        !isOpen && "justify-center"
+        !isOpen && "justify-center",
+        !kpOnline && "opacity-50 grayscale"
       )}
     >
       <div
@@ -302,8 +301,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
         )}
       >
         <Crown size={18} />
-        {roomType === "voice" && isVoiceConnected && isKP && (
-          <VoiceIndicator name={userNickname || "守秘人"} />
+        {kpOnline && (
+          <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-emerald-500 border-2 border-slate-900 rounded-full z-10"></div>
+        )}
+        {roomType === "voice" && isVoiceConnected && (
+          <VoiceIndicator name={"守秘人"} />
         )}
       </div>
       {isOpen && (

@@ -103,8 +103,23 @@ export const Dashboard: React.FC<DashboardProps> = ({
                   className="glass-panel bg-slate-800/30 hover:bg-slate-800/50 p-5 md:p-6 rounded-2xl relative overflow-hidden group cursor-pointer transition-all"
                 >
                   <div className="flex items-start gap-4 mb-4 md:mb-6">
-                    <div className="p-3 bg-purple-500/10 rounded-xl text-purple-400 border border-purple-500/20">
-                      <User size={24} className="md:w-8 md:h-8" />
+                    <div
+                      className={cn(
+                        "rounded-xl shrink-0 flex items-center justify-center",
+                        inv.avatar_url
+                          ? "w-12 h-12 md:w-14 md:h-14 border border-white/10 overflow-hidden bg-slate-900"
+                          : "p-3 bg-purple-500/10 text-purple-400 border border-purple-500/20"
+                      )}
+                    >
+                      {inv.avatar_url ? (
+                        <img
+                          src={inv.avatar_url}
+                          alt={inv.name}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <User size={24} className="md:w-8 md:h-8" />
+                      )}
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="font-bold text-white text-lg truncate group-hover:text-purple-400 transition-colors">
@@ -139,7 +154,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                       icon={Zap}
                     />
                   </div>
-                  <div className="text-xs text-slate-500 line-clamp-2 bg-slate-950/30 p-3 rounded-xl border border-white/5 min-h-[3.5rem]">
+                  <div className="text-xs text-slate-500 line-clamp-3 bg-slate-950/30 p-3 rounded-xl border border-white/5 min-h-[3.5rem] leading-relaxed whitespace-pre-wrap">
                     {inv.backstory || "暂无背景故事..."}
                   </div>
                 </div>
@@ -262,7 +277,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                           </span>
                         </div>
                       </div>
-                      <div className="text-xs text-slate-500 line-clamp-2 bg-slate-950/30 p-3 rounded-xl border border-white/5 min-h-[3.5rem]">
+                      <div className="text-xs text-slate-500 line-clamp-3 bg-slate-950/30 p-3 rounded-xl border border-white/5 min-h-[3.5rem] leading-relaxed whitespace-pre-wrap">
                         {npc.backstory || "..."}
                       </div>
                     </div>
