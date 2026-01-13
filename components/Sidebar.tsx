@@ -107,9 +107,7 @@ const MicrophoneButton = ({ isOpen }: { isOpen: boolean }) => {
         error.message?.includes("device") ||
         error.message?.includes("权限")
       ) {
-        alert(
-          "无法开启麦克风：权限被拒绝。"
-        );
+        alert("无法开启麦克风：权限被拒绝。");
       } else {
         alert("麦克风开启失败: " + (error.message || "未知错误"));
       }
@@ -324,7 +322,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       <div
         className={cn(
           "p-2 rounded-lg shrink-0 transition-colors relative",
-          activeCharId === "pc"
+          activeCharId === "pc" || kpOnline
             ? "bg-indigo-500 text-white"
             : "bg-slate-800 text-slate-400 group-hover:bg-slate-700"
         )}
