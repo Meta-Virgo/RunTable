@@ -133,7 +133,6 @@ const PostContent: React.FC<{ content: string }> = ({ content }) => {
   );
 };
 
-
 interface SquareProps {
   onScrollChange?: (direction: "up" | "down") => void;
 }
@@ -313,7 +312,7 @@ export const Square: React.FC<SquareProps> = ({ onScrollChange }) => {
       setLoadingPosts(true);
 
       // 1. Fetch Posts (without profiles join first)
-      const { data: postsData, error } = await supabase
+      const { data: postsData } = await supabase
         .from("posts")
         .select(
           `
