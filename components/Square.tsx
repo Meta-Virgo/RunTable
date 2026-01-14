@@ -2112,9 +2112,8 @@ const PostDetailModal: React.FC<{
         )}
         <div className="flex items-center gap-3">
           <div className="flex-1 bg-slate-800/50 rounded-full px-4 py-2 flex items-center gap-2 cursor-text border border-transparent hover:border-slate-700 transition-colors">
-            <input
-              type="text"
-              className="bg-transparent border-none outline-none text-sm text-slate-200 placeholder:text-slate-500 flex-1"
+            <textarea
+              className="bg-transparent border-none outline-none text-sm text-slate-200 placeholder:text-slate-500 flex-1 resize-none leading-snug"
               placeholder={
                 replyTo
                   ? `回复 @${replyTo.profiles?.nickname || "..."}...`
@@ -2122,22 +2121,7 @@ const PostDetailModal: React.FC<{
               }
               value={newComment}
               onChange={(e) => setNewComment(e.target.value)}
-              onKeyDown={async (e) => {
-                if (e.key === "Enter" && !e.shiftKey) {
-                  if (!newComment.trim() || sending) return;
-                  setSending(true);
-                  const success = await onSendComment(
-                    post.id,
-                    newComment,
-                    replyTo?.id
-                  );
-                  if (success) {
-                    setNewComment("");
-                    setReplyTo(null);
-                  }
-                  setSending(false);
-                }
-              }}
+              rows={1}
             />
           </div>
           <Button
