@@ -1,0 +1,34 @@
+{
+  "name": "runtable-pro",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@livekit/components-react": "^2.9.17",
+    "@livekit/components-styles": "^1.2.0",
+    "@supabase/supabase-js": "^2.88.0",
+    "livekit-client": "^2.17.0",
+    "livekit-server-sdk": "^2.15.0",
+    "lucide-react": "^0.292.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-easy-crop": "^5.5.6"
+  },
+  "devDependencies": {
+    "@types/react": "^18.2.15",
+    "@types/react-dom": "^18.2.7",
+    "@vitejs/plugin-react": "^4.0.3",
+    "autoprefixer": "^10.4.23",
+    "postcss": "^8.5.6",
+    "supabase": "^2.67.3",
+    "tailwindcss": "^3.4.17",
+    "typescript": "^5.0.2",
+    "vercel": "^50.3.0",
+    "vite": "^4.4.5"
+  }
+}
