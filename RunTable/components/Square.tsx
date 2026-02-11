@@ -152,6 +152,17 @@ export const Square: React.FC<SquareProps> = ({ onScrollChange }) => {
     name: string;
   } | null>(null);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
+  const postTextareaRef = React.useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    if (postTextareaRef.current) {
+      postTextareaRef.current.style.height = "auto";
+      postTextareaRef.current.style.height = `${Math.min(
+        postTextareaRef.current.scrollHeight,
+        300,
+      )}px`;
+    }
+  }, [newPostContent]);
 
   // Comments & Notifications
   const [selectedPostId, setSelectedPostId] = useState<string | null>(null);
@@ -319,7 +330,7 @@ export const Square: React.FC<SquareProps> = ({ onScrollChange }) => {
           *,
           post_likes (user_id),
           post_comments (count)
-        `
+        `,
         )
         .eq("channel_id", activeChannelId)
         .order("created_at", { ascending: false });
@@ -328,7 +339,7 @@ export const Square: React.FC<SquareProps> = ({ onScrollChange }) => {
         // 2. Fetch Profiles manually (authors AND likers)
         const authorIds = postsData.map((p: any) => p.user_id);
         const likerIds = postsData.flatMap((p: any) =>
-          p.post_likes ? p.post_likes.map((l: any) => l.user_id) : []
+          p.post_likes ? p.post_likes.map((l: any) => l.user_id) : [],
         );
         const allUserIds = Array.from(new Set([...authorIds, ...likerIds]));
 
@@ -338,7 +349,7 @@ export const Square: React.FC<SquareProps> = ({ onScrollChange }) => {
           .in("id", allUserIds);
 
         const profileMap = new Map(
-          profilesData?.map((p: any) => [p.id, p]) || []
+          profilesData?.map((p: any) => [p.id, p]) || [],
         );
 
         // 3. Fetch My Likes
@@ -350,7 +361,7 @@ export const Square: React.FC<SquareProps> = ({ onScrollChange }) => {
             .eq("user_id", currentUser.id)
             .in(
               "post_id",
-              postsData.map((p) => p.id)
+              postsData.map((p) => p.id),
             );
           if (myLikes) {
             myLikedPostIds = new Set(myLikes.map((l) => l.post_id));
@@ -390,7 +401,7 @@ export const Square: React.FC<SquareProps> = ({ onScrollChange }) => {
 
     // Identify posts that need comment previews
     const postsNeedingComments = posts.filter(
-      (p) => (p.comment_count || 0) > 0 && p.latest_comments === undefined
+      (p) => (p.comment_count || 0) > 0 && p.latest_comments === undefined,
     );
 
     if (postsNeedingComments.length === 0) return;
@@ -406,7 +417,7 @@ export const Square: React.FC<SquareProps> = ({ onScrollChange }) => {
             .order("created_at", { ascending: false })
             .limit(1);
           return { postId: post.id, comments: data || [] };
-        })
+        }),
       );
 
       // Collect all user IDs from the fetched comments
@@ -444,7 +455,7 @@ export const Square: React.FC<SquareProps> = ({ onScrollChange }) => {
             return { ...p, latest_comments: commentsWithProfiles };
           }
           return p;
-        })
+        }),
       );
     };
 
@@ -475,7 +486,7 @@ export const Square: React.FC<SquareProps> = ({ onScrollChange }) => {
               *,
               post_likes (count),
               post_comments (count)
-            `
+            `,
             )
             .eq("id", newPostId)
             .single();
@@ -500,7 +511,7 @@ export const Square: React.FC<SquareProps> = ({ onScrollChange }) => {
             };
             setPosts((prev) => [formattedPost, ...prev]);
           }
-        }
+        },
       )
       .subscribe();
 
@@ -566,14 +577,14 @@ export const Square: React.FC<SquareProps> = ({ onScrollChange }) => {
       .update({ is_read: true })
       .eq("id", notificationId);
     setNotifications((prev) =>
-      prev.map((n) => (n.id === notificationId ? { ...n, is_read: true } : n))
+      prev.map((n) => (n.id === notificationId ? { ...n, is_read: true } : n)),
     );
     setUnreadCount((prev) => Math.max(0, prev - 1));
   };
 
   const deleteNotification = async (
     e: React.MouseEvent,
-    notificationId: string
+    notificationId: string,
   ) => {
     e.stopPropagation();
     try {
@@ -615,7 +626,7 @@ export const Square: React.FC<SquareProps> = ({ onScrollChange }) => {
           user_id
         ),
         comment_likes (user_id)
-      `
+      `,
       )
       .eq("post_id", postId)
       .order("created_at", { ascending: true });
@@ -667,7 +678,7 @@ export const Square: React.FC<SquareProps> = ({ onScrollChange }) => {
   const handleSendComment = async (
     postId: string,
     content?: string,
-    quoteId?: string
+    quoteId?: string,
   ) => {
     const finalContent = content || newCommentContent;
     if (!finalContent.trim() || !currentUser) return false;
@@ -731,7 +742,7 @@ export const Square: React.FC<SquareProps> = ({ onScrollChange }) => {
             };
           }
           return p;
-        })
+        }),
       );
     }
     if (!content) setCommenting(false);
@@ -759,11 +770,11 @@ export const Square: React.FC<SquareProps> = ({ onScrollChange }) => {
                   like_count: Math.max(0, (p.like_count || 0) - 1),
                   is_liked: false,
                   liked_by: (p.liked_by || []).filter(
-                    (u) => u.nickname !== currentUser.nickname
+                    (u) => u.nickname !== currentUser.nickname,
                   ),
                 }
-              : p
-          )
+              : p,
+          ),
         );
       }
     } else {
@@ -786,8 +797,8 @@ export const Square: React.FC<SquareProps> = ({ onScrollChange }) => {
                     { nickname: currentUser.nickname || "我" },
                   ],
                 }
-              : p
-          )
+              : p,
+          ),
         );
 
         // Notify
@@ -825,7 +836,7 @@ export const Square: React.FC<SquareProps> = ({ onScrollChange }) => {
                   like_count: Math.max(0, (c.like_count || 0) - 1),
                   is_liked: false,
                 }
-              : c
+              : c,
           ),
         }));
       }
@@ -844,7 +855,7 @@ export const Square: React.FC<SquareProps> = ({ onScrollChange }) => {
                   like_count: (c.like_count || 0) + 1,
                   is_liked: true,
                 }
-              : c
+              : c,
           ),
         }));
 
@@ -893,8 +904,8 @@ export const Square: React.FC<SquareProps> = ({ onScrollChange }) => {
                 ...p,
                 comment_count: Math.max(0, (p.comment_count || 0) - 1),
               }
-            : p
-        )
+            : p,
+        ),
       );
     }
   };
@@ -970,7 +981,7 @@ export const Square: React.FC<SquareProps> = ({ onScrollChange }) => {
         .sort(
           (a, b) =>
             new Date(b.game_history.created_at).getTime() -
-            new Date(a.game_history.created_at).getTime()
+            new Date(a.game_history.created_at).getTime(),
         );
       setPlayerHistory(sorted);
     } else {
@@ -1001,7 +1012,7 @@ export const Square: React.FC<SquareProps> = ({ onScrollChange }) => {
         className={cn(
           "w-64 flex-shrink-0 border-r border-white/5 bg-slate-900 md:bg-slate-900/50 flex flex-col transition-transform duration-300 ease-in-out z-50",
           "fixed inset-y-0 left-0 md:relative md:translate-x-0",
-          showMobileSidebar ? "translate-x-0" : "-translate-x-full"
+          showMobileSidebar ? "translate-x-0" : "-translate-x-full",
         )}
       >
         <div className="h-16 flex items-center px-4 border-b border-white/5 justify-between">
@@ -1046,7 +1057,7 @@ export const Square: React.FC<SquareProps> = ({ onScrollChange }) => {
                             "w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm font-medium transition-all group",
                             activeChannelId === channel.id
                               ? "bg-indigo-500/20 text-indigo-300"
-                              : "text-slate-400 hover:bg-slate-800 hover:text-slate-200"
+                              : "text-slate-400 hover:bg-slate-800 hover:text-slate-200",
                           )}
                         >
                           <div className="flex items-center gap-2">
@@ -1156,7 +1167,7 @@ export const Square: React.FC<SquareProps> = ({ onScrollChange }) => {
                             key={n.id}
                             className={cn(
                               "p-3 border-b border-slate-700/50 hover:bg-slate-700/30 transition-colors cursor-pointer group",
-                              !n.is_read && "bg-slate-700/20"
+                              !n.is_read && "bg-slate-700/20",
                             )}
                             onClick={() => {
                               markAsRead(n.id);
@@ -1263,6 +1274,7 @@ export const Square: React.FC<SquareProps> = ({ onScrollChange }) => {
                     </div>
                   )}
                   <textarea
+                    ref={postTextareaRef}
                     className="w-full bg-transparent border-none focus:ring-0 outline-none text-slate-200 placeholder:text-slate-500 resize-none min-h-[80px] custom-scrollbar"
                     placeholder={`在 #${
                       activeChannel?.name || "..."
@@ -1319,8 +1331,8 @@ export const Square: React.FC<SquareProps> = ({ onScrollChange }) => {
                       .toLowerCase()
                       .includes(searchQuery.toLowerCase()) ||
                     post.tags?.some((t) =>
-                      t.toLowerCase().includes(searchQuery.toLowerCase())
-                    )
+                      t.toLowerCase().includes(searchQuery.toLowerCase()),
+                    ),
                 )
                 .map((post) => (
                   <div
@@ -1351,7 +1363,7 @@ export const Square: React.FC<SquareProps> = ({ onScrollChange }) => {
                             "font-bold text-sm",
                             post.profiles?.is_vip
                               ? "text-purple-400"
-                              : "text-white"
+                              : "text-white",
                           )}
                           onClick={() => openProfile(post.user_id)}
                         >
@@ -1411,7 +1423,7 @@ export const Square: React.FC<SquareProps> = ({ onScrollChange }) => {
                           <button
                             className={cn(
                               "flex items-center gap-1 hover:text-pink-400 transition-colors group/like relative",
-                              post.is_liked && "text-pink-400"
+                              post.is_liked && "text-pink-400",
                             )}
                             onClick={() => handleLike(post.id)}
                           >
@@ -1503,7 +1515,7 @@ export const Square: React.FC<SquareProps> = ({ onScrollChange }) => {
           "fixed bottom-8 right-8 z-50 p-3 bg-indigo-600 text-white rounded-full shadow-lg shadow-indigo-600/30 transition-all duration-300 hover:bg-indigo-500 hover:scale-110",
           showBackToTop
             ? "opacity-100 translate-y-0"
-            : "opacity-0 translate-y-10 pointer-events-none"
+            : "opacity-0 translate-y-10 pointer-events-none",
         )}
       >
         <ArrowUp size={24} />
@@ -1696,7 +1708,7 @@ export const Square: React.FC<SquareProps> = ({ onScrollChange }) => {
                                 <path d="M2 4l3 12h14l3-12-6 7-4-7-4 7-6-7zm3 16h14"></path>
                               </svg>
                               {new Date(
-                                item.game_history.created_at
+                                item.game_history.created_at,
                               ).toLocaleDateString()}
                               <span className="w-0.5 h-0.5 rounded-full bg-slate-600"></span>
                               KP: {item.game_history.kp_nickname}
@@ -1707,10 +1719,10 @@ export const Square: React.FC<SquareProps> = ({ onScrollChange }) => {
                               isDead
                                 ? "bg-red-950 text-red-500 border border-red-900"
                                 : isLost
-                                ? "bg-yellow-950 text-yellow-500 border border-yellow-900"
-                                : isCrazy
-                                ? "bg-purple-950 text-purple-500 border border-purple-900"
-                                : "bg-emerald-950 text-emerald-500 border border-emerald-900"
+                                  ? "bg-yellow-950 text-yellow-500 border border-yellow-900"
+                                  : isCrazy
+                                    ? "bg-purple-950 text-purple-500 border border-purple-900"
+                                    : "bg-emerald-950 text-emerald-500 border border-emerald-900"
                             }`}
                           >
                             {item.outcome}
@@ -1863,7 +1875,7 @@ const PostDetailModal: React.FC<{
   onSendComment: (
     pid: string,
     content?: string,
-    quoteId?: string
+    quoteId?: string,
   ) => Promise<boolean>;
   onLikeComment: (commentId: string) => void;
 }> = ({
@@ -1882,6 +1894,17 @@ const PostDetailModal: React.FC<{
   const [newComment, setNewComment] = useState("");
   const [sending, setSending] = useState(false);
   const [replyTo, setReplyTo] = useState<PostComment | null>(null);
+  const commentTextareaRef = React.useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    if (commentTextareaRef.current) {
+      commentTextareaRef.current.style.height = "auto";
+      commentTextareaRef.current.style.height = `${Math.min(
+        commentTextareaRef.current.scrollHeight,
+        200,
+      )}px`;
+    }
+  }, [newComment]);
 
   return (
     <Modal
@@ -1913,7 +1936,7 @@ const PostDetailModal: React.FC<{
             <span
               className={cn(
                 "font-bold text-sm cursor-pointer",
-                post.profiles?.is_vip ? "text-purple-400" : "text-slate-200"
+                post.profiles?.is_vip ? "text-purple-400" : "text-slate-200",
               )}
             >
               {post.profiles?.nickname || "未知用户"}
@@ -1964,7 +1987,7 @@ const PostDetailModal: React.FC<{
                   "mt-0.5",
                   post.is_liked
                     ? "fill-pink-500 text-pink-500"
-                    : "text-slate-400"
+                    : "text-slate-400",
                 )}
               />
               <div className="flex-1 text-xs text-slate-400 leading-5">
@@ -2017,7 +2040,7 @@ const PostDetailModal: React.FC<{
                             "text-sm font-bold cursor-pointer",
                             comment.profiles?.is_vip
                               ? "text-purple-400"
-                              : "text-slate-400"
+                              : "text-slate-400",
                           )}
                           onClick={() => openProfile(comment.user_id)}
                         >
@@ -2064,7 +2087,7 @@ const PostDetailModal: React.FC<{
                             "transition-colors",
                             comment.is_liked
                               ? "fill-pink-500 text-pink-500"
-                              : "text-slate-500 group-hover/clike:text-pink-400"
+                              : "text-slate-500 group-hover/clike:text-pink-400",
                           )}
                         />
                         <span
@@ -2072,7 +2095,7 @@ const PostDetailModal: React.FC<{
                             "text-[10px]",
                             comment.is_liked
                               ? "text-pink-500"
-                              : "text-slate-500 group-hover/clike:text-pink-400"
+                              : "text-slate-500 group-hover/clike:text-pink-400",
                           )}
                         >
                           {comment.like_count || 0}
@@ -2112,6 +2135,7 @@ const PostDetailModal: React.FC<{
         <div className="flex items-center gap-3">
           <div className="flex-1 bg-slate-800/50 rounded-full px-4 py-2 flex items-center gap-2 cursor-text border border-transparent hover:border-slate-700 transition-colors">
             <textarea
+              ref={commentTextareaRef}
               className="bg-transparent border-none outline-none text-sm text-slate-200 placeholder:text-slate-500 flex-1 resize-none leading-snug"
               placeholder={
                 replyTo
@@ -2131,7 +2155,7 @@ const PostDetailModal: React.FC<{
               const success = await onSendComment(
                 post.id,
                 newComment,
-                replyTo?.id
+                replyTo?.id,
               );
               if (success) {
                 setNewComment("");
@@ -2141,7 +2165,7 @@ const PostDetailModal: React.FC<{
             }}
             className={cn(
               "rounded-full px-6 transition-all",
-              !newComment.trim() && "opacity-50"
+              !newComment.trim() && "opacity-50",
             )}
           >
             {sending ? <Loader2 size={16} className="animate-spin" /> : "发送"}
