@@ -28,7 +28,7 @@ npm install -g supabase
 
 在终端运行：
 ```bash
-supabase secrets set DEEPSEEK_API_KEY=sk-54bbf491f30349e084c05b126db6947c
+supabase secrets set DEEPSEEK_API_KEY=your_deepseek_api_key
 ```
 
 ## 步骤 3: 部署 Edge Function
