@@ -24,20 +24,45 @@ export function useAuthProfile() {
   };
 
   useEffect(() => {
-    supabase.auth.getSession().then(async ({ data }) => {
-      setSession(data.session);
-      await syncProfile(data.session);
-      setAuthLoading(false);
-    });
+    let mounted = true;
+    const loadingFallback = window.setTimeout(() => {
+      if (mounted) {
+        console.warn("Auth session restore timed out; continuing startup.");
+        setAuthLoading(false);
+      }
+    }, 4000);
+
+    supabase.auth
+      .getSession()
+      .then(({ data }) => {
+        if (!mounted) return;
+        window.clearTimeout(loadingFallback);
+        setSession(data.session);
+        setAuthLoading(false);
+        syncProfile(data.session).catch((error) => {
+          console.error("Failed to sync profile:", error);
+        });
+      })
+      .catch((error) => {
+        console.error("Failed to restore auth session:", error);
+        window.clearTimeout(loadingFallback);
+        if (mounted) setAuthLoading(false);
+      });
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (_event, nextSession) => {
+    } = supabase.auth.onAuthStateChange((_event, nextSession) => {
       setSession(nextSession);
-      await syncProfile(nextSession);
+      syncProfile(nextSession).catch((error) => {
+        console.error("Failed to sync profile:", error);
+      });
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      mounted = false;
+      window.clearTimeout(loadingFallback);
+      subscription.unsubscribe();
+    };
   }, []);
 
   return {
