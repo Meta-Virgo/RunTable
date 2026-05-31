@@ -29,6 +29,33 @@ import {
 import { Button, cn, Modal } from "./UI";
 import { AvatarUpload } from "./AvatarUpload";
 import { useElasticScroll } from "../hooks/useElasticScroll";
+import {
+  createComment,
+  createNotification,
+  createPost,
+  deleteComment,
+  deleteNotification as deleteSquareNotification,
+  deletePost,
+  fetchCharactersByIds,
+  fetchChannels,
+  fetchKpHistory,
+  fetchLatestComments,
+  fetchLikedPostIds,
+  fetchNotifications as fetchSquareNotifications,
+  fetchPlayerHistory,
+  fetchPostComments,
+  fetchPostsForChannel,
+  fetchPostWithCounts,
+  fetchProfileById,
+  fetchProfilesByIds,
+  fetchSquareUser,
+  likeComment,
+  likePost,
+  markNotificationRead,
+  unlikeComment,
+  unlikePost,
+  uploadPostImage,
+} from "../services/square";
 
 const MAX_POST_LENGTH = 140;
 
@@ -150,6 +177,7 @@ export const Square: React.FC<SquareProps> = ({ onScrollChange }) => {
   const [pendingImage, setPendingImage] = useState<{
     dataUrl: string;
     name: string;
+    file: File;
   } | null>(null);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
@@ -245,7 +273,7 @@ export const Square: React.FC<SquareProps> = ({ onScrollChange }) => {
     reader.onload = (e) => {
       const result = e.target?.result as string;
       if (result) {
-        setPendingImage({ dataUrl: result, name: file.name });
+        setPendingImage({ dataUrl: result, name: file.name, file });
       }
     };
     reader.readAsDataURL(file);
@@ -272,25 +300,10 @@ export const Square: React.FC<SquareProps> = ({ onScrollChange }) => {
   // Fetch Channels & User
   useEffect(() => {
     const init = async () => {
-      // 1. Get User
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (user) {
-        const { data: profile } = await supabase
-          .from("profiles")
-          .select("*")
-          .eq("id", user.id)
-          .single();
-        setCurrentUser({ ...user, ...profile });
-      }
+      const user = await fetchSquareUser();
+      if (user) setCurrentUser(user);
 
-      // 2. Get Channels
-      const { data, error: _error } = await supabase
-        .from("channels")
-        .select("*")
-        .order("category")
-        .order("created_at");
+      const { data } = await fetchChannels();
 
       if (data) {
         setChannels(data);
@@ -311,18 +324,7 @@ export const Square: React.FC<SquareProps> = ({ onScrollChange }) => {
     const fetchPosts = async () => {
       setLoadingPosts(true);
 
-      // 1. Fetch Posts (without profiles join first)
-      const { data: postsData } = await supabase
-        .from("posts")
-        .select(
-          `
-          *,
-          post_likes (user_id),
-          post_comments (count)
-        `
-        )
-        .eq("channel_id", activeChannelId)
-        .order("created_at", { ascending: false });
+      const { data: postsData } = await fetchPostsForChannel(activeChannelId);
 
       if (postsData) {
         // 2. Fetch Profiles manually (authors AND likers)
@@ -332,29 +334,19 @@ export const Square: React.FC<SquareProps> = ({ onScrollChange }) => {
         );
         const allUserIds = Array.from(new Set([...authorIds, ...likerIds]));
 
-        const { data: profilesData } = await supabase
-          .from("profiles")
-          .select("id, nickname, avatar_url, is_vip")
-          .in("id", allUserIds);
+        const { data: profilesData } = await fetchProfilesByIds(allUserIds);
 
         const profileMap = new Map(
           profilesData?.map((p: any) => [p.id, p]) || []
         );
 
         // 3. Fetch My Likes
-        let myLikedPostIds = new Set();
+        let myLikedPostIds = new Set<string>();
         if (currentUser) {
-          const { data: myLikes } = await supabase
-            .from("post_likes")
-            .select("post_id")
-            .eq("user_id", currentUser.id)
-            .in(
-              "post_id",
-              postsData.map((p) => p.id)
-            );
-          if (myLikes) {
-            myLikedPostIds = new Set(myLikes.map((l) => l.post_id));
-          }
+          myLikedPostIds = await fetchLikedPostIds(
+            currentUser.id,
+            postsData.map((p) => p.id)
+          );
         }
 
         // 4. Transform data
@@ -399,12 +391,7 @@ export const Square: React.FC<SquareProps> = ({ onScrollChange }) => {
       // Fetch in parallel for simplicity
       const results = await Promise.all(
         postsNeedingComments.map(async (post) => {
-          const { data } = await supabase
-            .from("post_comments")
-            .select("*") // Fetch raw comments first
-            .eq("post_id", post.id)
-            .order("created_at", { ascending: false })
-            .limit(1);
+          const { data } = await fetchLatestComments(post.id, 1);
           return { postId: post.id, comments: data || [] };
         })
       );
@@ -418,10 +405,7 @@ export const Square: React.FC<SquareProps> = ({ onScrollChange }) => {
       // Fetch profiles for these users
       let profileMap = new Map();
       if (userIds.size > 0) {
-        const { data: profiles } = await supabase
-          .from("profiles")
-          .select("id, nickname, avatar_url, is_vip")
-          .in("id", Array.from(userIds));
+        const { data: profiles } = await fetchProfilesByIds(Array.from(userIds));
 
         if (profiles) {
           profileMap = new Map(profiles.map((p: any) => [p.id, p]));
@@ -468,25 +452,11 @@ export const Square: React.FC<SquareProps> = ({ onScrollChange }) => {
         async (payload) => {
           const newPostId = payload.new.id;
           // Fetch full post data
-          const { data: postData } = await supabase
-            .from("posts")
-            .select(
-              `
-              *,
-              post_likes (count),
-              post_comments (count)
-            `
-            )
-            .eq("id", newPostId)
-            .single();
+          const { data: postData } = await fetchPostWithCounts(newPostId);
 
           if (postData) {
             // Fetch Profile for this user
-            const { data: profileData } = await supabase
-              .from("profiles")
-              .select("id, nickname, avatar_url, is_vip")
-              .eq("id", postData.user_id)
-              .single();
+            const { data: profileData } = await fetchProfileById(postData.user_id);
 
             const formattedPost: Post = {
               ...postData,
@@ -525,10 +495,19 @@ export const Square: React.FC<SquareProps> = ({ onScrollChange }) => {
     };
 
     if (pendingImage) {
-      postData.image_url = pendingImage.dataUrl;
+      try {
+        postData.image_url = await uploadPostImage(
+          currentUser.id,
+          pendingImage.file
+        );
+      } catch (uploadError: any) {
+        alert("鍥剧墖涓婁紶澶辫触: " + uploadError.message);
+        setPosting(false);
+        return;
+      }
     }
 
-    const { error } = await supabase.from("posts").insert(postData);
+    const { error } = await createPost(postData);
 
     if (error) {
       alert("发布失败: " + error.message);
@@ -547,12 +526,7 @@ export const Square: React.FC<SquareProps> = ({ onScrollChange }) => {
 
   const fetchNotifications = async () => {
     if (!currentUser) return;
-    const { data } = await supabase
-      .from("notifications")
-      .select("*, actor:actor_id(nickname, avatar_url), post:post_id(content)")
-      .eq("user_id", currentUser.id)
-      .order("created_at", { ascending: false })
-      .limit(20);
+    const { data } = await fetchSquareNotifications(currentUser.id);
 
     if (data) {
       setNotifications(data as any);
@@ -561,10 +535,7 @@ export const Square: React.FC<SquareProps> = ({ onScrollChange }) => {
   };
 
   const markAsRead = async (notificationId: string) => {
-    await supabase
-      .from("notifications")
-      .update({ is_read: true })
-      .eq("id", notificationId);
+    await markNotificationRead(notificationId);
     setNotifications((prev) =>
       prev.map((n) => (n.id === notificationId ? { ...n, is_read: true } : n))
     );
@@ -577,10 +548,7 @@ export const Square: React.FC<SquareProps> = ({ onScrollChange }) => {
   ) => {
     e.stopPropagation();
     try {
-      const { error } = await supabase
-        .from("notifications")
-        .delete({ count: "exact" })
-        .eq("id", notificationId);
+      const { error } = await deleteSquareNotification(notificationId);
 
       if (error) {
         console.error("Delete notification error:", error);
@@ -604,21 +572,7 @@ export const Square: React.FC<SquareProps> = ({ onScrollChange }) => {
 
   const fetchComments = async (postId: string) => {
     setLoadingComments((prev) => ({ ...prev, [postId]: true }));
-    const { data: rawComments } = await supabase
-      .from("post_comments")
-      .select(
-        `
-        *,
-        quote:quote_id (
-          id,
-          content,
-          user_id
-        ),
-        comment_likes (user_id)
-      `
-      )
-      .eq("post_id", postId)
-      .order("created_at", { ascending: true });
+    const { data: rawComments } = await fetchPostComments(postId);
 
     if (rawComments && rawComments.length > 0) {
       // Collect all user IDs (commenters + quoted users)
@@ -631,10 +585,7 @@ export const Square: React.FC<SquareProps> = ({ onScrollChange }) => {
       });
 
       // Fetch profiles
-      const { data: profs } = await supabase
-        .from("profiles")
-        .select("id, nickname, avatar_url, is_vip")
-        .in("id", Array.from(userIds));
+      const { data: profs } = await fetchProfilesByIds(Array.from(userIds));
 
       const pmap = new Map((profs || []).map((p: any) => [p.id, p]));
       const myId = currentUser?.id;
@@ -680,17 +631,13 @@ export const Square: React.FC<SquareProps> = ({ onScrollChange }) => {
     };
     if (quoteId) payload.quote_id = quoteId;
 
-    const { data, error } = await supabase
-      .from("post_comments")
-      .insert(payload)
-      .select()
-      .single();
+    const { data, error } = await createComment(payload);
 
     if (!error && data) {
       // Notify post owner if not self
       const post = posts.find((p) => p.id === postId);
       if (post && post.user_id !== currentUser.id) {
-        await supabase.from("notifications").insert({
+        await createNotification({
           user_id: post.user_id,
           actor_id: currentUser.id,
           type: "comment",
@@ -702,11 +649,7 @@ export const Square: React.FC<SquareProps> = ({ onScrollChange }) => {
       fetchComments(postId);
 
       // Update comment count and latest_comments locally
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("*")
-        .eq("id", currentUser.id)
-        .single();
+      const { data: profile } = await fetchProfileById(currentUser.id);
       const newCommentObj: PostComment = {
         ...data,
         profiles: profile || {
@@ -746,10 +689,7 @@ export const Square: React.FC<SquareProps> = ({ onScrollChange }) => {
 
     if (post.is_liked) {
       // Unlike
-      const { error } = await supabase
-        .from("post_likes")
-        .delete()
-        .match({ post_id: postId, user_id: currentUser.id });
+      const { error } = await unlikePost(postId, currentUser.id);
       if (!error) {
         setPosts((prev) =>
           prev.map((p) =>
@@ -768,10 +708,7 @@ export const Square: React.FC<SquareProps> = ({ onScrollChange }) => {
       }
     } else {
       // Like
-      const { error } = await supabase.from("post_likes").insert({
-        post_id: postId,
-        user_id: currentUser.id,
-      });
+      const { error } = await likePost(postId, currentUser.id);
 
       if (!error) {
         setPosts((prev) =>
@@ -792,7 +729,7 @@ export const Square: React.FC<SquareProps> = ({ onScrollChange }) => {
 
         // Notify
         if (post.user_id !== currentUser.id) {
-          await supabase.from("notifications").insert({
+          await createNotification({
             user_id: post.user_id,
             actor_id: currentUser.id,
             type: "like",
@@ -811,10 +748,7 @@ export const Square: React.FC<SquareProps> = ({ onScrollChange }) => {
     if (!comment) return;
 
     if (comment.is_liked) {
-      const { error } = await supabase
-        .from("comment_likes")
-        .delete()
-        .match({ comment_id: commentId, user_id: currentUser.id });
+      const { error } = await unlikeComment(commentId, currentUser.id);
       if (!error) {
         setComments((prev) => ({
           ...prev,
@@ -830,10 +764,7 @@ export const Square: React.FC<SquareProps> = ({ onScrollChange }) => {
         }));
       }
     } else {
-      const { error } = await supabase.from("comment_likes").insert({
-        comment_id: commentId,
-        user_id: currentUser.id,
-      });
+      const { error } = await likeComment(commentId, currentUser.id);
       if (!error) {
         setComments((prev) => ({
           ...prev,
@@ -849,7 +780,7 @@ export const Square: React.FC<SquareProps> = ({ onScrollChange }) => {
         }));
 
         if (comment.user_id !== currentUser.id) {
-          await supabase.from("notifications").insert({
+          await createNotification({
             user_id: comment.user_id,
             actor_id: currentUser.id,
             type: "comment_like", // We might need to handle this type in notifications or just map it to 'like' but strictly it's a comment like
@@ -865,7 +796,7 @@ export const Square: React.FC<SquareProps> = ({ onScrollChange }) => {
     if (!currentUser) return;
     const post = posts.find((p) => p.id === postId);
     if (!post || post.user_id !== currentUser.id) return;
-    const { error } = await supabase.from("posts").delete().eq("id", postId);
+    const { error } = await deletePost(postId);
     if (!error) {
       setPosts((prev) => prev.filter((p) => p.id !== postId));
       if (selectedPostId === postId) setSelectedPostId(null);
@@ -877,10 +808,7 @@ export const Square: React.FC<SquareProps> = ({ onScrollChange }) => {
     const list = comments[postId] || [];
     const c = list.find((x) => x.id === commentId);
     if (!c || c.user_id !== currentUser.id) return;
-    const { error } = await supabase
-      .from("post_comments")
-      .delete()
-      .eq("id", commentId);
+    const { error } = await deleteComment(commentId);
     if (!error) {
       setComments((prev) => ({
         ...prev,
@@ -922,11 +850,7 @@ export const Square: React.FC<SquareProps> = ({ onScrollChange }) => {
   };
 
   const openProfile = async (userId: string) => {
-    const { data } = await supabase
-      .from("profiles")
-      .select("*")
-      .eq("id", userId)
-      .single();
+    const { data } = await fetchProfileById(userId);
     if (data) {
       setSelectedProfile(data as any);
       fetchUserHistory(userId);
@@ -936,28 +860,17 @@ export const Square: React.FC<SquareProps> = ({ onScrollChange }) => {
 
   const fetchUserHistory = async (userId: string) => {
     setHistoryLoading(true);
-    const { data: kpData } = await supabase
-      .from("game_histories")
-      .select("*")
-      .eq("kp_id", userId)
-      .order("created_at", { ascending: false });
+    const { data: kpData } = await fetchKpHistory(userId);
     if (kpData) setKpHistory(kpData);
 
-    const { data: playerData } = await supabase
-      .from("game_history_participants")
-      .select(`*, game_history:game_histories (*)`)
-      .eq("user_id", userId)
-      .order("id", { ascending: false });
+    const { data: playerData } = await fetchPlayerHistory(userId);
     if (playerData) {
       const charIds = playerData
         .map((p: any) => p.character_snapshot?.id)
         .filter(Boolean);
       let charMap = new Map<string, Character>();
       if (charIds.length > 0) {
-        const { data: latestChars } = await supabase
-          .from("characters")
-          .select("*")
-          .in("id", charIds);
+        const { data: latestChars } = await fetchCharactersByIds(charIds);
         if (latestChars) {
           charMap = new Map(latestChars.map((c: any) => [c.id, c]));
         }

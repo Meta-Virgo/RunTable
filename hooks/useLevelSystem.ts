@@ -44,7 +44,7 @@ export const useLevelSystem = (session: Session | null) => {
 
   const fetchProfile = useCallback(async () => {
     if (!session?.user) return;
-    const { data, error } = await supabase
+    const { data } = await supabase
       .from("profiles")
       .select("level, experience")
       .eq("id", session.user.id)
@@ -60,7 +60,7 @@ export const useLevelSystem = (session: Session | null) => {
   const heartbeat = useCallback(async () => {
     if (!session?.user) return;
     try {
-      const { data, error } = await supabase.rpc("handle_heartbeat");
+      const { data } = await supabase.rpc("handle_heartbeat");
       if (data) {
         setDailyActivity(data as DailyActivity);
       }

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { Suspense, useState, useEffect } from "react";
 import { supabase } from "../supabase";
 import { Room, Character, GameHistory, GameHistoryParticipant } from "../types";
 import { Button, Input, Textarea, Modal, cn } from "./UI";
@@ -23,8 +23,32 @@ import {
 import { CharacterModal } from "./Modals";
 import { AvatarUpload } from "./AvatarUpload";
 import { Friends } from "./Friends";
-import { Square } from "./Square";
 import { useElasticScroll } from "../hooks/useElasticScroll";
+import {
+  createRoom,
+  fetchVisibleRooms,
+  setRoomPassword,
+  updateRoomDetails,
+  verifyRoomPassword,
+} from "../services/rooms";
+import { getCurrentUser, updatePassword } from "../services/auth";
+import {
+  createCharacter,
+  deleteCharacter,
+  fetchUserInvestigators,
+  updateCharacter,
+} from "../services/characters";
+import {
+  createProfileForUser,
+  fetchProfileDetails,
+  updateProfile,
+} from "../services/profiles";
+import { mapCharacterRow } from "../utils/characterMapper";
+import { buildCharacterMutationPayload } from "../utils/characterPayload";
+
+const Square = React.lazy(() =>
+  import("./Square").then((module) => ({ default: module.Square }))
+);
 
 interface HomeProps {
   onJoinRoom: (roomId: string, charId: string | "pc") => void;
@@ -93,13 +117,19 @@ const RoomCard: React.FC<RoomCardProps> = ({
   const [passwordInput, setPasswordInput] = useState("");
   const [showPasswordInput, setShowPasswordInput] = useState(false);
 
-  const onJoinClick = () => {
-    if (room.password && !isKP) {
+  const onJoinClick = async () => {
+    if (room.has_password && !isKP) {
       if (!showPasswordInput) {
         setShowPasswordInput(true);
         return;
       }
-      if (passwordInput !== room.password) {
+      let isValid = false;
+      try {
+        isValid = await verifyRoomPassword(room.id, passwordInput);
+      } catch {
+        isValid = false;
+      }
+      if (!isValid) {
         alert("密码错误");
         return;
       }
@@ -121,7 +151,7 @@ const RoomCard: React.FC<RoomCardProps> = ({
               {room.title}
             </h3>
           </div>
-          {room.password && (
+          {room.has_password && (
             <div className="mt-1">
               <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20 inline-flex items-center gap-1">
                 🔒 私密
@@ -182,7 +212,7 @@ const RoomCard: React.FC<RoomCardProps> = ({
         <Button className="w-full" icon={Play} onClick={onJoinClick}>
           {showPasswordInput
             ? "验证并进入"
-            : room.password && !isKP
+            : room.has_password && !isKP
             ? "输入密码进入"
             : "进入房间"}
         </Button>
@@ -318,16 +348,11 @@ export const Home: React.FC<HomeProps> = ({
   useEffect(() => {
     fetchRooms();
     fetchMyCharacters();
-    supabase.auth.getUser().then(async ({ data: { user } }) => {
+    getCurrentUser().then(async ({ data: { user } }) => {
       if (user) {
         setCurrentUserId(user.id);
         setUserEmail(user.email || "");
-        // Fetch User Profile
-        const { data: profile } = await supabase
-          .from("profiles")
-          .select("user_code, nickname, bio, created_at, is_vip, avatar_url")
-          .eq("id", user.id)
-          .single();
+        const { data: profile } = await fetchProfileDetails(user.id);
         if (profile) {
           setUserCode(profile.user_code);
           setUserNickname(profile.nickname);
@@ -341,14 +366,10 @@ export const Home: React.FC<HomeProps> = ({
           fetchFriendRequestCount(user.id);
         } else {
           // Auto-create profile if missing (fallback for old users)
-          const { data: newProfile } = await supabase
-            .from("profiles")
-            .insert({
-              id: user.id,
-              nickname: user.email?.split("@")[0] || "User",
-            })
-            .select()
-            .single();
+          const { data: newProfile } = await createProfileForUser(
+            user.id,
+            user.email
+          );
           if (newProfile) {
             setUserCode(newProfile.user_code);
             setUserNickname(newProfile.nickname);
@@ -504,23 +525,9 @@ export const Home: React.FC<HomeProps> = ({
     setLoading(true);
     const {
       data: { user },
-    } = await supabase.auth.getUser();
+    } = await getCurrentUser();
 
-    let query = supabase
-      .from("rooms")
-      .select("*, characters(count), messages(count)")
-      .order("last_active_at", { ascending: false, nullsFirst: false });
-
-    if (user) {
-      // Show open rooms OR rooms created by me, but exclude completed
-      query = query
-        .or(`status.eq.open,kp_id.eq.${user.id}`)
-        .neq("status", "completed");
-    } else {
-      query = query.eq("status", "open");
-    }
-
-    const { data, error } = await query;
+    const { data, error } = await fetchVisibleRooms(user?.id);
 
     if (data) {
       const now = new Date().getTime();
@@ -567,42 +574,13 @@ export const Home: React.FC<HomeProps> = ({
   const fetchMyCharacters = async () => {
     const {
       data: { user },
-    } = await supabase.auth.getUser();
+    } = await getCurrentUser();
     if (!user) return;
 
-    const { data, error } = await supabase
-      .from("characters")
-      .select("*")
-      .eq("user_id", user.id)
-      .eq("type", "investigator");
+    const { data, error } = await fetchUserInvestigators(user.id);
 
     if (data) {
-      // Map DB fields to Frontend fields
-      const mappedChars = data.map((c) => ({
-        ...c,
-        role: "调查员", // Default role
-        avatar_url: c.avatar_url,
-        job: c.info?.job || "",
-        age: c.info?.age || "",
-        sex: c.info?.sex || "",
-        notes: c.info?.notes || "",
-        backstory: c.info?.backstory || "",
-        str: c.stats?.str || 50,
-        con: c.stats?.con || 50,
-        siz: c.stats?.siz || 50,
-        dex: c.stats?.dex || 50,
-        app: c.stats?.app || 50,
-        int: c.stats?.int || 50,
-        pow: c.stats?.pow || 50,
-        edu: c.stats?.edu || 50,
-        luck: c.stats?.luck || 50,
-        hp: c.stats?.hp || 10,
-        san: c.stats?.san || 50,
-        mp: c.stats?.mp || 10,
-        skills: c.info?.skills || c.stats?.skills || {},
-        items: c.info?.items || [],
-        spells: c.info?.spells || [],
-      }));
+      const mappedChars = data.map(mapCharacterRow);
       setMyCharacters(mappedChars);
     }
     if (error) console.error("Error fetching characters:", error);
@@ -614,23 +592,27 @@ export const Home: React.FC<HomeProps> = ({
 
     const {
       data: { user },
-    } = await supabase.auth.getUser();
+    } = await getCurrentUser();
     if (!user) return;
 
-    const { data, error } = await supabase
-      .from("rooms")
-      .insert({
-        title: newRoomTitle,
-        description: newRoomDesc,
-        kp_id: user.id,
-        status: "open",
-        password: newRoomPassword || null,
-        type: newRoomType,
-      })
-      .select()
-      .single();
+    const { data, error } = await createRoom({
+      title: newRoomTitle,
+      description: newRoomDesc,
+      kpId: user.id,
+      hasPassword: !!newRoomPassword,
+      type: newRoomType,
+    });
 
     if (data) {
+      if (newRoomPassword) {
+        try {
+          await setRoomPassword(data.id, newRoomPassword);
+        } catch (passwordError: any) {
+          alert("鎴块棿宸插垱寤猴紝但瀵嗙爜淇濆瓨澶辫触: " + passwordError.message);
+          setLoading(false);
+          return;
+        }
+      }
       setNewRoomTitle("");
       setNewRoomDesc("");
       setNewRoomPassword("");
@@ -648,16 +630,21 @@ export const Home: React.FC<HomeProps> = ({
     if (!editingRoom || !editingRoom.title.trim()) return;
     setLoading(true);
 
-    const { error } = await supabase
-      .from("rooms")
-      .update({
-        title: editingRoom.title,
-        description: editingRoom.description,
-        password: editingRoom.password || null,
-      })
-      .eq("id", editingRoom.id);
+    const { error } = await updateRoomDetails(editingRoom.id, {
+      title: editingRoom.title,
+      description: editingRoom.description,
+    });
 
     if (!error) {
+      if (editingRoom.password !== undefined) {
+        try {
+          await setRoomPassword(editingRoom.id, editingRoom.password || "");
+        } catch (passwordError: any) {
+          alert("鎴块棿宸叉洿鏂帮紝但瀵嗙爜淇濆瓨澶辫触: " + passwordError.message);
+          setLoading(false);
+          return;
+        }
+      }
       setEditingRoom(null);
     } else {
       alert("更新房间失败: " + error.message);
@@ -668,10 +655,11 @@ export const Home: React.FC<HomeProps> = ({
   const handleUpdateProfile = async () => {
     if (!currentUserId) return;
     setLoading(true);
-    const { error } = await supabase
-      .from("profiles")
-      .update({ nickname: editNickname, bio: editBio, avatar_url: editAvatar })
-      .eq("id", currentUserId);
+    const { error } = await updateProfile(currentUserId, {
+      nickname: editNickname,
+      bio: editBio,
+      avatar_url: editAvatar,
+    });
 
     if (!error) {
       setUserNickname(editNickname);
@@ -690,7 +678,7 @@ export const Home: React.FC<HomeProps> = ({
       return;
     }
     setLoading(true);
-    const { error } = await supabase.auth.updateUser({ password: newPassword });
+    const { error } = await updatePassword(newPassword);
 
     if (!error) {
       alert("密码修改成功");
@@ -706,46 +694,16 @@ export const Home: React.FC<HomeProps> = ({
   const handleSaveCharacter = async (char: Character) => {
     const {
       data: { user },
-    } = await supabase.auth.getUser();
+    } = await getCurrentUser();
     if (!user) return;
 
-    const dbChar = {
-      user_id: user.id,
-      name: char.name,
-      type: "investigator",
-      avatar_url: char.avatar_url,
-      info: {
-        job: char.job,
-        age: char.age,
-        sex: char.sex,
-        notes: char.notes,
-        backstory: char.backstory,
-        skills: char.skills || {},
-        items: char.items || [],
-        spells: char.spells || [],
-      },
-      stats: {
-        str: char.str,
-        con: char.con,
-        siz: char.siz,
-        dex: char.dex,
-        app: char.app,
-        int: char.int,
-        pow: char.pow,
-        edu: char.edu,
-        luck: char.luck,
-        hp: char.hp,
-        san: char.san,
-        mp: char.mp,
-        skills: char.skills || {}, // Backup in stats as well
-      },
-    };
+    const dbChar = buildCharacterMutationPayload(char, {
+      userId: user.id,
+      typeFallback: "investigator",
+    });
 
     if (editingChar) {
-      const { error } = await supabase
-        .from("characters")
-        .update(dbChar)
-        .eq("id", char.id);
+      const { error } = await updateCharacter(char.id, dbChar);
       if (!error) {
         setMyCharacters((prev) =>
           prev.map((c) => (c.id === char.id ? char : c))
@@ -755,11 +713,7 @@ export const Home: React.FC<HomeProps> = ({
         alert("更新失败: " + error.message);
       }
     } else {
-      const { data, error } = await supabase
-        .from("characters")
-        .insert(dbChar)
-        .select()
-        .single();
+      const { data, error } = await createCharacter(dbChar);
       if (data) {
         setMyCharacters((prev) => [...prev, { ...char, id: data.id }]);
         setShowCharModal(false);
@@ -770,7 +724,7 @@ export const Home: React.FC<HomeProps> = ({
   };
 
   const handleDeleteCharacter = async (id: string) => {
-    const { error } = await supabase.from("characters").delete().eq("id", id);
+    const { error } = await deleteCharacter(id);
     if (!error) {
       setMyCharacters((prev) => prev.filter((c) => c.id !== id));
       setShowCharModal(false);
@@ -938,7 +892,15 @@ export const Home: React.FC<HomeProps> = ({
               </button>
             </div>
             <div className="flex-1 min-h-0 relative">
-              <Square onScrollChange={(dir) => setShowHeader(dir === "up")} />
+              <Suspense
+                fallback={
+                  <div className="h-full grid place-items-center text-slate-500">
+                    Loading...
+                  </div>
+                }
+              >
+                <Square onScrollChange={(dir) => setShowHeader(dir === "up")} />
+              </Suspense>
             </div>
           </>
         ) : (
