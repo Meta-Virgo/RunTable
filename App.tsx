@@ -1,5 +1,4 @@
 import React, {
-  lazy,
   Suspense,
   useState,
   useEffect,
@@ -13,7 +12,29 @@ import { Button } from "./components/UI";
 import "@livekit/components-styles";
 import { ModuleInfo, Character, Log } from "./types"; // Removed AppData as it might not be used anymore
 import { Menu, LogOut, Volume2, VolumeX } from "lucide-react";
+import {
+  CharacterModal,
+  ChatArea,
+  ConclusionModal,
+  Dashboard,
+  Home,
+  LiveKitRoom,
+  ModuleModal,
+  MusicPlayer,
+  RoomAudioRenderer,
+  Sidebar,
+  StartAudio,
+  StatusModal,
+  StoryModal,
+} from "./components/AppLazyComponents";
+import {
+  EMPTY_MODULE_INFO,
+  INITIAL_CHAR_STATE,
+  PAGE_SIZE,
+} from "./constants/appState";
 import { parseDiceCommand } from "./utils/commandParser";
+import { evaluateDiceExpression, resolveStatAlias } from "./utils/diceExpression";
+import { buildStoryReport } from "./utils/storyReport";
 import { useLevelSystem } from "./hooks/useLevelSystem";
 import { useAuthProfile } from "./hooks/useAuthProfile";
 import { useGlobalPresence } from "./hooks/useGlobalPresence";
@@ -51,99 +72,6 @@ import {
   updateCharacterStats as saveCharacterStats,
 } from "./services/characters";
 import { clearLocalSupabaseSession, getCurrentUser, signOut } from "./services/auth";
-
-const Home = lazy(() =>
-  import("./components/Home").then((module) => ({ default: module.Home }))
-);
-const Sidebar = lazy(() =>
-  import("./components/Sidebar").then((module) => ({ default: module.Sidebar }))
-);
-const ChatArea = lazy(() =>
-  import("./components/ChatArea").then((module) => ({
-    default: module.ChatArea,
-  }))
-);
-const Dashboard = lazy(() =>
-  import("./components/Dashboard").then((module) => ({
-    default: module.Dashboard,
-  }))
-);
-const MusicPlayer = lazy(() =>
-  import("./components/MusicPlayer").then((module) => ({
-    default: module.MusicPlayer,
-  }))
-);
-const ModuleModal = lazy(() =>
-  import("./components/Modals").then((module) => ({
-    default: module.ModuleModal,
-  }))
-);
-const CharacterModal = lazy(() =>
-  import("./components/Modals").then((module) => ({
-    default: module.CharacterModal,
-  }))
-);
-const StatusModal = lazy(() =>
-  import("./components/Modals").then((module) => ({
-    default: module.StatusModal,
-  }))
-);
-const StoryModal = lazy(() =>
-  import("./components/Modals").then((module) => ({
-    default: module.StoryModal,
-  }))
-);
-const ConclusionModal = lazy(() =>
-  import("./components/Modals").then((module) => ({
-    default: module.ConclusionModal,
-  }))
-);
-const LiveKitRoom = lazy(() =>
-  import("@livekit/components-react").then((module) => ({
-    default: module.LiveKitRoom,
-  }))
-);
-const RoomAudioRenderer = lazy(() =>
-  import("@livekit/components-react").then((module) => ({
-    default: module.RoomAudioRenderer,
-  }))
-);
-const StartAudio = lazy(() =>
-  import("@livekit/components-react").then((module) => ({
-    default: module.StartAudio,
-  }))
-);
-
-// --- Constants ---
-const INITIAL_CHAR_STATE: Character = {
-  id: "",
-  name: "",
-  role: "调查员",
-  type: "investigator",
-  avatar_url: null,
-  job: "",
-  age: "",
-  sex: "",
-  str: 50,
-  con: 50,
-  siz: 50,
-  dex: 50,
-  app: 50,
-  int: 50,
-  pow: 50,
-  edu: 50,
-  luck: 50,
-  hp: 10,
-  san: 50,
-  mp: 10,
-  notes: "",
-  backstory: "",
-  skills: {},
-  items: [],
-  spells: [],
-};
-
-const EMPTY_MODULE_INFO: ModuleInfo = { title: "", description: "", notes: "" };
 
 const App: React.FC = () => {
   // Routing State
@@ -304,7 +232,6 @@ const App: React.FC = () => {
   // Pagination State
   const [hasMoreLogs, setHasMoreLogs] = useState(true);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
-  const PAGE_SIZE = 50; // Reduced from 500 to 50 for smoother loading
 
   // Characters Ref for Realtime (Refs are needed to access latest state inside listeners)
   const charactersRef = useRef(characters);
@@ -399,20 +326,12 @@ const App: React.FC = () => {
       });
       setRoomType(room.type || "text");
       setRoomPassword("");
-      setCurrentRoomId(roomId);
       setActiveCharId(charId);
       setIsKP(userIsKP);
       setKpId(room.kp_id);
       setBgMusicUrl(room.bg_music_url);
       setIsMusicPlaying(room.is_music_playing || false);
       setMusicTrackIndex(room.music_track_index || 0);
-
-      // URL Persistence
-      if (!isRestoring) {
-        const url = new URL(window.location.href);
-        url.searchParams.set("room", roomId);
-        window.history.pushState({}, "", url);
-      }
 
       // If joining as character, update character's room_id
       if (charId !== "pc" && user) {
@@ -433,6 +352,15 @@ const App: React.FC = () => {
           alert("加入房间失败：找不到该角色或无权操作");
           return;
         }
+      }
+
+      setCurrentRoomId(roomId);
+
+      // URL Persistence
+      if (!isRestoring) {
+        const url = new URL(window.location.href);
+        url.searchParams.set("room", roomId);
+        window.history.pushState({}, "", url);
       }
 
       // Load Characters in Room
@@ -460,7 +388,8 @@ const App: React.FC = () => {
             const { error: msgError } = await addRoomSystemMessage(
               roomId,
               user.id,
-              enterMsg
+              enterMsg,
+              charId === "pc" ? null : charId
             );
             if (msgError)
               console.error("Failed to send enter message:", msgError);
@@ -549,47 +478,6 @@ const App: React.FC = () => {
     return total;
   };
 
-  const generateStory = (sourceLogs: Log[] = logs) => {
-    if (sourceLogs.length === 0) return "暂无记录。";
-    return sourceLogs
-      .filter((log) => {
-        // 过滤掉不必要的系统消息
-        if (log.type === "system") {
-          if (log.content.includes("已清空聊天记录")) return false;
-          if (log.content.includes("进入了房间")) return false;
-          if (log.content.includes("离开了房间")) return false;
-        }
-        return true;
-      })
-      .map((log) => {
-        // Handle name display: replace nickname with "守秘人" if role is Keeper
-        const displayName = log.charRole === "Keeper" ? "守秘人" : log.charName;
-
-        if (log.type === "dice" || log.type === "dice_secret") {
-          try {
-            const d = JSON.parse(log.content);
-            const prefix = log.type === "dice_secret" ? "(暗骰) " : "";
-            return `> [${displayName}] ${prefix}投掷了 ${d.count}D${
-              d.type || 6
-            }: ${d.total} [${d.details.join(", ")}]`;
-          } catch (e) {
-            return `> [${displayName}] ${log.content}`;
-          }
-        }
-        if (["system", "status"].includes(log.type))
-          return `> [${displayName}] ${log.content}`;
-
-        if (log.type === "image") {
-          return `${displayName}: [图片]`;
-        }
-
-        // Remove markdown symbols like **
-        const cleanContent = log.content.replace(/\*\*/g, "");
-        return `${displayName}: ${cleanContent}`;
-      })
-      .join("\n\n");
-  };
-
   const handleShowStory = async () => {
     if (!currentRoomId) return;
 
@@ -626,7 +514,7 @@ const App: React.FC = () => {
         session?.user?.id
       );
 
-      const story = generateStory(formattedLogs);
+      const story = buildStoryReport(formattedLogs);
       setStoryContent(story);
     } catch (e) {
       console.error("Error generating story:", e);
@@ -990,110 +878,6 @@ const App: React.FC = () => {
     }
   };
 
-  const ALIAS_MAP: Record<string, string> = {
-    力量: "str",
-    str: "str",
-    体质: "con",
-    con: "con",
-    体型: "siz",
-    siz: "siz",
-    敏捷: "dex",
-    dex: "dex",
-    外貌: "app",
-    app: "app",
-    智力: "int",
-    int: "int",
-    意志: "pow",
-    pow: "pow",
-    教育: "edu",
-    edu: "edu",
-    幸运: "luck",
-    luck: "luck",
-    hp: "hp",
-    HP: "hp",
-    san: "san",
-    SAN: "san",
-    mp: "mp",
-    MP: "mp",
-    db: "db",
-    DB: "db",
-    伤害加值: "db",
-    build: "build",
-    Build: "build",
-    体格: "build",
-  };
-
-  const evaluateDiceExpression = (
-    expression: string,
-    char: Character | undefined
-  ): { total: number; details: string[] } => {
-    let evalString = expression.toLowerCase();
-    const detailsParts: string[] = [];
-
-    // 1. Replace stats
-    evalString = evalString.replace(/[a-z\u4e00-\u9fa5]+/g, (match) => {
-      // Ignore 'd' if it is part of dice notation (e.g. 1d100)
-      if (match === "d") return "d";
-
-      const key = ALIAS_MAP[match] || match;
-      if (char) {
-        // Priority 1: Check top-level computed props (db, build)
-        if ((char as any)[key] !== undefined) {
-          // Ensure value is string and lowercased (e.g. "+1D4" -> "+1d4")
-          return String((char as any)[key]).toLowerCase();
-        }
-
-        if (char.stats && char.stats[key] !== undefined) {
-          return String(char.stats[key]);
-        }
-        if (char.skills && char.skills[match] !== undefined) {
-          return String(char.skills[match]);
-        }
-      }
-
-      // If unknown, return 0 (safe fallback) or keep it (risky)
-      // If we keep "sword", eval fails.
-      // We return 0.
-      return "0";
-    });
-
-    // 2. Replace Dice (NdM or dM)
-    evalString = evalString.replace(/(\d*)d(\d+)/g, (_, p1, p2) => {
-      const count = p1 ? parseInt(p1) : 1;
-      const sides = parseInt(p2);
-      let total = 0;
-      const rolls = [];
-      for (let i = 0; i < count; i++) {
-        const r = Math.floor(Math.random() * sides) + 1;
-        total += r;
-        rolls.push(r);
-      }
-      detailsParts.push(`${count}d${sides}[${rolls.join(",")}]`);
-      return String(total);
-    });
-
-    // 3. Clean up operators (handle ++, +-, etc.)
-    evalString = evalString.replace(/\s+/g, ""); // Remove spaces
-    evalString = evalString.replace(/\+\+/g, "+");
-    evalString = evalString.replace(/\-\-/g, "+");
-    evalString = evalString.replace(/\+\-/g, "-");
-    evalString = evalString.replace(/\-\+/g, "-");
-
-    // 4. Eval
-    if (!/^[\d\+\-\*\/\(\)\.]+$/.test(evalString)) {
-      return { total: 0, details: ["表达式错误"] };
-    }
-
-    try {
-      // eslint-disable-next-line no-new-func
-      const result = new Function("return " + evalString)();
-      const rounded = Math.round(result * 100) / 100;
-      return { total: rounded, details: detailsParts };
-    } catch (e) {
-      return { total: 0, details: ["计算错误"] };
-    }
-  };
-
   const updateCharacterStats = async (
     charId: string,
     changes: { stat: string; value: number; type: "=" | "+" | "-" }[]
@@ -1122,7 +906,7 @@ const App: React.FC = () => {
     const logChanges: string[] = [];
 
     changes.forEach((change) => {
-      const key = ALIAS_MAP[change.stat] || change.stat;
+      const key = resolveStatAlias(change.stat);
       // We only support updating stats present in the stats object for now
       if (newStats[key] !== undefined) {
         let current = newStats[key] || 0;
@@ -1317,7 +1101,7 @@ const App: React.FC = () => {
             ) {
               baseVal = charToCheck.skills[skillName];
             } else if (charToCheck.stats) {
-              const key = ALIAS_MAP[skillName] || skillName;
+              const key = resolveStatAlias(skillName);
               if (charToCheck.stats[key] !== undefined) {
                 baseVal = charToCheck.stats[key];
               }
@@ -1437,6 +1221,7 @@ const App: React.FC = () => {
         const { error: msgError } = await addMessage({
           roomId: currentRoomId,
           userId: user.id,
+          characterId: !isKP && activeCharId !== "pc" ? activeCharId : null,
           type: "system",
           content: leaveMsg,
         });

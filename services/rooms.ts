@@ -125,11 +125,13 @@ export async function fetchProfileNickname(userId: string) {
 export async function addRoomSystemMessage(
   roomId: string,
   userId: string,
-  content: string
+  content: string,
+  characterId: string | null = null
 ) {
   return supabase.from("messages").insert({
     room_id: roomId,
     user_id: userId,
+    character_id: characterId,
     type: "system",
     content,
   });
