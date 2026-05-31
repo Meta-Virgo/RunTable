@@ -1,33 +1,118 @@
-import React, { useState, useEffect, useRef } from "react";
-import { Session } from "@supabase/supabase-js";
-import { supabase } from "./supabase";
+import React, {
+  lazy,
+  Suspense,
+  useState,
+  useEffect,
+  useRef,
+  useCallback,
+} from "react";
 import { Login } from "./components/Login";
 import { Welcome } from "./components/Welcome";
-import { Home } from "./components/Home";
-import { Sidebar } from "./components/Sidebar";
-import { ChatArea } from "./components/ChatArea";
-import { Dashboard } from "./components/Dashboard";
 import { LoadingScreen } from "./components/LoadingScreen";
-import {
-  ModuleModal,
-  CharacterModal,
-  StatusModal,
-  StoryModal,
-  ConclusionModal,
-} from "./components/Modals";
 import { Button } from "./components/UI";
-import { MusicPlayer } from "./components/MusicPlayer";
-import {
-  LiveKitRoom,
-  RoomAudioRenderer,
-  StartAudio,
-} from "@livekit/components-react";
 import "@livekit/components-styles";
 import { ModuleInfo, Character, Log } from "./types"; // Removed AppData as it might not be used anymore
 import { Menu, LogOut, Volume2, VolumeX } from "lucide-react";
 import { parseDiceCommand } from "./utils/commandParser";
 import { useLevelSystem } from "./hooks/useLevelSystem";
-import { calculateDBAndBuild } from "./utils/cocRules";
+import { useAuthProfile } from "./hooks/useAuthProfile";
+import { useGlobalPresence } from "./hooks/useGlobalPresence";
+import { useRoomRealtime } from "./hooks/useRoomRealtime";
+import { mapCharacterRow } from "./utils/characterMapper";
+import { buildCharacterMutationPayload } from "./utils/characterPayload";
+import {
+  addRoomSystemMessage,
+  assignCharacterToRoom,
+  concludeRoom,
+  deleteRoom,
+  fetchProfileNickname,
+  fetchRoomById,
+  fetchRoomCharacters,
+  setRoomPassword as saveRoomPassword,
+  updateRoomModule,
+  updateRoomMusicState,
+  updateRoomMusicUrl,
+} from "./services/rooms";
+import { requestVoiceToken } from "./services/livekit";
+import {
+  addMessage,
+  deleteMessage,
+  deleteRoomMessages,
+  fetchMessagesBefore,
+  fetchMessagesPage,
+  mapMessagesToLogs,
+} from "./services/messages";
+import {
+  createCharacter,
+  deleteCharacter as deleteCharacterRecord,
+  fetchCharacterById,
+  removeCharacterFromRoom,
+  updateCharacter,
+  updateCharacterStats as saveCharacterStats,
+} from "./services/characters";
+import { clearLocalSupabaseSession, getCurrentUser, signOut } from "./services/auth";
+
+const Home = lazy(() =>
+  import("./components/Home").then((module) => ({ default: module.Home }))
+);
+const Sidebar = lazy(() =>
+  import("./components/Sidebar").then((module) => ({ default: module.Sidebar }))
+);
+const ChatArea = lazy(() =>
+  import("./components/ChatArea").then((module) => ({
+    default: module.ChatArea,
+  }))
+);
+const Dashboard = lazy(() =>
+  import("./components/Dashboard").then((module) => ({
+    default: module.Dashboard,
+  }))
+);
+const MusicPlayer = lazy(() =>
+  import("./components/MusicPlayer").then((module) => ({
+    default: module.MusicPlayer,
+  }))
+);
+const ModuleModal = lazy(() =>
+  import("./components/Modals").then((module) => ({
+    default: module.ModuleModal,
+  }))
+);
+const CharacterModal = lazy(() =>
+  import("./components/Modals").then((module) => ({
+    default: module.CharacterModal,
+  }))
+);
+const StatusModal = lazy(() =>
+  import("./components/Modals").then((module) => ({
+    default: module.StatusModal,
+  }))
+);
+const StoryModal = lazy(() =>
+  import("./components/Modals").then((module) => ({
+    default: module.StoryModal,
+  }))
+);
+const ConclusionModal = lazy(() =>
+  import("./components/Modals").then((module) => ({
+    default: module.ConclusionModal,
+  }))
+);
+const LiveKitRoom = lazy(() =>
+  import("@livekit/components-react").then((module) => ({
+    default: module.LiveKitRoom,
+  }))
+);
+const RoomAudioRenderer = lazy(() =>
+  import("@livekit/components-react").then((module) => ({
+    default: module.RoomAudioRenderer,
+  }))
+);
+const StartAudio = lazy(() =>
+  import("@livekit/components-react").then((module) => ({
+    default: module.StartAudio,
+  }))
+);
 
 // --- Constants ---
 const INITIAL_CHAR_STATE: Character = {
@@ -87,10 +172,8 @@ const App: React.FC = () => {
     return false;
   });
 
-  // Auth State
-  const [session, setSession] = useState<Session | null>(null);
-  const [authLoading, setAuthLoading] = useState(true);
   const [minLoadingPassed, setMinLoadingPassed] = useState(false); // Ensure loading screen shows for a bit
+  const { session, authLoading, userNickname, isVip } = useAuthProfile();
 
   // Level System
   const levelInfo = useLevelSystem(session);
@@ -113,18 +196,14 @@ const App: React.FC = () => {
   const [isKP, setIsKP] = useState(false);
   const [kpId, setKpId] = useState<string | null>(null);
   const [onlineUsers, setOnlineUsers] = useState<Set<string>>(new Set());
-  const [globalOnlineUsers, setGlobalOnlineUsers] = useState<Set<string>>(
-    new Set()
-  );
-  const [userNickname, setUserNickname] = useState<string>("");
-  const [isVip, setIsVip] = useState(false);
+  const globalOnlineUsers = useGlobalPresence(session?.user?.id);
   const [bgMusicUrl, setBgMusicUrl] = useState<string | null>(null);
   const [isMusicPlaying, setIsMusicPlaying] = useState(false);
   const [musicTrackIndex, setMusicTrackIndex] = useState(0);
   const [globalMute, setGlobalMute] = useState(false);
 
   useEffect(() => {
-    if (roomType === "voice" && currentRoomId) {
+    if (roomType === "voice" && currentRoomId && session?.access_token) {
       (async () => {
         try {
           const participantName =
@@ -133,18 +212,13 @@ const App: React.FC = () => {
               : characters.find((c) => c.id === activeCharId)?.name ||
                 "未知用户";
 
-          const resp = await fetch(`/api/token`, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              roomName: currentRoomId,
-              participantName,
-            }),
+          const voiceToken = await requestVoiceToken({
+            accessToken: session.access_token,
+            roomId: currentRoomId,
+            activeCharId,
+            participantName,
           });
-          const data = await resp.json();
-          setToken(data.token);
+          setToken(voiceToken);
         } catch (e) {
           console.error(e);
         }
@@ -152,7 +226,7 @@ const App: React.FC = () => {
     } else {
       setToken("");
     }
-  }, [roomType, currentRoomId, activeCharId, userNickname, characters]);
+  }, [roomType, currentRoomId, activeCharId, userNickname, characters, session]);
 
   // Load More Logs Logic
   const handleLoadMoreLogs = async () => {
@@ -180,70 +254,21 @@ const App: React.FC = () => {
     }
 
     try {
-      const { data: msgs, error: msgError } = await supabase
-        .from("messages")
-        .select(
-          `
-                *,
-                characters ( id, name, type, role, info, theme_color, avatar_url )
-            `
-        )
-        .eq("room_id", currentRoomId)
-        .lt("created_at", oldestTime) // Get messages older than the current oldest
-        .order("created_at", { ascending: false })
-        .limit(PAGE_SIZE);
+      const { data: msgs, error: msgError } = await fetchMessagesBefore(
+        currentRoomId,
+        oldestTime,
+        PAGE_SIZE
+      );
 
       if (msgError) throw msgError;
 
       if (msgs && msgs.length > 0) {
         msgs.reverse(); // Sort oldest first
 
-        // Fetch Profiles
-        const userIds = Array.from(new Set(msgs.map((m: any) => m.user_id)));
-        const { data: profiles } = await supabase
-          .from("profiles")
-          .select("id, nickname, avatar_url")
-          .in("id", userIds);
-
-        const profileMap = new Map(profiles?.map((p: any) => [p.id, p]) || []);
-
-        const formattedLogs: Log[] = msgs.map((msg: any) => {
-          const charName = msg.characters
-            ? msg.characters.name
-            : profileMap.get(msg.user_id)?.nickname || "守秘人";
-          const charAvatar = msg.characters
-            ? msg.characters.avatar_url
-            : profileMap.get(msg.user_id)?.avatar_url;
-
-          let charRole = "Keeper";
-          if (msg.characters) {
-            charRole =
-              msg.characters.role ||
-              (msg.characters.type === "investigator"
-                ? "调查员"
-                : msg.characters.type === "monster"
-                ? "怪物"
-                : "NPC");
-          }
-
-          return {
-            id: msg.id,
-            timestamp: new Date(msg.created_at).toLocaleTimeString([], {
-              hour: "2-digit",
-              minute: "2-digit",
-            }),
-            createdAt: msg.created_at,
-            charId: msg.character_id || "pc",
-            charName: charName,
-            charRole: charRole,
-            charAvatar: charAvatar,
-            type: msg.type as Log["type"],
-            content: msg.content,
-            isMine: msg.user_id === session?.user?.id,
-            recipientId: msg.recipient_id,
-            quote: msg.meta?.quote,
-          };
-        });
+        const formattedLogs = await mapMessagesToLogs(
+          msgs,
+          session?.user?.id
+        );
 
         setLogs((prev) => [...formattedLogs, ...prev]);
 
@@ -295,50 +320,6 @@ const App: React.FC = () => {
     return () => clearTimeout(timer);
   }, []);
 
-  // Auth Check
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setAuthLoading(false);
-      // Fetch nickname and VIP status
-      if (session?.user) {
-        supabase
-          .from("profiles")
-          .select("nickname, is_vip")
-          .eq("id", session.user.id)
-          .single()
-          .then(({ data }) => {
-            if (data) {
-              if (data.nickname) setUserNickname(data.nickname);
-              setIsVip(!!data.is_vip);
-            }
-          });
-      }
-    });
-
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-      // Fetch nickname and VIP status on auth change
-      if (session?.user) {
-        supabase
-          .from("profiles")
-          .select("nickname, is_vip")
-          .eq("id", session.user.id)
-          .single()
-          .then(({ data }) => {
-            if (data) {
-              if (data.nickname) setUserNickname(data.nickname);
-              setIsVip(!!data.is_vip);
-            }
-          });
-      }
-    });
-
-    return () => subscription.unsubscribe();
-  }, []);
-
   // Session Restoration (URL & Persistence)
   useEffect(() => {
     const restoreSession = async () => {
@@ -351,11 +332,7 @@ const App: React.FC = () => {
       if (!roomId) return;
 
       // Fetch Room to validate access
-      const { data: room, error } = await supabase
-        .from("rooms")
-        .select("*")
-        .eq("id", roomId)
-        .single();
+      const { data: room, error } = await fetchRoomById(roomId);
       if (error || !room) {
         // Invalid room, clear URL
         window.history.replaceState(null, "", window.location.pathname);
@@ -377,542 +354,6 @@ const App: React.FC = () => {
     }
   }, [session, authLoading]);
 
-  // Global Presence
-  useEffect(() => {
-    if (!session?.user) return;
-
-    const channel = supabase
-      .channel("global_presence")
-      .on("presence", { event: "sync" }, () => {
-        const newState = channel.presenceState();
-        const userIds = new Set<string>();
-        for (const id in newState) {
-          (newState[id] as any[]).forEach((p) => {
-            if (p.user_id) userIds.add(p.user_id);
-          });
-        }
-        setGlobalOnlineUsers(userIds);
-      })
-      .subscribe(async (status) => {
-        if (status === "SUBSCRIBED") {
-          await channel.track({
-            user_id: session.user.id,
-            online_at: new Date().toISOString(),
-          });
-        }
-      });
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [session]);
-
-  // =========================================================================
-  //  ⚡️ Core Logic: Fetching & Realtime
-  // =========================================================================
-  useEffect(() => {
-    if (!currentRoomId || !session?.user) return;
-
-    // Fetch characters (Add this to ensure characters are loaded on restore/join)
-    const fetchCharacters = async () => {
-      const { data: chars } = await supabase
-        .from("characters")
-        .select("*")
-        .eq("room_id", currentRoomId);
-      if (chars) {
-        const mappedChars = chars.map((c) => ({
-          ...c,
-          role: c.role || "调查员",
-          avatar_url: c.avatar_url,
-          job: c.info?.job || "",
-          age: c.info?.age || "",
-          sex: c.info?.sex || "",
-          notes: c.info?.notes || "",
-          backstory: c.info?.backstory || "",
-          skills: c.info?.skills || c.stats?.skills || {},
-          items: c.info?.items || [],
-          spells: c.info?.spells || [],
-          str: c.stats?.str || 50,
-          con: c.stats?.con || 50,
-          siz: c.stats?.siz || 50,
-          dex: c.stats?.dex || 50,
-          app: c.stats?.app || 50,
-          int: c.stats?.int || 50,
-          pow: c.stats?.pow || 50,
-          edu: c.stats?.edu || 50,
-          luck: c.stats?.luck || 50,
-          hp: c.stats?.hp || 10,
-          san: c.stats?.san || 50,
-          mp: c.stats?.mp || 10,
-          ...calculateDBAndBuild(c.stats?.str || 50, c.stats?.siz || 50),
-        }));
-        setCharacters(mappedChars);
-      }
-    };
-    fetchCharacters();
-
-    // Fetch history
-    const fetchMessages = async () => {
-      // 1. Get Messages with Join Query (一次性拿到角色名和昵称)
-      const { data: msgs, error: msgError } = await supabase
-        .from("messages")
-        .select(
-          `
-                    *,
-                    characters ( id, name, type, role, info, theme_color, avatar_url )
-                `
-        )
-        .eq("room_id", currentRoomId)
-        .order("created_at", { ascending: false })
-        .limit(PAGE_SIZE); // Use PAGE_SIZE for consistency
-
-      if (msgError) {
-        console.error("Error fetching messages:", msgError);
-        // return; // Don't return here, so we can try to render what we have or retry
-      }
-
-      if (msgs && msgs.length > 0) {
-        // Reverse to show oldest first (since we fetched newest first)
-        msgs.reverse();
-
-        // 1.5 Fetch Profiles manually for OOC messages
-        const userIds = Array.from(new Set(msgs.map((m: any) => m.user_id)));
-        const { data: profiles } = await supabase
-          .from("profiles")
-          .select("id, nickname, avatar_url")
-          .in("id", userIds);
-
-        const profileMap = new Map(profiles?.map((p: any) => [p.id, p]) || []);
-
-        // 2. Map to Logs using joined data
-        const formattedLogs: Log[] = msgs.map((msg: any) => {
-          // Logic: Character Name > Profile Nickname > '守秘人'
-          const charName = msg.characters
-            ? msg.characters.name
-            : profileMap.get(msg.user_id)?.nickname || "守秘人";
-          const charAvatar = msg.characters
-            ? msg.characters.avatar_url
-            : profileMap.get(msg.user_id)?.avatar_url;
-          // Logic: Character Role > 'Keeper'
-          let charRole = "Keeper";
-          if (msg.characters) {
-            // Use DB role column, fallback to type mapping if empty
-            charRole =
-              msg.characters.role ||
-              (msg.characters.type === "investigator"
-                ? "调查员"
-                : msg.characters.type === "monster"
-                ? "怪物"
-                : "NPC");
-          }
-
-          return {
-            id: msg.id,
-            timestamp: new Date(msg.created_at).toLocaleTimeString([], {
-              hour: "2-digit",
-              minute: "2-digit",
-            }),
-            createdAt: msg.created_at, // Store raw timestamp
-            charId: msg.character_id || "pc",
-            charName: charName,
-            charRole: charRole,
-            charAvatar: charAvatar,
-            type: msg.type as Log["type"],
-            content: msg.content,
-            isMine: msg.user_id === session.user.id,
-            recipientId: msg.recipient_id,
-            quote: msg.meta?.quote,
-          };
-        });
-
-        // Set hasMore based on count
-        setHasMoreLogs(msgs.length === PAGE_SIZE);
-
-        setLogs(formattedLogs);
-      } else {
-        setLogs([]);
-        setHasMoreLogs(false);
-      }
-    };
-    fetchMessages();
-
-    // Subscribe to new messages & Presence
-    const channel = supabase
-      .channel(`room:${currentRoomId}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "INSERT",
-          schema: "public",
-          table: "messages",
-          filter: `room_id=eq.${currentRoomId}`,
-        },
-        async (payload) => {
-          const msg = payload.new;
-
-          // Check for kick signal
-          if (
-            msg.type === "system" &&
-            msg.meta?.type === "kick" &&
-            msg.meta?.userId === session.user.id
-          ) {
-            alert("你已被移出房间");
-            doLeaveCleanup();
-            return;
-          }
-
-          // Need to fetch metadata because Realtime payload is raw
-          let charName = "守秘人";
-          let charRole = "Keeper";
-          let charAvatar: string | null = null;
-
-          // 1. Try local cache
-          const localChar = charactersRef.current.find(
-            (c) => c.id === msg.character_id
-          );
-
-          if (localChar) {
-            charName = localChar.name;
-            charRole = localChar.role;
-            charAvatar = localChar.avatar_url || null;
-          } else if (msg.character_id) {
-            // 2. Fetch from DB if not in local list
-            const { data: char } = await supabase
-              .from("characters")
-              .select("name, role, avatar_url")
-              .eq("id", msg.character_id)
-              .single();
-            if (char) {
-              charName = char.name;
-              charRole = char.role;
-              charAvatar = char.avatar_url;
-            }
-          } else {
-            // 3. Fetch user nickname if it's an OOC message
-            const { data: profile } = await supabase
-              .from("profiles")
-              .select("nickname, avatar_url")
-              .eq("id", msg.user_id)
-              .single();
-            if (profile) {
-              charName = profile.nickname || "玩家";
-              charAvatar = profile.avatar_url;
-            }
-          }
-
-          const newLog: Log = {
-            id: msg.id,
-            timestamp: new Date(msg.created_at).toLocaleTimeString([], {
-              hour: "2-digit",
-              minute: "2-digit",
-            }),
-            createdAt: msg.created_at,
-            charId: msg.character_id || "pc",
-            charName,
-            charRole,
-            charAvatar,
-            type: msg.type as Log["type"],
-            content: msg.content,
-            isMine: msg.user_id === session.user.id,
-            quote: msg.meta?.quote,
-          };
-
-          setLogs((prev) => {
-            if (prev.some((l) => l.id === newLog.id)) return prev;
-            return [...prev, newLog];
-          });
-        }
-      )
-      .on(
-        "postgres_changes",
-        {
-          event: "INSERT",
-          schema: "public",
-          table: "characters",
-          filter: `room_id=eq.${currentRoomId}`,
-        },
-        (payload) => {
-          const newChar = payload.new as any;
-          // Check if already exists to avoid dupes
-          setCharacters((prev) => {
-            if (prev.find((c) => c.id === newChar.id)) return prev;
-
-            const mappedChar: Character = {
-              id: newChar.id,
-              user_id: newChar.user_id,
-              room_id: newChar.room_id,
-              name: newChar.name,
-              type: newChar.type,
-              avatar_url: newChar.avatar_url,
-              role:
-                newChar.role ||
-                (newChar.type === "investigator"
-                  ? "调查员"
-                  : newChar.type === "monster"
-                  ? "怪物"
-                  : "NPC"),
-              job: newChar.info?.job || "",
-              age: newChar.info?.age || "",
-              sex: newChar.info?.sex || "",
-              notes: newChar.info?.notes || "",
-              backstory: newChar.info?.backstory || "",
-              skills: newChar.info?.skills || newChar.stats?.skills || {},
-              items: newChar.info?.items || [],
-              spells: newChar.info?.spells || [],
-              str: newChar.stats?.str || 50,
-              con: newChar.stats?.con || 50,
-              siz: newChar.stats?.siz || 50,
-              dex: newChar.stats?.dex || 50,
-              app: newChar.stats?.app || 50,
-              int: newChar.stats?.int || 50,
-              pow: newChar.stats?.pow || 50,
-              edu: newChar.stats?.edu || 50,
-              luck: newChar.stats?.luck || 50,
-              hp: newChar.stats?.hp || 10,
-              san: newChar.stats?.san || 50,
-              mp: newChar.stats?.mp || 10,
-              ...calculateDBAndBuild(
-                newChar.stats?.str || 50,
-                newChar.stats?.siz || 50
-              ),
-            };
-            return [...prev, mappedChar];
-          });
-        }
-      )
-      .on(
-        "postgres_changes",
-        {
-          event: "UPDATE",
-          schema: "public",
-          table: "characters",
-          filter: `room_id=eq.${currentRoomId}`,
-        },
-        (payload) => {
-          const newChar = payload.new as any;
-
-          // 检查角色是否已存在于当前列表中
-          const exists = charactersRef.current.some((c) => c.id === newChar.id);
-
-          if (exists) {
-            // 如果存在，更新信息
-            setCharacters((prev) =>
-              prev.map((c) => {
-                if (c.id === newChar.id) {
-                  // Handle potential partial updates and JSON parsing
-                  const safeInfo =
-                    typeof newChar.info === "string"
-                      ? JSON.parse(newChar.info)
-                      : newChar.info || c.info || {};
-
-                  const safeStats =
-                    typeof newChar.stats === "string"
-                      ? JSON.parse(newChar.stats)
-                      : newChar.stats || c.stats || {};
-
-                  return {
-                    ...c,
-                    name: newChar.name !== undefined ? newChar.name : c.name,
-                    type: newChar.type !== undefined ? newChar.type : c.type,
-                    avatar_url:
-                      newChar.avatar_url !== undefined
-                        ? newChar.avatar_url
-                        : c.avatar_url,
-                    role:
-                      newChar.role !== undefined
-                        ? newChar.role
-                        : newChar.type !== undefined
-                        ? newChar.type === "investigator"
-                          ? "调查员"
-                          : newChar.type === "monster"
-                          ? "怪物"
-                          : "NPC"
-                        : c.role,
-
-                    // Update mapped fields from info
-                    job: safeInfo.job !== undefined ? safeInfo.job : c.job,
-                    age: safeInfo.age !== undefined ? safeInfo.age : c.age,
-                    sex: safeInfo.sex !== undefined ? safeInfo.sex : c.sex,
-                    notes:
-                      safeInfo.notes !== undefined ? safeInfo.notes : c.notes,
-                    backstory:
-                      safeInfo.backstory !== undefined
-                        ? safeInfo.backstory
-                        : c.backstory,
-                    skills:
-                      safeInfo.skills || safeStats.skills || c.skills || {},
-                    items:
-                      safeInfo.items !== undefined
-                        ? safeInfo.items
-                        : c.items || [],
-                    spells:
-                      safeInfo.spells !== undefined
-                        ? safeInfo.spells
-                        : c.spells || [],
-
-                    // Update mapped fields from stats
-                    str: safeStats.str !== undefined ? safeStats.str : c.str,
-                    con: safeStats.con !== undefined ? safeStats.con : c.con,
-                    siz: safeStats.siz !== undefined ? safeStats.siz : c.siz,
-                    dex: safeStats.dex !== undefined ? safeStats.dex : c.dex,
-                    app: safeStats.app !== undefined ? safeStats.app : c.app,
-                    int: safeStats.int !== undefined ? safeStats.int : c.int,
-                    pow: safeStats.pow !== undefined ? safeStats.pow : c.pow,
-                    edu: safeStats.edu !== undefined ? safeStats.edu : c.edu,
-                    luck:
-                      safeStats.luck !== undefined ? safeStats.luck : c.luck,
-                    hp: safeStats.hp !== undefined ? safeStats.hp : c.hp,
-                    san: safeStats.san !== undefined ? safeStats.san : c.san,
-                    mp: safeStats.mp !== undefined ? safeStats.mp : c.mp,
-                    ...calculateDBAndBuild(
-                      safeStats.str !== undefined ? safeStats.str : c.str,
-                      safeStats.siz !== undefined ? safeStats.siz : c.siz
-                    ),
-
-                    room_id:
-                      newChar.room_id !== undefined
-                        ? newChar.room_id
-                        : c.room_id,
-                    user_id:
-                      newChar.user_id !== undefined
-                        ? newChar.user_id
-                        : c.user_id,
-
-                    // Preserve raw objects for future reference
-                    info: safeInfo,
-                    stats: safeStats,
-                  };
-                }
-                return c;
-              })
-            );
-          } else {
-            // 如果不存在（说明是通过 UPDATE 进入房间的），当作新角色添加
-            const mappedChar: Character = {
-              id: newChar.id,
-              user_id: newChar.user_id,
-              room_id: newChar.room_id,
-              name: newChar.name,
-              type: newChar.type,
-              avatar_url: newChar.avatar_url,
-              role:
-                newChar.role ||
-                (newChar.type === "investigator"
-                  ? "调查员"
-                  : newChar.type === "monster"
-                  ? "怪物"
-                  : "NPC"),
-              job: newChar.info?.job || "",
-              age: newChar.info?.age || "",
-              sex: newChar.info?.sex || "",
-              notes: newChar.info?.notes || "",
-              backstory: newChar.info?.backstory || "",
-              skills: newChar.info?.skills || newChar.stats?.skills || {},
-              items: newChar.info?.items || [],
-              spells: newChar.info?.spells || [],
-              str: newChar.stats?.str || 50,
-              con: newChar.stats?.con || 50,
-              siz: newChar.stats?.siz || 50,
-              dex: newChar.stats?.dex || 50,
-              app: newChar.stats?.app || 50,
-              int: newChar.stats?.int || 50,
-              pow: newChar.stats?.pow || 50,
-              edu: newChar.stats?.edu || 50,
-              luck: newChar.stats?.luck || 50,
-              hp: newChar.stats?.hp || 10,
-              san: newChar.stats?.san || 50,
-              mp: newChar.stats?.mp || 10,
-              ...calculateDBAndBuild(
-                newChar.stats?.str || 50,
-                newChar.stats?.siz || 50
-              ),
-            };
-            setCharacters((prev) => [...prev, mappedChar]);
-          }
-        }
-      )
-      // Listen for Message Deletion
-      .on(
-        "postgres_changes",
-        {
-          event: "DELETE",
-          schema: "public",
-          table: "messages",
-          filter: `room_id=eq.${currentRoomId}`,
-        },
-        (payload) => {
-          const deletedId = payload.old.id;
-          setLogs((prev) => prev.filter((l) => l.id !== deletedId));
-        }
-      )
-      // Listen for Room Deletion/Update
-      .on(
-        "postgres_changes",
-        {
-          event: "DELETE",
-          schema: "public",
-          table: "rooms",
-          filter: `id=eq.${currentRoomId}`,
-        },
-        () => {
-          // Room deleted by owner (or someone else), just cleanup locally
-          alert("房间已被房主解散");
-          doLeaveCleanup();
-        }
-      )
-      .on(
-        "postgres_changes",
-        {
-          event: "UPDATE",
-          schema: "public",
-          table: "rooms",
-          filter: `id=eq.${currentRoomId}`,
-        },
-        (payload) => {
-          const newRoom = payload.new as any;
-          if (newRoom.bg_music_url !== undefined) {
-            setBgMusicUrl(newRoom.bg_music_url);
-          }
-          if (newRoom.is_music_playing !== undefined) {
-            setIsMusicPlaying(newRoom.is_music_playing);
-          }
-          if (newRoom.music_track_index !== undefined) {
-            setMusicTrackIndex(newRoom.music_track_index);
-          }
-          setModuleInfo((prev) => ({
-            ...prev,
-            title: newRoom.title !== undefined ? newRoom.title : prev.title,
-            description:
-              newRoom.description !== undefined
-                ? newRoom.description
-                : prev.description,
-          }));
-        }
-      )
-      .on("presence", { event: "sync" }, () => {
-        const newState = channel.presenceState();
-        const userIds = new Set<string>();
-        for (const id in newState) {
-          (newState[id] as any[]).forEach((p) => {
-            if (p.user_id) userIds.add(p.user_id);
-          });
-        }
-        setOnlineUsers(userIds);
-      })
-      .subscribe(async (status) => {
-        if (status === "SUBSCRIBED") {
-          await channel.track({
-            user_id: session.user.id,
-            nickname: userNickname || "User",
-          });
-        }
-      });
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [currentRoomId, session, userNickname]);
-
   // Responsive Check
   useEffect(() => {
     const checkMobile = () => {
@@ -932,16 +373,12 @@ const App: React.FC = () => {
     isRestoring = false
   ) => {
     // Fetch Room Data
-    const { data: room } = await supabase
-      .from("rooms")
-      .select("*")
-      .eq("id", roomId)
-      .single();
+    const { data: room } = await fetchRoomById(roomId);
     if (room) {
       // Permission Check
       const {
         data: { user },
-      } = await supabase.auth.getUser();
+      } = await getCurrentUser();
       const userIsKP = user?.id === room.kp_id;
 
       if (!charId) {
@@ -961,7 +398,7 @@ const App: React.FC = () => {
         notes: "",
       });
       setRoomType(room.type || "text");
-      setRoomPassword(room.password || "");
+      setRoomPassword("");
       setCurrentRoomId(roomId);
       setActiveCharId(charId);
       setIsKP(userIsKP);
@@ -979,14 +416,11 @@ const App: React.FC = () => {
 
       // If joining as character, update character's room_id
       if (charId !== "pc" && user) {
-        const { data: updatedChar, error } = await supabase
-          .from("characters")
-          .update({
-            room_id: roomId,
-            user_id: user.id,
-          })
-          .eq("id", charId)
-          .select();
+        const { data: updatedChar, error } = await assignCharacterToRoom(
+          charId,
+          roomId,
+          user.id
+        );
 
         if (error) {
           console.error("Failed to update character room:", error);
@@ -1002,49 +436,16 @@ const App: React.FC = () => {
       }
 
       // Load Characters in Room
-      const { data: chars } = await supabase
-        .from("characters")
-        .select("*")
-        .eq("room_id", roomId);
+      const { data: chars } = await fetchRoomCharacters(roomId);
       if (chars) {
-        const mappedChars = chars.map((c) => ({
-          ...c,
-          role: c.role || "调查员",
-          avatar_url: c.avatar_url,
-          job: c.info?.job || "",
-          age: c.info?.age || "",
-          sex: c.info?.sex || "",
-          notes: c.info?.notes || "",
-          backstory: c.info?.backstory || "",
-          skills: c.info?.skills || c.stats?.skills || {},
-          items: c.info?.items || [],
-          spells: c.info?.spells || [],
-          str: c.stats?.str || 50,
-          con: c.stats?.con || 50,
-          siz: c.stats?.siz || 50,
-          dex: c.stats?.dex || 50,
-          app: c.stats?.app || 50,
-          int: c.stats?.int || 50,
-          pow: c.stats?.pow || 50,
-          edu: c.stats?.edu || 50,
-          luck: c.stats?.luck || 50,
-          hp: c.stats?.hp || 10,
-          san: c.stats?.san || 50,
-          mp: c.stats?.mp || 10,
-          ...calculateDBAndBuild(c.stats?.str || 50, c.stats?.siz || 50),
-        }));
+        const mappedChars = chars.map(mapCharacterRow);
         setCharacters(mappedChars);
 
         // 发送进入房间的系统消息（仅在非恢复会话且有用户信息时）
         if (!isRestoring && user) {
           let enterMsg = "";
           // Fetch nickname for better UX
-          const { data: profile } = await supabase
-            .from("profiles")
-            .select("nickname")
-            .eq("id", user.id)
-            .single();
-          const userName = profile?.nickname || "某人";
+          const userName = (await fetchProfileNickname(user.id)) || "User";
 
           if (charId === "pc") {
             enterMsg = `${userName} (守秘人) 进入了房间`;
@@ -1056,12 +457,11 @@ const App: React.FC = () => {
           }
 
           if (enterMsg) {
-            const { error: msgError } = await supabase.from("messages").insert({
-              room_id: roomId,
-              user_id: user.id,
-              type: "system",
-              content: enterMsg,
-            });
+            const { error: msgError } = await addRoomSystemMessage(
+              roomId,
+              user.id,
+              enterMsg
+            );
             if (msgError)
               console.error("Failed to send enter message:", msgError);
           }
@@ -1084,14 +484,14 @@ const App: React.FC = () => {
     // If it's 'pc' (KP), character_id is NULL; otherwise use UUID
     const characterId = isMainPC ? null : targetId;
 
-    const { error } = await supabase.from("messages").insert({
-      room_id: currentRoomId,
-      user_id: session.user.id,
-      character_id: characterId,
-      type: type,
-      content: content,
-      recipient_id: recipientId || null,
-      meta: meta || {},
+    const { error } = await addMessage({
+      roomId: currentRoomId,
+      userId: session.user.id,
+      characterId,
+      type,
+      content,
+      recipientId,
+      meta,
     });
 
     if (error) {
@@ -1191,6 +591,8 @@ const App: React.FC = () => {
   };
 
   const handleShowStory = async () => {
+    if (!currentRoomId) return;
+
     setShowStoryModal(true);
     setIsGeneratingStory(true);
     setStoryContent("");
@@ -1202,17 +604,11 @@ const App: React.FC = () => {
       let hasMore = true;
 
       while (hasMore) {
-        const { data, error } = await supabase
-          .from("messages")
-          .select(
-            `
-              *,
-              characters ( id, name, type, role, info, theme_color, avatar_url )
-            `
-          )
-          .eq("room_id", currentRoomId)
-          .order("created_at", { ascending: true })
-          .range(page * BATCH_SIZE, (page + 1) * BATCH_SIZE - 1);
+        const { data, error } = await fetchMessagesPage(
+          currentRoomId,
+          page,
+          BATCH_SIZE
+        );
 
         if (error) throw error;
 
@@ -1225,54 +621,10 @@ const App: React.FC = () => {
         }
       }
 
-      // Fetch Profiles for OOC messages
-      const userIds = Array.from(new Set(allMsgs.map((m: any) => m.user_id)));
-      let profileMap = new Map();
-      if (userIds.length > 0) {
-        const { data: profiles } = await supabase
-          .from("profiles")
-          .select("id, nickname, avatar_url")
-          .in("id", userIds);
-        profileMap = new Map(profiles?.map((p: any) => [p.id, p]) || []);
-      }
-
-      const formattedLogs: Log[] = allMsgs.map((msg: any) => {
-        const charName = msg.characters
-          ? msg.characters.name
-          : profileMap.get(msg.user_id)?.nickname || "守秘人";
-        const charAvatar = msg.characters
-          ? msg.characters.avatar_url
-          : profileMap.get(msg.user_id)?.avatar_url;
-
-        let charRole = "Keeper";
-        if (msg.characters) {
-          charRole =
-            msg.characters.role ||
-            (msg.characters.type === "investigator"
-              ? "调查员"
-              : msg.characters.type === "monster"
-              ? "怪物"
-              : "NPC");
-        }
-
-        return {
-          id: msg.id,
-          timestamp: new Date(msg.created_at).toLocaleTimeString([], {
-            hour: "2-digit",
-            minute: "2-digit",
-          }),
-          createdAt: msg.created_at,
-          charId: msg.character_id || "pc",
-          charName: charName,
-          charRole: charRole,
-          charAvatar: charAvatar,
-          type: msg.type as Log["type"],
-          content: msg.content,
-          isMine: msg.user_id === session?.user?.id,
-          recipientId: msg.recipient_id,
-          quote: msg.meta?.quote,
-        };
-      });
+      const formattedLogs = await mapMessagesToLogs(
+        allMsgs,
+        session?.user?.id
+      );
 
       const story = generateStory(formattedLogs);
       setStoryContent(story);
@@ -1285,10 +637,7 @@ const App: React.FC = () => {
   };
 
   const handleDeleteMessage = async (messageId: string) => {
-    const { error } = await supabase
-      .from("messages")
-      .delete()
-      .eq("id", messageId);
+    const { error } = await deleteMessage(messageId);
     if (error) {
       console.error("撤回消息失败:", error);
       alert("撤回消息失败: " + error.message);
@@ -1384,47 +733,15 @@ const App: React.FC = () => {
 
     if (!newName) newName = `${baseName} Copy`; // Ultimate fallback
 
-    // 3. Prepare data
-    const charData = {
-      room_id: currentRoomId,
-      user_id: session.user.id,
+    const charData = buildCharacterMutationPayload(char, {
+      roomId: currentRoomId,
+      userId: session.user.id,
       name: newName,
-      role: char.role,
-      avatar_url: char.avatar_url,
-      type: char.type || "monster", // Default to monster if undefined, or keep char.type
-      info: {
-        job: char.job,
-        age: char.age,
-        sex: char.sex,
-        notes: char.notes,
-        backstory: char.backstory,
-        skills: char.skills || {},
-        items: char.items || [],
-        spells: char.spells || [],
-      },
-      stats: {
-        str: char.str,
-        con: char.con,
-        siz: char.siz,
-        dex: char.dex,
-        app: char.app,
-        int: char.int,
-        pow: char.pow,
-        edu: char.edu,
-        luck: char.luck,
-        hp: char.hp,
-        san: char.san,
-        mp: char.mp,
-        skills: char.skills || {},
-      },
-    };
+      typeFallback: "monster",
+    });
 
     try {
-      const { data, error } = await supabase
-        .from("characters")
-        .insert(charData)
-        .select()
-        .single();
+      const { data, error } = await createCharacter(charData);
 
       if (error) throw error;
 
@@ -1441,92 +758,23 @@ const App: React.FC = () => {
   const handleSaveCharacter = async (char: Character) => {
     if (!currentRoomId || !session?.user) return;
 
-    const charData = {
-      room_id: currentRoomId,
-      // 如果是编辑现有角色，保留原 user_id；否则使用当前用户 ID
-      user_id: editingChar ? editingChar.user_id : session.user.id,
-      name: char.name,
-      role: char.role,
-      avatar_url: char.avatar_url,
-      // 确保 type 被正确设置，如果 char.type 为空则使用默认值
-      type: char.type || "investigator",
-
-      info: {
-        job: char.job,
-        age: char.age,
-        sex: char.sex,
-        notes: char.notes,
-        backstory: char.backstory,
-        skills: char.skills || {},
-        items: char.items || [],
-        spells: char.spells || [],
-      },
-
-      stats: {
-        str: char.str,
-        con: char.con,
-        siz: char.siz,
-        dex: char.dex,
-        app: char.app,
-        int: char.int,
-        pow: char.pow,
-        edu: char.edu,
-        luck: char.luck,
-        hp: char.hp,
-        san: char.san,
-        mp: char.mp,
-        skills: char.skills || {},
-      },
-    };
+    const charData = buildCharacterMutationPayload(char, {
+      roomId: currentRoomId,
+      userId: editingChar?.user_id || session.user.id,
+      typeFallback: "investigator",
+    });
 
     try {
       if (editingChar) {
-        const { error } = await supabase
-          .from("characters")
-          .update(charData)
-          .eq("id", char.id);
+        const { error } = await updateCharacter(char.id, charData);
 
         if (error) throw error;
 
         // Refetch to ensure we have the latest DB state (including server-side defaults or triggers)
-        const { data: latestChar, error: fetchError } = await supabase
-          .from("characters")
-          .select("*")
-          .eq("id", char.id)
-          .single();
+        const { data: latestChar, error: fetchError } = await fetchCharacterById(char.id);
 
         if (latestChar && !fetchError) {
-          const mappedLatest: Character = {
-            ...char, // Keep local fields
-            ...latestChar, // Overwrite with DB fields
-            // Remap JSONB fields
-            role: latestChar.role || "调查员",
-            avatar_url: latestChar.avatar_url,
-            job: latestChar.info?.job || "",
-            age: latestChar.info?.age || "",
-            sex: latestChar.info?.sex || "",
-            notes: latestChar.info?.notes || "",
-            backstory: latestChar.info?.backstory || "",
-            skills: latestChar.info?.skills || latestChar.stats?.skills || {},
-            items: latestChar.info?.items || [],
-            spells: latestChar.info?.spells || [],
-            str: latestChar.stats?.str || 50,
-            con: latestChar.stats?.con || 50,
-            siz: latestChar.stats?.siz || 50,
-            dex: latestChar.stats?.dex || 50,
-            app: latestChar.stats?.app || 50,
-            int: latestChar.stats?.int || 50,
-            pow: latestChar.stats?.pow || 50,
-            edu: latestChar.stats?.edu || 50,
-            luck: latestChar.stats?.luck || 50,
-            hp: latestChar.stats?.hp || 10,
-            san: latestChar.stats?.san || 50,
-            mp: latestChar.stats?.mp || 10,
-            ...calculateDBAndBuild(
-              latestChar.stats?.str || 50,
-              latestChar.stats?.siz || 50
-            ),
-          };
+          const mappedLatest = mapCharacterRow({ ...char, ...latestChar });
           setCharacters((prev) =>
             prev.map((c) => (c.id === char.id ? mappedLatest : c))
           );
@@ -1538,47 +786,12 @@ const App: React.FC = () => {
         }
         // addLog('system', `守秘人 更新了 [${char.name}] 的档案`);
       } else {
-        const { data, error } = await supabase
-          .from("characters")
-          .insert(charData)
-          .select()
-          .single();
+        const { data, error } = await createCharacter(charData);
 
         if (error) throw error;
 
         if (data) {
-          const newChar: Character = {
-            ...char,
-            id: data.id,
-            // 确保从数据库返回的数据中正确读取 type 和 role
-            type: data.type,
-            role: data.role,
-            // Remap JSONB fields from DB response
-            job: data.info?.job || "",
-            age: data.info?.age || "",
-            sex: data.info?.sex || "",
-            notes: data.info?.notes || "",
-            backstory: data.info?.backstory || "",
-            skills: data.info?.skills || data.stats?.skills || {},
-            items: data.info?.items || [],
-            spells: data.info?.spells || [],
-            str: data.stats?.str || 50,
-            con: data.stats?.con || 50,
-            siz: data.stats?.siz || 50,
-            dex: data.stats?.dex || 50,
-            app: data.stats?.app || 50,
-            int: data.stats?.int || 50,
-            pow: data.stats?.pow || 50,
-            edu: data.stats?.edu || 50,
-            luck: data.stats?.luck || 50,
-            hp: data.stats?.hp || 10,
-            san: data.stats?.san || 50,
-            mp: data.stats?.mp || 10,
-            ...calculateDBAndBuild(
-              data.stats?.str || 50,
-              data.stats?.siz || 50
-            ),
-          };
+          const newChar = mapCharacterRow({ ...char, ...data });
           // OPTIMIZATION: Do NOT manually update state here if Realtime is active.
           // Realtime subscription will handle the UI update to avoid duplication race conditions.
           // However, Realtime might be slightly delayed.
@@ -1600,7 +813,7 @@ const App: React.FC = () => {
   const handleDeleteCharacter = async (id: string) => {
     if (!id) return;
 
-    const { error } = await supabase.from("characters").delete().eq("id", id);
+    const { error } = await deleteCharacterRecord(id);
 
     if (error) {
       console.error("删除失败:", error);
@@ -1619,10 +832,7 @@ const App: React.FC = () => {
     if (!char) return;
 
     // 1. Update DB: Set room_id to null
-    const { error } = await supabase
-      .from("characters")
-      .update({ room_id: null })
-      .eq("id", id);
+    const { error } = await removeCharacterFromRoom(id);
 
     if (error) {
       console.error("移出失败:", error);
@@ -1632,9 +842,9 @@ const App: React.FC = () => {
 
     // 2. Send system message with kick signal
     if (char.user_id) {
-      await supabase.from("messages").insert({
-        room_id: currentRoomId,
-        user_id: session.user.id,
+      await addMessage({
+        roomId: currentRoomId,
+        userId: session.user.id,
         type: "system",
         content: `守秘人将 [${char.name}] 移出了房间`,
         meta: { type: "kick", userId: char.user_id },
@@ -1668,10 +878,7 @@ const App: React.FC = () => {
       skills: target.skills || {},
     };
 
-    const { error } = await supabase
-      .from("characters")
-      .update({ stats: newStats })
-      .eq("id", target.id);
+    const { error } = await saveCharacterStats(target.id, newStats);
 
     if (error) {
       alert("状态更新失败");
@@ -1702,10 +909,7 @@ const App: React.FC = () => {
 
   const handleDeleteRoom = async () => {
     if (!currentRoomId) return;
-    const { error } = await supabase
-      .from("rooms")
-      .delete()
-      .eq("id", currentRoomId);
+    const { error } = await deleteRoom(currentRoomId);
     if (!error) {
       // ✅ Clean reset
       setCharacters([]);
@@ -1723,10 +927,7 @@ const App: React.FC = () => {
   const handleClearChat = async () => {
     if (!currentRoomId) return;
 
-    const { error } = await supabase
-      .from("messages")
-      .delete()
-      .eq("room_id", currentRoomId);
+    const { error } = await deleteRoomMessages(currentRoomId);
 
     if (error) {
       console.error("清空聊天记录失败:", error);
@@ -1750,10 +951,7 @@ const App: React.FC = () => {
     if (!currentRoomId || !isKP) return;
 
     try {
-      const { error } = await supabase.rpc("conclude_game", {
-        p_room_id: currentRoomId,
-        p_outcomes: outcomes,
-      });
+      const { error } = await concludeRoom(currentRoomId, outcomes);
 
       if (error) throw error;
 
@@ -1778,20 +976,15 @@ const App: React.FC = () => {
 
   const handleSignOut = async () => {
     try {
-      const { error } = await supabase.auth.signOut();
+      const { error } = await signOut();
       if (error) throw error;
     } catch (error) {
       console.warn("Logout error (safe to ignore):", error);
       // Fallback: Manually clear session from local storage if network request fails
       // This ensures the user is logged out locally even if the server request was aborted
-      Object.keys(localStorage).forEach((key) => {
-        if (key.startsWith("sb-") && key.endsWith("-auth-token")) {
-          localStorage.removeItem(key);
-        }
-      });
+      clearLocalSupabaseSession();
     } finally {
       // Force state reset
-      setSession(null);
       setCurrentRoomId(null);
       window.history.replaceState(null, "", window.location.pathname);
     }
@@ -1946,10 +1139,7 @@ const App: React.FC = () => {
 
     if (logChanges.length === 0) return;
 
-    const { error } = await supabase
-      .from("characters")
-      .update({ stats: newStats })
-      .eq("id", charId);
+    const { error } = await saveCharacterStats(charId, newStats);
 
     if (!error) {
       addLog("system", `[${target.name}] 属性变更: ${logChanges.join(", ")}`);
@@ -2223,7 +1413,7 @@ const App: React.FC = () => {
     const {
       error: userError,
       data: { user },
-    } = await supabase.auth.getUser();
+    } = await getCurrentUser();
     if (user && !userError) {
       let leaveMsg = "";
 
@@ -2244,9 +1434,9 @@ const App: React.FC = () => {
       }
 
       if (leaveMsg) {
-        const { error: msgError } = await supabase.from("messages").insert({
-          room_id: currentRoomId,
-          user_id: user.id, // Use validated user.id instead of session.user.id
+        const { error: msgError } = await addMessage({
+          roomId: currentRoomId,
+          userId: user.id,
           type: "system",
           content: leaveMsg,
         });
@@ -2262,7 +1452,7 @@ const App: React.FC = () => {
     doLeaveCleanup();
   };
 
-  const doLeaveCleanup = () => {
+  const doLeaveCleanup = useCallback(() => {
     // ✅ Clean reset
     setCurrentRoomId(null);
     setCharacters([]);
@@ -2273,14 +1463,29 @@ const App: React.FC = () => {
     setBgMusicUrl(null);
     setOnlineUsers(new Set());
     window.history.replaceState(null, "", window.location.pathname);
-  };
+  }, []);
+
+  useRoomRealtime({
+    currentRoomId,
+    userId: session?.user?.id,
+    userNickname,
+    pageSize: PAGE_SIZE,
+    charactersRef,
+    setCharacters,
+    setLogs,
+    setHasMoreLogs,
+    setModuleInfo,
+    setBgMusicUrl,
+    setIsMusicPlaying,
+    setMusicTrackIndex,
+    setOnlineUsers,
+    onKicked: doLeaveCleanup,
+    onRoomDeleted: doLeaveCleanup,
+  });
 
   const handleUpdateMusic = async (url: string) => {
     if (!currentRoomId || !isKP) return;
-    const { error } = await supabase
-      .from("rooms")
-      .update({ bg_music_url: url })
-      .eq("id", currentRoomId);
+    const { error } = await updateRoomMusicUrl(currentRoomId, url);
     if (error) {
       console.error("Failed to update background music:", error);
       alert(`更新背景音乐失败: ${error.message || JSON.stringify(error)}`);
@@ -2294,13 +1499,11 @@ const App: React.FC = () => {
     trackIndex: number
   ) => {
     if (!currentRoomId || !isKP) return;
-    const { error } = await supabase
-      .from("rooms")
-      .update({
-        is_music_playing: isPlaying,
-        music_track_index: trackIndex,
-      })
-      .eq("id", currentRoomId);
+    const { error } = await updateRoomMusicState(
+      currentRoomId,
+      isPlaying,
+      trackIndex
+    );
 
     if (error) {
       console.error("Failed to update music state:", error);
@@ -2345,17 +1548,20 @@ const App: React.FC = () => {
 
   if (!currentRoomId) {
     return (
-      <Home
-        onJoinRoom={handleJoinRoom}
-        onLogout={handleSignOut}
-        onlineUsers={globalOnlineUsers}
-        levelInfo={levelInfo}
-      />
+      <Suspense fallback={<LoadingScreen />}>
+        <Home
+          onJoinRoom={handleJoinRoom}
+          onLogout={handleSignOut}
+          onlineUsers={globalOnlineUsers}
+          levelInfo={levelInfo}
+        />
+      </Suspense>
     );
   }
 
   const appContent = (
-    <div className="flex h-screen text-slate-200 font-sans selection:bg-indigo-500/30 overflow-hidden bg-[#020617]">
+    <Suspense fallback={<LoadingScreen />}>
+      <div className="flex h-screen text-slate-200 font-sans selection:bg-indigo-500/30 overflow-hidden bg-[#020617]">
       {/* Background Effects */}
       <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none z-0">
         <div className="absolute top-[-10%] left-[-10%] w-96 h-96 bg-purple-900/20 rounded-full blur-[100px] animate-blob"></div>
@@ -2528,16 +1734,19 @@ const App: React.FC = () => {
               title: info.title,
               description: info.description,
             };
-            if (password !== undefined) updates.password = password;
-
-            const { error } = await supabase
-              .from("rooms")
-              .update(updates)
-              .eq("id", currentRoomId);
+            const { error } = await updateRoomModule(currentRoomId, updates);
 
             if (error) {
               alert("保存失败: " + error.message);
             } else {
+              if (password !== undefined) {
+                try {
+                  await saveRoomPassword(currentRoomId, password);
+                } catch (passwordError: any) {
+                  alert("Password save failed: " + passwordError.message);
+                  return;
+                }
+              }
               // Local update for immediate feedback (Realtime will also trigger)
               setModuleInfo(info);
               if (password !== undefined) setRoomPassword(password);
@@ -2583,11 +1792,13 @@ const App: React.FC = () => {
           onClose={() => setShowStoryModal(false)}
         />
       )}
-    </div>
+      </div>
+    </Suspense>
   );
 
   if (roomType === "voice" && token) {
     return (
+      <Suspense fallback={<LoadingScreen />}>
       <LiveKitRoom
         token={token}
         serverUrl={import.meta.env.VITE_LIVEKIT_URL}
@@ -2603,6 +1814,7 @@ const App: React.FC = () => {
       >
         {appContent}
       </LiveKitRoom>
+      </Suspense>
     );
   }
 

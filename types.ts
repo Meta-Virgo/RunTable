@@ -32,6 +32,7 @@ export interface Room {
   status: "open" | "closed" | "archived" | "completed";
   room_number?: number;
   password?: string | null;
+  has_password?: boolean;
   last_active_at?: string;
   bg_music_url?: string | null;
   type: "text" | "voice";

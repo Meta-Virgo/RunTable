@@ -15,14 +15,13 @@ import {
   MicOff,
 } from "lucide-react";
 import {
+  useLocalParticipant,
   useParticipants,
   useIsSpeaking,
-  useTrackToggle,
 } from "@livekit/components-react";
 import { cn } from "./UI";
 import { Character } from "../types";
 import { useElasticScroll } from "../hooks/useElasticScroll";
-import { Track } from "livekit-client";
 
 interface SidebarProps {
   isOpen: boolean;
@@ -89,14 +88,16 @@ const VoiceControls = ({
 };
 
 const MicrophoneButton = ({ isOpen }: { isOpen: boolean }) => {
-  const { toggle, enabled, buttonProps } = useTrackToggle({
-    source: Track.Source.Microphone,
-    initialState: false,
-  });
+  const { localParticipant, isMicrophoneEnabled: enabled } =
+    useLocalParticipant();
 
   const handleToggle = async () => {
     try {
-      await toggle();
+      await localParticipant.setMicrophoneEnabled(!enabled, {
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: true,
+      });
     } catch (error: any) {
       console.error("Microphone toggle error:", error);
       // 处理常见的权限错误
@@ -116,7 +117,6 @@ const MicrophoneButton = ({ isOpen }: { isOpen: boolean }) => {
 
   return (
     <button
-      {...buttonProps}
       onClick={handleToggle}
       className={cn(
         "w-full flex items-center gap-3 px-3 py-3 rounded-xl transition-all duration-300 group border",

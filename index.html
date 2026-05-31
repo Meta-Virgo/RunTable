@@ -6,205 +6,52 @@
       name="viewport"
       content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
     />
-    <title>RunTable Pro - 沉浸式跑团终端</title>
-    <!-- 使用 Data URI 作为 Favicon 解决 404 问题 -->
+    <title>RunTable Pro - Immersive TRPG Table</title>
     <link
       rel="icon"
-      href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎲</text></svg>"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%E2%9A%84%3C/text%3E%3C/svg%3E"
     />
-
     <link
       href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=Noto+Sans+SC:wght@300;400;500;700&display=swap"
       rel="stylesheet"
     />
     <style>
-      /* 静态 Loading 样式 - 对应 components/LoadingScreen.tsx */
       body {
         margin: 0;
-        background-color: #020617;
+        background: #020617;
       }
+
       #initial-loader {
-        position: fixed;
-        inset: 0;
-        z-index: 9999;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        background-color: #020617;
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
         color: #e2e8f0;
         font-family: "Inter", "Noto Sans SC", system-ui, sans-serif;
       }
-      .loader-blob {
-        position: absolute;
-        border-radius: 9999px;
-        filter: blur(100px);
-        animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-      }
-      .blob-1 {
-        top: -10%;
-        left: -10%;
-        width: 24rem;
-        height: 24rem;
-        background-color: rgba(88, 28, 135, 0.2);
-      }
-      .blob-2 {
-        bottom: 10%;
-        right: -5%;
-        width: 30rem;
-        height: 30rem;
-        background-color: rgba(49, 46, 129, 0.1);
-        animation-delay: 1s;
-        filter: blur(120px);
-      }
 
-      .icon-wrapper {
-        position: relative;
-        margin-bottom: 2rem;
-      }
-      .icon-glow {
-        position: absolute;
-        inset: 0;
-        background-color: rgba(99, 102, 241, 0.3);
-        filter: blur(24px);
-        border-radius: 9999px;
-        animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-      }
-      .loader-icon {
-        width: 64px;
-        height: 64px;
+      #initial-loader strong {
+        display: block;
+        margin-bottom: 0.5rem;
         color: #818cf8;
-        animation: bounce 3s infinite;
-        position: relative;
-        z-index: 10;
+        font-size: 1.75rem;
+        letter-spacing: 0.04em;
       }
 
-      .loader-title {
-        font-size: 1.875rem;
-        line-height: 2.25rem;
-        font-weight: 700;
-        letter-spacing: 0.05em;
-        margin-bottom: 1rem;
-        background: linear-gradient(to right, #818cf8, #c084fc);
-        -webkit-background-clip: text;
-        background-clip: text;
-        color: transparent;
-      }
-
-      .loader-status {
-        display: flex;
-        align-items: center;
-        font-size: 0.875rem;
-        font-weight: 500;
+      #initial-loader span {
         color: #64748b;
-        gap: 0.5rem;
-      }
-
-      .loader-bar-bg {
-        width: 12rem;
-        height: 0.25rem;
-        background-color: #1e293b;
-        border-radius: 9999px;
-        margin-top: 1.5rem;
-        overflow: hidden;
-        position: relative;
-      }
-      .loader-bar-fill {
-        position: absolute;
-        top: 0;
-        left: 0;
-        height: 100%;
-        width: 50%;
-        background: linear-gradient(to right, #6366f1, #a855f7);
-        border-radius: 9999px;
-        animation: shimmer 1.5s infinite linear;
-      }
-
-      @keyframes pulse {
-        0%,
-        100% {
-          opacity: 1;
-        }
-        50% {
-          opacity: 0.5;
-        }
-      }
-      @keyframes bounce {
-        0%,
-        100% {
-          transform: translateY(-25%);
-          animation-timing-function: cubic-bezier(0.8, 0, 1, 1);
-        }
-        50% {
-          transform: none;
-          animation-timing-function: cubic-bezier(0, 0, 0.2, 1);
-        }
-      }
-      @keyframes shimmer {
-        0% {
-          transform: translateX(-100%);
-        }
-        100% {
-          transform: translateX(200%);
-        }
+        font-size: 0.875rem;
       }
     </style>
   </head>
   <body>
     <div id="root">
-      <!-- 静态 Loading 结构，React 挂载后会被替换 -->
       <div id="initial-loader">
-        <div class="loader-blob blob-1"></div>
-        <div class="loader-blob blob-2"></div>
-
-        <div
-          style="
-            position: relative;
-            z-index: 10;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-          "
-        >
-          <div class="icon-wrapper">
-            <div class="icon-glow"></div>
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="64"
-              height="64"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              class="loader-icon"
-            >
-              <rect width="12" height="12" x="2" y="10" rx="2" ry="2" />
-              <path
-                d="m17.92 14 3.5-3.5a2.24 2.24 0 0 0 0-3l-5-4.92a2.24 2.24 0 0 0-3 0L10 6"
-              />
-              <path d="M6 18h.01" />
-              <path d="M10 14h.01" />
-              <path d="M15 6h.01" />
-              <path d="M18 9h.01" />
-            </svg>
-          </div>
-
-          <h1 class="loader-title">RunTable</h1>
-
-          <div class="loader-status">
-            <span>正在初始化</span>
-            <span>...</span>
-          </div>
-
-          <div class="loader-bar-bg">
-            <div class="loader-bar-fill"></div>
-          </div>
+        <div>
+          <strong>RunTable</strong>
+          <span>Loading...</span>
         </div>
       </div>
     </div>
-    <!-- 这里的 type="module" 是关键，它告诉 Vite 处理这个 TSX 入口文件 -->
     <script type="module" src="/index.tsx"></script>
   </body>
 </html>
