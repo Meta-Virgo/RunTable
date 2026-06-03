@@ -150,6 +150,10 @@ const App: React.FC = () => {
           setToken(voiceToken);
         } catch (e) {
           console.error(e);
+          alert(
+            "语音连接失败: " +
+              (e instanceof Error ? e.message : "无法获取语音房间凭证")
+          );
         }
       })();
     } else {
@@ -1594,13 +1598,17 @@ const App: React.FC = () => {
         token={token}
         serverUrl={import.meta.env.VITE_LIVEKIT_URL}
         connect={true}
-        audio={false}
+        audio={{
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+        }}
         video={false}
         data-lk-theme="default"
         onDisconnected={handleLeaveRoom}
         onError={(error) => {
           console.error("LiveKit Error:", error);
-          // 可以在这里处理全局错误，或者让组件自己处理
+          alert("语音房间连接异常: " + error.message);
         }}
       >
         {appContent}
