@@ -8,7 +8,6 @@ import {
   User,
   LogOut,
   Loader2,
-  Play,
   Users,
   Edit2,
   BookOpen,
@@ -23,13 +22,14 @@ import {
 import { CharacterModal } from "./Modals";
 import { AvatarUpload } from "./AvatarUpload";
 import { Friends } from "./Friends";
+import { RoomCard } from "./RoomCard";
 import { useElasticScroll } from "../hooks/useElasticScroll";
 import {
   createRoom,
+  fetchRoomActivityCounts,
   fetchVisibleRooms,
   setRoomPassword,
   updateRoomDetails,
-  verifyRoomPassword,
 } from "../services/rooms";
 import { getCurrentUser, updatePassword } from "../services/auth";
 import {
@@ -51,7 +51,11 @@ const Square = React.lazy(() =>
 );
 
 interface HomeProps {
-  onJoinRoom: (roomId: string, charId: string | "pc") => void;
+  onJoinRoom: (
+    roomId: string,
+    charId: string | "pc",
+    password?: string | null
+  ) => void;
   onLogout: () => void;
   onlineUsers: Set<string>;
   levelInfo?: {
@@ -88,137 +92,6 @@ const INITIAL_CHAR_STATE: Character = {
   skills: {},
   items: [],
   spells: [],
-};
-
-interface RoomCardProps {
-  room: Room;
-  currentUserId: string | null;
-  myCharacters: Character[];
-  onJoinRoom: (roomId: string, charId: string) => void;
-}
-
-const RoomCard: React.FC<RoomCardProps> = ({
-  room,
-  currentUserId,
-  myCharacters,
-  onJoinRoom,
-}) => {
-  const isKP = currentUserId === room.kp_id;
-  const [selectedCharId, setSelectedCharId] = useState<string>("");
-
-  useEffect(() => {
-    if (isKP) {
-      setSelectedCharId("pc");
-    } else if (myCharacters.length > 0) {
-      setSelectedCharId(myCharacters[0].id);
-    }
-  }, [isKP, myCharacters]);
-
-  const [passwordInput, setPasswordInput] = useState("");
-  const [showPasswordInput, setShowPasswordInput] = useState(false);
-
-  const onJoinClick = async () => {
-    if (room.has_password && !isKP) {
-      if (!showPasswordInput) {
-        setShowPasswordInput(true);
-        return;
-      }
-      let isValid = false;
-      try {
-        isValid = await verifyRoomPassword(room.id, passwordInput);
-      } catch {
-        isValid = false;
-      }
-      if (!isValid) {
-        alert("密码错误");
-        return;
-      }
-    }
-    onJoinRoom(room.id, selectedCharId);
-  };
-
-  return (
-    <div className="bg-slate-800/30 border border-slate-700/50 hover:border-indigo-500/30 rounded-xl p-5 transition-all hover:bg-slate-800/50 group flex flex-col">
-      <div className="flex justify-between items-start mb-2">
-        <div className="flex-1 min-w-0 mr-2">
-          <div className="flex items-center gap-2">
-            {room.type === "voice" ? (
-              <Mic size={18} className="text-pink-400 shrink-0" />
-            ) : (
-              <MessageSquare size={18} className="text-indigo-400 shrink-0" />
-            )}
-            <h3 className="font-bold text-white text-lg line-clamp-1">
-              {room.title}
-            </h3>
-          </div>
-          {room.has_password && (
-            <div className="mt-1">
-              <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20 inline-flex items-center gap-1">
-                🔒 私密
-              </span>
-            </div>
-          )}
-        </div>
-        <div className="flex items-center gap-2 shrink-0">
-          <span className="text-xs text-slate-500 font-mono bg-slate-900/50 px-1.5 py-0.5 rounded border border-white/5">
-            #{room.room_number || "???"}
-          </span>
-          {(room as any).isArchived ? (
-            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-500/10 text-slate-400 border border-slate-500/20 uppercase">
-              Archived
-            </span>
-          ) : (
-            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 uppercase">
-              Open
-            </span>
-          )}
-        </div>
-      </div>
-      <p className="text-slate-400 text-sm mb-4 line-clamp-2 flex-1">
-        {room.description || "暂无描述"}
-      </p>
-
-      <div className="pt-4 border-t border-white/5 space-y-3">
-        <div className="flex flex-col gap-2">
-          <label className="text-xs text-slate-500 font-medium">
-            选择角色加入:
-          </label>
-          <select
-            className="bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-indigo-500 text-slate-300"
-            value={selectedCharId}
-            onChange={(e) => setSelectedCharId(e.target.value)}
-          >
-            {isKP && <option value="pc">我是 KP (主持人)</option>}
-            {myCharacters.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name} ({c.job})
-              </option>
-            ))}
-          </select>
-        </div>
-
-        {showPasswordInput && (
-          <div className="animate-fade-in">
-            <Input
-              type="password"
-              placeholder="输入房间密码..."
-              value={passwordInput}
-              onChange={(e) => setPasswordInput(e.target.value)}
-              autoFocus
-            />
-          </div>
-        )}
-
-        <Button className="w-full" icon={Play} onClick={onJoinClick}>
-          {showPasswordInput
-            ? "验证并进入"
-            : room.has_password && !isKP
-            ? "输入密码进入"
-            : "进入房间"}
-        </Button>
-      </div>
-    </div>
-  );
 };
 
 export const Home: React.FC<HomeProps> = ({
@@ -530,10 +403,15 @@ export const Home: React.FC<HomeProps> = ({
     const { data, error } = await fetchVisibleRooms(user?.id);
 
     if (data) {
+      const activityCounts = await fetchRoomActivityCounts(
+        data.map((room) => room.id)
+      );
       const now = new Date().getTime();
       const processed = data.map((r: any) => {
-        const charCount = r.characters?.[0]?.count || 0;
-        const msgCount = r.messages?.[0]?.count || 0;
+        const activity = activityCounts.get(r.id);
+        const charCount =
+          activity?.character_count ?? r.characters?.[0]?.count ?? 2;
+        const msgCount = activity?.message_count ?? r.messages?.[0]?.count ?? 5;
         const createdAt = new Date(r.created_at).getTime();
         const lastActive = r.last_active_at
           ? new Date(r.last_active_at).getTime()
@@ -608,7 +486,7 @@ export const Home: React.FC<HomeProps> = ({
         try {
           await setRoomPassword(data.id, newRoomPassword);
         } catch (passwordError: any) {
-          alert("鎴块棿宸插垱寤猴紝但瀵嗙爜淇濆瓨澶辫触: " + passwordError.message);
+          alert("房间已创建，但密码保存失败: " + passwordError.message);
           setLoading(false);
           return;
         }
@@ -640,7 +518,7 @@ export const Home: React.FC<HomeProps> = ({
         try {
           await setRoomPassword(editingRoom.id, editingRoom.password || "");
         } catch (passwordError: any) {
-          alert("鎴块棿宸叉洿鏂帮紝但瀵嗙爜淇濆瓨澶辫触: " + passwordError.message);
+          alert("房间已更新，但密码保存失败: " + passwordError.message);
           setLoading(false);
           return;
         }

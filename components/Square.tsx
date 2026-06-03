@@ -501,7 +501,7 @@ export const Square: React.FC<SquareProps> = ({ onScrollChange }) => {
           pendingImage.file
         );
       } catch (uploadError: any) {
-        alert("鍥剧墖涓婁紶澶辫触: " + uploadError.message);
+        alert("图片上传失败: " + uploadError.message);
         setPosting(false);
         return;
       }

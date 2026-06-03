@@ -18,12 +18,12 @@ export function getVoiceParticipantName(
   characters: Character[]
 ) {
   if (activeCharId === "pc") {
-    return userNickname || "瀹堢浜?";
+    return userNickname || "守秘人";
   }
 
   return (
     characters.find((character) => character.id === activeCharId)?.name ||
-    "鏈煡鐢ㄦ埛"
+    "未知用户"
   );
 }
 

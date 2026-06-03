@@ -43,12 +43,13 @@ import { mapCharacterRow } from "./utils/characterMapper";
 import { buildCharacterMutationPayload } from "./utils/characterPayload";
 import {
   addRoomSystemMessage,
-  assignCharacterToRoom,
   concludeRoom,
   deleteRoom,
   fetchProfileNickname,
   fetchRoomById,
   fetchRoomCharacters,
+  joinRoom,
+  kickRoomMember,
   setRoomPassword as saveRoomPassword,
   updateRoomModule,
   updateRoomMusicState,
@@ -297,6 +298,7 @@ const App: React.FC = () => {
   const handleJoinRoom = async (
     roomId: string,
     charId: string,
+    password?: string | null,
     isRestoring = false
   ) => {
     // Fetch Room Data
@@ -318,6 +320,21 @@ const App: React.FC = () => {
         return;
       }
 
+      const { error: joinError } = await joinRoom({
+        roomId,
+        characterId: charId === "pc" ? null : charId,
+        password,
+      });
+
+      if (joinError) {
+        console.error("Failed to join room:", joinError);
+        const message = joinError.message.includes("Invalid room password")
+          ? "密码错误"
+          : joinError.message;
+        alert("加入房间失败：" + message);
+        return;
+      }
+
       // Set basic room info
       setModuleInfo({
         title: room.title,
@@ -332,27 +349,6 @@ const App: React.FC = () => {
       setBgMusicUrl(room.bg_music_url);
       setIsMusicPlaying(room.is_music_playing || false);
       setMusicTrackIndex(room.music_track_index || 0);
-
-      // If joining as character, update character's room_id
-      if (charId !== "pc" && user) {
-        const { data: updatedChar, error } = await assignCharacterToRoom(
-          charId,
-          roomId,
-          user.id
-        );
-
-        if (error) {
-          console.error("Failed to update character room:", error);
-          alert("加入房间失败：无法更新角色信息");
-          return;
-        }
-
-        if (!updatedChar || updatedChar.length === 0) {
-          console.error("Character update returned no rows. ID:", charId);
-          alert("加入房间失败：找不到该角色或无权操作");
-          return;
-        }
-      }
 
       setCurrentRoomId(roomId);
 
@@ -719,13 +715,23 @@ const App: React.FC = () => {
     const char = characters.find((c) => c.id === id);
     if (!char) return;
 
-    // 1. Update DB: Set room_id to null
-    const { error } = await removeCharacterFromRoom(id);
+    // 1. Update DB through membership RPC for player characters.
+    if (char.user_id) {
+      try {
+        await kickRoomMember(currentRoomId, char.user_id);
+      } catch (error: any) {
+        console.error("移出失败:", error);
+        alert("移出失败: " + error.message);
+        return;
+      }
+    } else {
+      const { error } = await removeCharacterFromRoom(id);
 
-    if (error) {
-      console.error("移出失败:", error);
-      alert("移出失败: " + error.message);
-      return;
+      if (error) {
+        console.error("移出失败:", error);
+        alert("移出失败: " + error.message);
+        return;
+      }
     }
 
     // 2. Send system message with kick signal

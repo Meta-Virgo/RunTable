@@ -5,6 +5,12 @@ export const ROOM_SELECT =
 
 export const ROOM_WITH_COUNTS_SELECT = `${ROOM_SELECT}, characters(count), messages(count)`;
 
+export interface RoomActivityCount {
+  room_id: string;
+  character_count: number;
+  message_count: number;
+}
+
 export async function fetchRoomById(roomId: string) {
   return supabase.from("rooms").select(ROOM_SELECT).eq("id", roomId).single();
 }
@@ -24,6 +30,26 @@ export async function fetchVisibleRooms(userId?: string) {
   }
 
   return query;
+}
+
+export async function fetchRoomActivityCounts(roomIds: string[]) {
+  if (roomIds.length === 0) return new Map<string, RoomActivityCount>();
+
+  const { data, error } = await supabase.rpc("get_room_activity_counts", {
+    p_room_ids: roomIds,
+  });
+
+  if (error) {
+    console.warn("Failed to fetch room activity counts:", error);
+    return new Map<string, RoomActivityCount>();
+  }
+
+  return new Map(
+    ((data || []) as RoomActivityCount[]).map((count) => [
+      count.room_id,
+      count,
+    ])
+  );
 }
 
 export async function createRoom(input: {
@@ -93,19 +119,27 @@ export async function concludeRoom(
   });
 }
 
-export async function assignCharacterToRoom(
-  characterId: string,
-  roomId: string,
-  userId: string
-) {
-  return supabase
-    .from("characters")
-    .update({
-      room_id: roomId,
-      user_id: userId,
-    })
-    .eq("id", characterId)
-    .select();
+export async function joinRoom(input: {
+  roomId: string;
+  characterId: string | null;
+  password?: string | null;
+}) {
+  return supabase.rpc("join_room", {
+    p_room_id: input.roomId,
+    p_character_id: input.characterId,
+    p_password: input.password || null,
+  });
+}
+
+export async function kickRoomMember(roomId: string, userId: string) {
+  const { error } = await supabase.rpc("kick_room_member", {
+    p_room_id: roomId,
+    p_user_id: userId,
+  });
+
+  if (error) {
+    throw error;
+  }
 }
 
 export async function fetchRoomCharacters(roomId: string) {
@@ -148,18 +182,3 @@ export async function setRoomPassword(roomId: string, password: string) {
   }
 }
 
-export async function verifyRoomPassword(
-  roomId: string,
-  password: string
-): Promise<boolean> {
-  const { data, error } = await supabase.rpc("verify_room_password", {
-    p_room_id: roomId,
-    p_password: password,
-  });
-
-  if (error) {
-    throw error;
-  }
-
-  return data === true;
-}
