@@ -4,6 +4,7 @@ import React, {
   useEffect,
   useRef,
   useCallback,
+  useMemo,
 } from "react";
 import { Login } from "./components/Login";
 import { Welcome } from "./components/Welcome";
@@ -57,7 +58,6 @@ import {
 } from "./services/rooms";
 import {
   ensureMicrophonePermission,
-  getVoiceParticipantName,
   requestVoiceToken,
 } from "./services/livekit";
 import {
@@ -127,6 +127,9 @@ const App: React.FC = () => {
   const [voiceConnectionStatus, setVoiceConnectionStatus] =
     useState<VoiceConnectionStatus>("idle");
   const [voiceError, setVoiceError] = useState<string | null>(null);
+  const [isPageHidden, setIsPageHidden] = useState(() =>
+    typeof document === "undefined" ? false : document.visibilityState === "hidden"
+  );
 
   // ✅ 初始化为空数组/空对象，不再使用 DEFAULT_DATA
   const [characters, setCharacters] = useState<Character[]>([]);
@@ -145,9 +148,36 @@ const App: React.FC = () => {
   const [isMusicPlaying, setIsMusicPlaying] = useState(false);
   const [musicTrackIndex, setMusicTrackIndex] = useState(0);
   const [globalMute, setGlobalMute] = useState(false);
+  const voiceAccessToken = session?.access_token;
+  const selectedVoiceCharacterName =
+    activeCharId === "pc"
+      ? undefined
+      : characters.find((character) => character.id === activeCharId)?.name;
+  const voiceParticipantName = useMemo(
+    () =>
+      activeCharId === "pc"
+        ? userNickname || "守秘人"
+        : selectedVoiceCharacterName || "未知用户",
+    [activeCharId, selectedVoiceCharacterName, userNickname]
+  );
 
   useEffect(() => {
-    if (roomType === "voice" && currentRoomId && session?.access_token) {
+    const syncPageVisibility = () => {
+      setIsPageHidden(document.visibilityState === "hidden");
+    };
+
+    syncPageVisibility();
+    document.addEventListener("visibilitychange", syncPageVisibility);
+    window.addEventListener("pageshow", syncPageVisibility);
+
+    return () => {
+      document.removeEventListener("visibilitychange", syncPageVisibility);
+      window.removeEventListener("pageshow", syncPageVisibility);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (roomType === "voice" && currentRoomId && voiceAccessToken) {
       let cancelled = false;
 
       (async () => {
@@ -159,17 +189,11 @@ const App: React.FC = () => {
           await ensureMicrophonePermission();
           if (cancelled) return;
 
-          const participantName = getVoiceParticipantName(
-            activeCharId,
-            userNickname,
-            characters
-          );
-
           const voiceToken = await requestVoiceToken({
-            accessToken: session.access_token,
+            accessToken: voiceAccessToken,
             roomId: currentRoomId,
             activeCharId,
-            participantName,
+            participantName: voiceParticipantName,
           });
           if (cancelled) return;
           setToken(voiceToken);
@@ -198,7 +222,13 @@ const App: React.FC = () => {
       setVoiceConnectionStatus("idle");
       setVoiceError(null);
     }
-  }, [roomType, currentRoomId, activeCharId, userNickname, characters, session]);
+  }, [
+    roomType,
+    currentRoomId,
+    activeCharId,
+    voiceAccessToken,
+    voiceParticipantName,
+  ]);
 
   // Load More Logs Logic
   const handleLoadMoreLogs = async () => {
@@ -1673,6 +1703,14 @@ const App: React.FC = () => {
         token={token}
         serverUrl={import.meta.env.VITE_LIVEKIT_URL}
         connect={true}
+        options={{
+          disconnectOnPageLeave: false,
+        }}
+        connectOptions={{
+          maxRetries: 5,
+          peerConnectionTimeout: 30_000,
+          websocketTimeout: 30_000,
+        }}
         audio={{
           echoCancellation: true,
           noiseSuppression: true,
@@ -1685,8 +1723,14 @@ const App: React.FC = () => {
           setVoiceError(null);
         }}
         onDisconnected={() => {
+          if (isPageHidden) {
+            setVoiceConnectionStatus("connecting");
+            setVoiceError(null);
+            return;
+          }
+
           setVoiceConnectionStatus("disconnected");
-          setVoiceError("语音连接已断开，请刷新或重新进入房间。");
+          setVoiceError("语音连接已断开，正在尝试保持当前房间连接。");
         }}
         onError={(error) => {
           console.error("LiveKit Error:", error);
