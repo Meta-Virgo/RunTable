@@ -1,10 +1,7 @@
 import React, { useState, useEffect } from "react";
-import { supabase } from "../supabase";
 import {
-  Channel,
   Post,
   PostComment,
-  Notification,
   Profile,
   GameHistory,
   GameHistoryParticipant,
@@ -29,32 +26,20 @@ import {
 import { Button, cn, Modal } from "./UI";
 import { AvatarUpload } from "./AvatarUpload";
 import { useElasticScroll } from "../hooks/useElasticScroll";
+import { useSquareFeed } from "../hooks/useSquareFeed";
+import { useSquareNotifications } from "../hooks/useSquareNotifications";
 import {
   createComment,
   createNotification,
-  createPost,
   deleteComment,
-  deleteNotification as deleteSquareNotification,
-  deletePost,
   fetchCharactersByIds,
-  fetchChannels,
   fetchKpHistory,
-  fetchLatestComments,
-  fetchLikedPostIds,
-  fetchNotifications as fetchSquareNotifications,
   fetchPlayerHistory,
   fetchPostComments,
-  fetchPostsForChannel,
-  fetchPostWithCounts,
   fetchProfileById,
   fetchProfilesByIds,
-  fetchSquareUser,
   likeComment,
-  likePost,
-  markNotificationRead,
   unlikeComment,
-  unlikePost,
-  uploadPostImage,
 } from "../services/square";
 
 const MAX_POST_LENGTH = 140;
@@ -165,15 +150,22 @@ interface SquareProps {
 }
 
 export const Square: React.FC<SquareProps> = ({ onScrollChange }) => {
-  const [activeChannelId, setActiveChannelId] = useState<string | null>(null);
-  const [channels, setChannels] = useState<Channel[]>([]);
-  const [posts, setPosts] = useState<Post[]>([]);
-  const [loadingChannels, setLoadingChannels] = useState(true);
-  const [loadingPosts, setLoadingPosts] = useState(false);
+  const {
+    activeChannelId,
+    setActiveChannelId,
+    channels,
+    posts,
+    setPosts,
+    loadingChannels,
+    loadingPosts,
+    currentUser,
+    publishPost,
+    togglePostLike,
+    deleteFeedPost,
+  } = useSquareFeed();
   const [searchQuery, setSearchQuery] = useState("");
   const [newPostContent, setNewPostContent] = useState("");
   const [posting, setPosting] = useState(false);
-  const [currentUser, setCurrentUser] = useState<any>(null);
   const [pendingImage, setPendingImage] = useState<{
     dataUrl: string;
     name: string;
@@ -191,6 +183,12 @@ export const Square: React.FC<SquareProps> = ({ onScrollChange }) => {
   const [_commenting, setCommenting] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const [showMobileSidebar, setShowMobileSidebar] = useState(false);
+  const {
+    notifications,
+    unreadCount,
+    markAsRead,
+    deleteNotification: deleteSquareNotification,
+  } = useSquareNotifications(currentUser, showNotifications);
 
   const [showBackToTop, setShowBackToTop] = useState(false);
   const scrollContainerRef = React.useRef<HTMLDivElement>(null);
@@ -241,8 +239,6 @@ export const Square: React.FC<SquareProps> = ({ onScrollChange }) => {
       scrollContainerRef.current.scrollTo({ top: 0, behavior: "smooth" });
     }
   };
-  const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [unreadCount, setUnreadCount] = useState(0);
   const [showProfile, setShowProfile] = useState(false);
   const [selectedProfile, setSelectedProfile] = useState<Profile | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<{
@@ -297,249 +293,21 @@ export const Square: React.FC<SquareProps> = ({ onScrollChange }) => {
     }
   };
 
-  // Fetch Channels & User
-  useEffect(() => {
-    const init = async () => {
-      const user = await fetchSquareUser();
-      if (user) setCurrentUser(user);
-
-      const { data } = await fetchChannels();
-
-      if (data) {
-        setChannels(data);
-        // Set default active channel (e.g., '闲聊大厅')
-        const defaultChannel =
-          data.find((c) => c.name === "闲聊大厅") || data[0];
-        if (defaultChannel) setActiveChannelId(defaultChannel.id);
-      }
-      setLoadingChannels(false);
-    };
-    init();
-  }, []);
-
-  // Fetch Posts when active channel changes
-  useEffect(() => {
-    if (!activeChannelId) return;
-
-    const fetchPosts = async () => {
-      setLoadingPosts(true);
-
-      const { data: postsData } = await fetchPostsForChannel(activeChannelId);
-
-      if (postsData) {
-        // 2. Fetch Profiles manually (authors AND likers)
-        const authorIds = postsData.map((p: any) => p.user_id);
-        const likerIds = postsData.flatMap((p: any) =>
-          p.post_likes ? p.post_likes.map((l: any) => l.user_id) : []
-        );
-        const allUserIds = Array.from(new Set([...authorIds, ...likerIds]));
-
-        const { data: profilesData } = await fetchProfilesByIds(allUserIds);
-
-        const profileMap = new Map(
-          profilesData?.map((p: any) => [p.id, p]) || []
-        );
-
-        // 3. Fetch My Likes
-        let myLikedPostIds = new Set<string>();
-        if (currentUser) {
-          myLikedPostIds = await fetchLikedPostIds(
-            currentUser.id,
-            postsData.map((p) => p.id)
-          );
-        }
-
-        // 4. Transform data
-        const formattedPosts: Post[] = postsData.map((p: any) => ({
-          ...p,
-          profiles: profileMap.get(p.user_id) || {
-            nickname: "未知用户",
-            avatar_url: null,
-            is_vip: false,
-          },
-          like_count: p.post_likes?.length || 0,
-          comment_count: p.post_comments?.[0]?.count || 0,
-          is_liked: myLikedPostIds.has(p.id),
-          liked_by:
-            p.post_likes
-              ?.map((l: any) => profileMap.get(l.user_id))
-              .filter(Boolean) || [],
-        }));
-        setPosts(formattedPosts);
-      }
-      setLoadingPosts(false);
-    };
-
-    fetchPosts();
-
-    // Fetch latest comments for posts that have comments but no preview
-    // We will do this in the effect dependency or a separate effect.
-  }, [activeChannelId, currentUser]);
-
-  // Separate effect for fetching comment previews
-  useEffect(() => {
-    if (posts.length === 0) return;
-
-    // Identify posts that need comment previews
-    const postsNeedingComments = posts.filter(
-      (p) => (p.comment_count || 0) > 0 && p.latest_comments === undefined
-    );
-
-    if (postsNeedingComments.length === 0) return;
-
-    const fetchPreviews = async () => {
-      // Fetch in parallel for simplicity
-      const results = await Promise.all(
-        postsNeedingComments.map(async (post) => {
-          const { data } = await fetchLatestComments(post.id, 1);
-          return { postId: post.id, comments: data || [] };
-        })
-      );
-
-      // Collect all user IDs from the fetched comments
-      const userIds = new Set<string>();
-      results.forEach((r) => {
-        r.comments.forEach((c: any) => userIds.add(c.user_id));
-      });
-
-      // Fetch profiles for these users
-      let profileMap = new Map();
-      if (userIds.size > 0) {
-        const { data: profiles } = await fetchProfilesByIds(Array.from(userIds));
-
-        if (profiles) {
-          profileMap = new Map(profiles.map((p: any) => [p.id, p]));
-        }
-      }
-
-      setPosts((prev) =>
-        prev.map((p) => {
-          const res = results.find((r) => r.postId === p.id);
-          if (res) {
-            // Attach profiles to comments
-            const commentsWithProfiles = res.comments.map((c: any) => ({
-              ...c,
-              profiles: profileMap.get(c.user_id) || {
-                nickname: "未知用户",
-                avatar_url: null,
-                is_vip: false,
-              },
-            }));
-            return { ...p, latest_comments: commentsWithProfiles };
-          }
-          return p;
-        })
-      );
-    };
-
-    fetchPreviews();
-  }, [posts, activeChannelId]); // Changed dependency to posts to ensure it runs when content updates but length matches
-
-  // Realtime subscription for posts in this channel
-  useEffect(() => {
-    if (!activeChannelId) return;
-
-    const channel = supabase
-      .channel(`posts:${activeChannelId}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "INSERT",
-          schema: "public",
-          table: "posts",
-          filter: `channel_id=eq.${activeChannelId}`,
-        },
-        async (payload) => {
-          const newPostId = payload.new.id;
-          // Fetch full post data
-          const { data: postData } = await fetchPostWithCounts(newPostId);
-
-          if (postData) {
-            // Fetch Profile for this user
-            const { data: profileData } = await fetchProfileById(postData.user_id);
-
-            const formattedPost: Post = {
-              ...postData,
-              profiles: profileData || {
-                nickname: "未知用户",
-                avatar_url: null,
-                is_vip: false,
-              },
-              like_count: postData.post_likes?.[0]?.count || 0,
-              comment_count: postData.post_comments?.[0]?.count || 0,
-            };
-            setPosts((prev) => [formattedPost, ...prev]);
-          }
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [activeChannelId]);
-
   const handlePost = async () => {
-    if (
-      (!newPostContent.trim() && !pendingImage) ||
-      !activeChannelId ||
-      !currentUser
-    )
-      return;
     setPosting(true);
-
-    const postData: any = {
-      channel_id: activeChannelId,
-      user_id: currentUser.id,
-      content: newPostContent.trim(),
-    };
-
-    if (pendingImage) {
-      try {
-        postData.image_url = await uploadPostImage(
-          currentUser.id,
-          pendingImage.file
-        );
-      } catch (uploadError: any) {
-        alert("图片上传失败: " + uploadError.message);
-        setPosting(false);
-        return;
+    try {
+      const result = await publishPost(newPostContent, pendingImage?.file);
+      if (!result.ok && result.message) {
+        alert(result.message);
+      } else if (result.ok) {
+        setNewPostContent("");
+        setPendingImage(null);
       }
+    } catch (error: any) {
+      alert("图片上传失败: " + error.message);
+    } finally {
+      setPosting(false);
     }
-
-    const { error } = await createPost(postData);
-
-    if (error) {
-      alert("发布失败: " + error.message);
-    } else {
-      setNewPostContent("");
-      setPendingImage(null);
-    }
-    setPosting(false);
-  };
-
-  useEffect(() => {
-    if (currentUser) {
-      fetchNotifications();
-    }
-  }, [currentUser, showNotifications]);
-
-  const fetchNotifications = async () => {
-    if (!currentUser) return;
-    const { data } = await fetchSquareNotifications(currentUser.id);
-
-    if (data) {
-      setNotifications(data as any);
-      setUnreadCount(data.filter((n: any) => !n.is_read).length);
-    }
-  };
-
-  const markAsRead = async (notificationId: string) => {
-    await markNotificationRead(notificationId);
-    setNotifications((prev) =>
-      prev.map((n) => (n.id === notificationId ? { ...n, is_read: true } : n))
-    );
-    setUnreadCount((prev) => Math.max(0, prev - 1));
   };
 
   const deleteNotification = async (
@@ -547,26 +315,9 @@ export const Square: React.FC<SquareProps> = ({ onScrollChange }) => {
     notificationId: string
   ) => {
     e.stopPropagation();
-    try {
-      const { error } = await deleteSquareNotification(notificationId);
-
-      if (error) {
-        console.error("Delete notification error:", error);
-        alert("删除失败: " + error.message);
-        return;
-      }
-
-      // 如果没有报错，即使 count 为 0 (可能已经被删除了)，我们也从 UI 移除
-      setNotifications((prev) => {
-        const target = prev.find((n) => n.id === notificationId);
-        if (target && !target.is_read) {
-          setUnreadCount((count) => Math.max(0, count - 1));
-        }
-        return prev.filter((n) => n.id !== notificationId);
-      });
-    } catch (err) {
-      console.error("Delete notification exception:", err);
-      alert("删除时发生错误");
+    const result = await deleteSquareNotification(notificationId);
+    if (!result.ok && result.message) {
+      alert(result.message);
     }
   };
 
@@ -682,62 +433,7 @@ export const Square: React.FC<SquareProps> = ({ onScrollChange }) => {
   };
 
   const handleLike = async (postId: string) => {
-    if (!currentUser) return;
-
-    const post = posts.find((p) => p.id === postId);
-    if (!post) return;
-
-    if (post.is_liked) {
-      // Unlike
-      const { error } = await unlikePost(postId, currentUser.id);
-      if (!error) {
-        setPosts((prev) =>
-          prev.map((p) =>
-            p.id === postId
-              ? {
-                  ...p,
-                  like_count: Math.max(0, (p.like_count || 0) - 1),
-                  is_liked: false,
-                  liked_by: (p.liked_by || []).filter(
-                    (u) => u.nickname !== currentUser.nickname
-                  ),
-                }
-              : p
-          )
-        );
-      }
-    } else {
-      // Like
-      const { error } = await likePost(postId, currentUser.id);
-
-      if (!error) {
-        setPosts((prev) =>
-          prev.map((p) =>
-            p.id === postId
-              ? {
-                  ...p,
-                  like_count: (p.like_count || 0) + 1,
-                  is_liked: true,
-                  liked_by: [
-                    ...(p.liked_by || []),
-                    { nickname: currentUser.nickname || "我" },
-                  ],
-                }
-              : p
-          )
-        );
-
-        // Notify
-        if (post.user_id !== currentUser.id) {
-          await createNotification({
-            user_id: post.user_id,
-            actor_id: currentUser.id,
-            type: "like",
-            post_id: postId,
-          });
-        }
-      }
-    }
+    await togglePostLike(postId);
   };
 
   const handleLikeComment = async (commentId: string) => {
@@ -793,12 +489,8 @@ export const Square: React.FC<SquareProps> = ({ onScrollChange }) => {
   };
 
   const handleDeletePost = async (postId: string) => {
-    if (!currentUser) return;
-    const post = posts.find((p) => p.id === postId);
-    if (!post || post.user_id !== currentUser.id) return;
-    const { error } = await deletePost(postId);
-    if (!error) {
-      setPosts((prev) => prev.filter((p) => p.id !== postId));
+    const deleted = await deleteFeedPost(postId);
+    if (deleted) {
       if (selectedPostId === postId) setSelectedPostId(null);
     }
   };

@@ -17,6 +17,14 @@ import {
 import { Button } from "./UI";
 import { useElasticScroll } from "../hooks/useElasticScroll";
 import { useDraggable } from "../hooks/useDraggable";
+import {
+  fetchPlayableSongUrl,
+  fetchPlaylistDetails,
+  fetchSongDetails,
+  formatMusicSource,
+  parseMusicInput,
+  parseMusicSource,
+} from "../services/musicCatalog";
 
 interface MusicPlayerProps {
   url: string | null;
@@ -161,26 +169,7 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
 
   useEffect(() => {
     if (url) {
-      let id = "";
-      let type = 2; // Default to song
-
-      // Handle custom prefix format "s:123" or "p:123"
-      if (url.startsWith("s:")) {
-        id = url.substring(2);
-        type = 2;
-      } else if (url.startsWith("p:")) {
-        id = url.substring(2);
-        type = 0;
-      } else {
-        // Fallback for raw ID or old format
-        const match = url.match(/id=(\d+)/);
-        if (match) {
-          id = match[1];
-          if (url.includes("playlist")) type = 0;
-        } else if (/^\d+$/.test(url)) {
-          id = url;
-        }
-      }
+      const { id, type } = parseMusicSource(url);
 
       setParsedId(id);
       setParsedType(type);
@@ -204,44 +193,14 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
           setCurrentTrackIndex(0);
           setVisualTrackIndex(0);
 
-          const endpoints = [
-            {
-              url: `https://corsproxy.io/?${encodeURIComponent(
-                `https://music.163.com/api/song/detail?ids=[${id}]`
-              )}`,
-              name: "corsproxy-v6",
-            },
-            {
-              url: `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(
-                `https://music.163.com/api/song/detail?ids=[${id}]`
-              )}`,
-              name: "codetabs-v6",
-            },
-          ];
-
-          let success = false;
-          for (const endpoint of endpoints) {
-            try {
-              const res = await fetch(endpoint.url);
-              if (!res.ok) continue;
-              const data = await res.json();
-              const songs = data.songs || [];
-              if (songs.length > 0) {
-                setPlaylistTracks(songs);
-                success = true;
-                break;
-              }
-            } catch (e) {
-              console.warn(
-                `Failed to fetch song detail via ${endpoint.name}`,
-                e
-              );
+          try {
+            const songs = await fetchSongDetails([id]);
+            if (songs.length > 0) {
+              setPlaylistTracks(songs);
+            } else {
+              console.warn("Failed to fetch song details for UI");
             }
-          }
-
-          if (!success) {
-            // If fetch fails, we might still want to try playing it (metadata might load from audio)
-            // But we won't have cover art.
+          } catch {
             console.warn("Failed to fetch song details for UI");
           }
           setIsLoadingPlaylist(false);
@@ -271,68 +230,13 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
       setIsPlaying(false);
     }
 
-    // Strategy: Try multiple proxies/endpoints
-    const endpoints = [
-      // Strategy 1: V6 API via corsproxy.io (usually most robust)
-      {
-        url: `https://corsproxy.io/?${encodeURIComponent(
-          `https://music.163.com/api/v6/playlist/detail?id=${id}&n=1000&s=8`
-        )}`,
-        parser: (data: any) => ({
-          tracks: data.playlist?.tracks || [],
-          trackIds: data.playlist?.trackIds || [],
-        }),
-        name: "corsproxy-v6",
-      },
-      // Strategy 2: CodeTabs Proxy (Backup)
-      {
-        url: `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(
-          `https://music.163.com/api/v6/playlist/detail?id=${id}&n=1000`
-        )}`,
-        parser: (data: any) => ({
-          tracks: data.playlist?.tracks || [],
-          trackIds: data.playlist?.trackIds || [],
-        }),
-        name: "codetabs-v6",
-      },
-    ];
-
-    let success = false;
-    let lastError = null;
-
-    for (const endpoint of endpoints) {
-      try {
-        console.log(`Trying playlist fetch via ${endpoint.name}...`);
-        const res = await fetch(endpoint.url);
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-
-        const data = await res.json();
-        const { tracks, trackIds } = endpoint.parser(data);
-
-        if (
-          (tracks && tracks.length > 0) ||
-          (trackIds && trackIds.length > 0)
-        ) {
-          console.log(
-            `Success via ${endpoint.name}, found ${tracks.length} tracks, ${trackIds.length} IDs`
-          );
-          setPlaylistTracks(tracks);
-          setAllTrackIds(trackIds);
-          setCurrentTrackIndex(0);
-          success = true;
-          break; // Stop if successful
-        } else {
-          console.warn(`No tracks found via ${endpoint.name}`, data);
-        }
-      } catch (error) {
-        console.warn(`Failed via ${endpoint.name}:`, error);
-        lastError = error;
-      }
-    }
-
-    if (!success) {
-      console.error("All playlist fetch strategies failed", lastError);
-      // Keep empty tracks to show error state
+    try {
+      const { tracks, trackIds } = await fetchPlaylistDetails(id);
+      setPlaylistTracks(tracks);
+      setAllTrackIds(trackIds);
+      setCurrentTrackIndex(0);
+    } catch (error) {
+      console.error("All playlist fetch strategies failed", error);
     }
 
     setIsLoadingPlaylist(false);
@@ -356,54 +260,9 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
         return;
       }
 
-      console.log(`Loading more tracks: ${nextIds.length} items`);
-
-      // Use song/detail API via corsproxy (with fallback)
-      const endpoints = [
-        // Strategy 1: V6 API via corsproxy.io (usually most robust)
-        {
-          url: `https://corsproxy.io/?${encodeURIComponent(
-            `https://music.163.com/api/song/detail?ids=[${nextIds.join(",")}]`
-          )}`,
-          name: "corsproxy-v6",
-        },
-        // Strategy 2: CodeTabs Proxy (Backup)
-        {
-          url: `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(
-            `https://music.163.com/api/song/detail?ids=[${nextIds.join(",")}]`
-          )}`,
-          name: "codetabs-v6",
-        },
-      ];
-
-      let success = false;
-      let lastError = null;
-
-      for (const endpoint of endpoints) {
-        try {
-          console.log(`Loading more tracks via ${endpoint.name}...`);
-          const res = await fetch(endpoint.url);
-          if (!res.ok) throw new Error(`HTTP ${res.status}`);
-
-          const data = await res.json();
-          const newTracks = data.songs || [];
-
-          if (newTracks.length > 0) {
-            setPlaylistTracks((prev) => [...prev, ...newTracks]);
-            success = true;
-            break; // Stop if successful
-          }
-        } catch (error) {
-          console.warn(
-            `Failed to load more tracks via ${endpoint.name}:`,
-            error
-          );
-          lastError = error;
-        }
-      }
-
-      if (!success) {
-        console.error("All load more strategies failed", lastError);
+      const newTracks = await fetchSongDetails(nextIds.map(String));
+      if (newTracks.length > 0) {
+        setPlaylistTracks((prev) => [...prev, ...newTracks]);
       }
     } catch (e) {
       console.error("Failed to load more tracks", e);
@@ -473,43 +332,6 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
     }
   }, [currentTrackIndex, showPlaylist]);
 
-  const fetchSongUrl = async (id: string) => {
-    // Try standard outer url first (fastest, but might fail for some)
-    // Actually, outer url often returns HTML for blocked songs, hard to detect without HEAD request
-    // So better to use API directly via proxy
-
-    const strategies = [
-      {
-        name: "api-v6-corsproxy",
-        url: `https://corsproxy.io/?${encodeURIComponent(
-          `https://music.163.com/api/song/enhance/player/url?ids=[${id}]&br=320000`
-        )}`,
-      },
-      {
-        name: "api-v6-codetabs",
-        url: `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(
-          `https://music.163.com/api/song/enhance/player/url?ids=[${id}]&br=320000`
-        )}`,
-      },
-    ];
-
-    for (const strategy of strategies) {
-      try {
-        const res = await fetch(strategy.url);
-        if (!res.ok) continue;
-        const data = await res.json();
-        const songUrl = data.data?.[0]?.url;
-        if (songUrl) return songUrl.replace(/^http:/, "https:");
-      } catch (e) {
-        console.warn(`Failed to fetch song url via ${strategy.name}`, e);
-      }
-    }
-
-    // Fallback to standard outer URL if API fails (last resort)
-    // Use direct outer link which usually works fine and avoids ORB/CORS proxy issues for media
-    return `https://music.163.com/song/media/outer/url?id=${id}.mp3`;
-  };
-
   // Audio Element Management
   useEffect(() => {
     let isMounted = true;
@@ -536,7 +358,7 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
         setIsLoadingSong(true);
 
         try {
-          const realUrl = await fetchSongUrl(String(trackId));
+          const realUrl = await fetchPlayableSongUrl(String(trackId));
           if (!isMounted) return;
 
           if (!realUrl || realUrl.includes("404")) {
@@ -710,36 +532,20 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
   };
 
   const handleInputChange = (val: string) => {
-    setInputUrl(val);
-    // Auto-detect type from pasted URL
-    if (val.includes("playlist")) {
-      setMusicType("playlist");
-      const match = val.match(/id=(\d+)/);
-      if (match) setInputUrl(match[1]);
-    } else if (val.includes("song")) {
-      setMusicType("song");
-      const match = val.match(/id=(\d+)/);
-      if (match) setInputUrl(match[1]);
-    }
+    const parsed = parseMusicInput(val);
+    setInputUrl(parsed.inputUrl);
+    if (parsed.musicType) setMusicType(parsed.musicType);
   };
 
   const handleSave = () => {
-    let finalUrl = inputUrl;
-    // Extract ID if it's still a full URL
-    const match = inputUrl.match(/id=(\d+)/);
-    if (match) {
-      finalUrl = match[1];
-    }
-
-    if (!finalUrl.trim()) {
+    const finalUrl = formatMusicSource(inputUrl, musicType);
+    if (!finalUrl) {
       onUpdateUrl("");
       setShowInput(false);
       return;
     }
 
-    // Add prefix based on type
-    const prefix = musicType === "playlist" ? "p:" : "s:";
-    onUpdateUrl(prefix + finalUrl);
+    onUpdateUrl(finalUrl);
     setShowInput(false);
   };
 

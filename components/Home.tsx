@@ -1,6 +1,5 @@
 import React, { Suspense, useState, useEffect } from "react";
-import { supabase } from "../supabase";
-import { Room, Character, GameHistory, GameHistoryParticipant } from "../types";
+import { Room, Character } from "../types";
 import { Button, Input, Textarea, Modal, cn } from "./UI";
 import {
   Plus,
@@ -24,27 +23,15 @@ import { AvatarUpload } from "./AvatarUpload";
 import { Friends } from "./Friends";
 import { RoomCard } from "./RoomCard";
 import { useElasticScroll } from "../hooks/useElasticScroll";
+import { useLobbyCatalog } from "../hooks/useLobbyCatalog";
+import { useHomeProfileData } from "../hooks/useHomeProfileData";
+import { useInvestigatorLibrary } from "../hooks/useInvestigatorLibrary";
 import {
   createRoom,
-  fetchRoomActivityCounts,
-  fetchVisibleRooms,
   setRoomPassword,
   updateRoomDetails,
 } from "../services/rooms";
-import { getCurrentUser, updatePassword } from "../services/auth";
-import {
-  createCharacter,
-  deleteCharacter,
-  fetchUserInvestigators,
-  updateCharacter,
-} from "../services/characters";
-import {
-  createProfileForUser,
-  fetchProfileDetails,
-  updateProfile,
-} from "../services/profiles";
-import { mapCharacterRow } from "../utils/characterMapper";
-import { buildCharacterMutationPayload } from "../utils/characterPayload";
+import { getCurrentUser } from "../services/auth";
 
 const Square = React.lazy(() =>
   import("./Square").then((module) => ({ default: module.Square }))
@@ -106,11 +93,6 @@ export const Home: React.FC<HomeProps> = ({
   const [loading, setLoading] = useState(false);
 
   // Rooms State
-  const [rooms, setRooms] = useState<Room[]>([]);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [roomFilter, setRoomFilter] = useState<
-    "all" | "mine" | "created" | "kp_online"
-  >("all");
   const [showCreateRoom, setShowCreateRoom] = useState(false);
   const [newRoomTitle, setNewRoomTitle] = useState("");
   const [newRoomDesc, setNewRoomDesc] = useState("");
@@ -120,17 +102,8 @@ export const Home: React.FC<HomeProps> = ({
   const [editingRoom, setEditingRoom] = useState<Room | null>(null);
 
   // Characters State
-  const [myCharacters, setMyCharacters] = useState<Character[]>([]);
   const [showCharModal, setShowCharModal] = useState(false);
   const [editingChar, setEditingChar] = useState<Character | null>(null);
-  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
-  const [userCode, setUserCode] = useState<number | null>(null);
-  const [_userEmail, setUserEmail] = useState<string>("");
-  const [userNickname, setUserNickname] = useState<string | null>(null);
-  const [userBio, setUserBio] = useState<string | null>(null);
-  const [userAvatar, setUserAvatar] = useState<string | null>(null);
-  const [userCreatedAt, setUserCreatedAt] = useState<string | null>(null);
-  const [isVip, setIsVip] = useState(false);
 
   // Profile Edit State
   const [isEditingProfile, setIsEditingProfile] = useState(false);
@@ -144,20 +117,47 @@ export const Home: React.FC<HomeProps> = ({
   const [newPassword, setNewPassword] = useState("");
   const [confirmNewPassword, setConfirmNewPassword] = useState("");
 
-  // Game History State
-  const [kpHistory, setKpHistory] = useState<GameHistory[]>([]);
-  const [playerHistory, setPlayerHistory] = useState<
-    (GameHistoryParticipant & { game_history: GameHistory })[]
-  >([]);
   const [historyTab, setHistoryTab] = useState<"kp" | "player">("player");
   const [showHistoryModal, setShowHistoryModal] = useState(false);
 
   // Friend Requests Count
-  const [friendRequestCount, setFriendRequestCount] = useState(0);
   const [showHeader, setShowHeader] = useState(true);
   const [showBackToTop, setShowBackToTop] = useState(false);
   const mainRef = React.useRef<HTMLElement>(null);
   const mainContentRef = React.useRef<HTMLDivElement>(null);
+  const {
+    currentUserId,
+    userCode,
+    userNickname,
+    userBio,
+    userAvatar,
+    userCreatedAt,
+    isVip,
+    kpHistory,
+    playerHistory,
+    friendRequestCount,
+    saveProfile,
+    changePassword,
+  } = useHomeProfileData();
+  const { myCharacters, saveInvestigator, deleteInvestigator } =
+    useInvestigatorLibrary();
+  const myRoomIds = React.useMemo(
+    () => new Set(myCharacters.map((c) => c.room_id).filter(Boolean)),
+    [myCharacters]
+  );
+  const {
+    filteredRooms,
+    isLoadingRooms,
+    searchQuery,
+    setSearchQuery,
+    roomFilter,
+    setRoomFilter,
+    refreshRooms,
+  } = useLobbyCatalog({
+    currentUserId,
+    characterRoomIds: myRoomIds,
+    onlineUsers,
+  });
 
   useElasticScroll(mainRef, mainContentRef, {
     disabled: activeTab === "square",
@@ -217,253 +217,6 @@ export const Home: React.FC<HomeProps> = ({
     }
   };
 
-  // Initial Data Fetch & Realtime
-  useEffect(() => {
-    fetchRooms();
-    fetchMyCharacters();
-    getCurrentUser().then(async ({ data: { user } }) => {
-      if (user) {
-        setCurrentUserId(user.id);
-        setUserEmail(user.email || "");
-        const { data: profile } = await fetchProfileDetails(user.id);
-        if (profile) {
-          setUserCode(profile.user_code);
-          setUserNickname(profile.nickname);
-          setUserBio(profile.bio || "");
-          setUserAvatar(profile.avatar_url);
-          setUserCreatedAt(profile.created_at);
-          setIsVip(!!profile.is_vip);
-
-          // Fetch History
-          fetchGameHistory(user.id);
-          fetchFriendRequestCount(user.id);
-        } else {
-          // Auto-create profile if missing (fallback for old users)
-          const { data: newProfile } = await createProfileForUser(
-            user.id,
-            user.email
-          );
-          if (newProfile) {
-            setUserCode(newProfile.user_code);
-            setUserNickname(newProfile.nickname);
-            setUserBio(newProfile.bio || "");
-            setUserAvatar(newProfile.avatar_url);
-            setUserCreatedAt(newProfile.created_at);
-            setIsVip(!!newProfile.is_vip);
-
-            // Fetch History
-            fetchGameHistory(user.id);
-            fetchFriendRequestCount(user.id);
-          }
-        }
-      }
-    });
-
-    // Realtime Rooms Subscription
-    const channel = supabase
-      .channel("public:rooms_list")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "rooms" },
-        (payload) => {
-          if (payload.eventType === "INSERT") {
-            // Only add if status is open
-            const newRoom = payload.new as Room;
-            if (newRoom.status === "open") {
-              setRooms((prev) => [newRoom, ...prev]);
-            }
-          } else if (payload.eventType === "DELETE") {
-            setRooms((prev) => prev.filter((r) => r.id !== payload.old.id));
-          } else if (payload.eventType === "UPDATE") {
-            const updatedRoom = payload.new as Room;
-            if (updatedRoom.status !== "open") {
-              // Remove if closed/archived
-              setRooms((prev) => prev.filter((r) => r.id !== updatedRoom.id));
-            } else {
-              // Update or Add
-              setRooms((prev) => {
-                const exists = prev.find((r) => r.id === updatedRoom.id);
-                if (exists)
-                  return prev.map((r) =>
-                    r.id === updatedRoom.id ? { ...r, ...updatedRoom } : r
-                  );
-                return [updatedRoom, ...prev];
-              });
-            }
-          }
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, []);
-
-  // Friend Request Realtime Subscription
-  useEffect(() => {
-    if (!currentUserId) return;
-
-    const channel = supabase
-      .channel("friendships_monitor")
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "friendships",
-          filter: `friend_id=eq.${currentUserId}`,
-        },
-        () => {
-          fetchFriendRequestCount(currentUserId);
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [currentUserId]);
-
-  const fetchFriendRequestCount = async (userId: string) => {
-    // Remove head: true to avoid ERR_ABORTED on some clients/proxies
-    const { count, error } = await supabase
-      .from("friendships")
-      .select("id", { count: "exact" })
-      .eq("friend_id", userId)
-      .eq("status", "pending");
-
-    if (!error && count !== null) {
-      setFriendRequestCount(count);
-    }
-  };
-
-  const fetchGameHistory = async (userId: string) => {
-    // 1. Fetch KP History
-    const { data: kpData } = await supabase
-      .from("game_histories")
-      .select("*")
-      .eq("kp_id", userId)
-      .order("created_at", { ascending: false });
-
-    if (kpData) {
-      setKpHistory(kpData);
-    }
-
-    // 2. Fetch Player History
-    const { data: playerData } = await supabase
-      .from("game_history_participants")
-      .select(
-        `
-        *,
-        game_history:game_histories (*)
-      `
-      )
-      .eq("user_id", userId)
-      .order("id", { ascending: false }); // ideally order by game_history.created_at but simple ID sort works for now
-
-    if (playerData) {
-      // Fetch latest character data
-      const charIds = playerData
-        .map((p: any) => p.character_snapshot?.id)
-        .filter(Boolean);
-
-      let charMap = new Map();
-      if (charIds.length > 0) {
-        const { data: latestChars } = await supabase
-          .from("characters")
-          .select("*")
-          .in("id", charIds);
-        if (latestChars) {
-          charMap = new Map(latestChars.map((c) => [c.id, c]));
-        }
-      }
-
-      const sorted = (playerData as any[])
-        .map((p) => ({
-          ...p,
-          latest_character: charMap.get(p.character_snapshot?.id),
-        }))
-        .sort((a, b) => {
-          return (
-            new Date(b.game_history.created_at).getTime() -
-            new Date(a.game_history.created_at).getTime()
-          );
-        });
-      setPlayerHistory(sorted);
-    }
-  };
-
-  const fetchRooms = async () => {
-    setLoading(true);
-    const {
-      data: { user },
-    } = await getCurrentUser();
-
-    const { data, error } = await fetchVisibleRooms(user?.id);
-
-    if (data) {
-      const activityCounts = await fetchRoomActivityCounts(
-        data.map((room) => room.id)
-      );
-      const now = new Date().getTime();
-      const processed = data.map((r: any) => {
-        const activity = activityCounts.get(r.id);
-        const charCount =
-          activity?.character_count ?? r.characters?.[0]?.count ?? 2;
-        const msgCount = activity?.message_count ?? r.messages?.[0]?.count ?? 5;
-        const createdAt = new Date(r.created_at).getTime();
-        const lastActive = r.last_active_at
-          ? new Date(r.last_active_at).getTime()
-          : createdAt;
-
-        // Zombie Logic: Created > 24h ago, <= 1 person, < 5 messages
-        const isZombie =
-          now - createdAt > 24 * 60 * 60 * 1000 &&
-          charCount <= 1 &&
-          msgCount < 5;
-
-        // Archived Logic: > 7 days no activity
-        const isArchived = now - lastActive > 7 * 24 * 60 * 60 * 1000;
-
-        return {
-          ...r,
-          isZombie,
-          isArchived,
-          last_active_at: r.last_active_at || r.created_at,
-        };
-      });
-
-      // Sort: Non-Zombie first, then by Activity
-      processed.sort((a: any, b: any) => {
-        if (a.isZombie !== b.isZombie) return a.isZombie ? 1 : -1;
-        return (
-          new Date(b.last_active_at).getTime() -
-          new Date(a.last_active_at).getTime()
-        );
-      });
-
-      setRooms(processed);
-    }
-    if (error) console.error("Error fetching rooms:", error);
-    setLoading(false);
-  };
-
-  const fetchMyCharacters = async () => {
-    const {
-      data: { user },
-    } = await getCurrentUser();
-    if (!user) return;
-
-    const { data, error } = await fetchUserInvestigators(user.id);
-
-    if (data) {
-      const mappedChars = data.map(mapCharacterRow);
-      setMyCharacters(mappedChars);
-    }
-    if (error) console.error("Error fetching characters:", error);
-  };
-
   const handleCreateRoom = async () => {
     if (!newRoomTitle.trim()) return;
     setLoading(true);
@@ -496,6 +249,7 @@ export const Home: React.FC<HomeProps> = ({
       setNewRoomPassword("");
       setNewRoomType("text");
       setShowCreateRoom(false);
+      refreshRooms();
       onJoinRoom(data.id, "pc"); // Creator joins as KP (pc)
     }
     setLoading(false);
@@ -531,21 +285,17 @@ export const Home: React.FC<HomeProps> = ({
   };
 
   const handleUpdateProfile = async () => {
-    if (!currentUserId) return;
     setLoading(true);
-    const { error } = await updateProfile(currentUserId, {
+    const result = await saveProfile({
       nickname: editNickname,
       bio: editBio,
       avatar_url: editAvatar,
     });
 
-    if (!error) {
-      setUserNickname(editNickname);
-      setUserBio(editBio);
-      setUserAvatar(editAvatar);
+    if (result.ok) {
       setIsEditingProfile(false);
-    } else {
-      alert("更新失败: " + error.message);
+    } else if (result.message) {
+      alert(result.message);
     }
     setLoading(false);
   };
@@ -556,91 +306,36 @@ export const Home: React.FC<HomeProps> = ({
       return;
     }
     setLoading(true);
-    const { error } = await updatePassword(newPassword);
+    const result = await changePassword(newPassword);
 
-    if (!error) {
+    if (result.ok) {
       alert("密码修改成功");
       setShowChangePwdModal(false);
       setNewPassword("");
       setConfirmNewPassword("");
-    } else {
-      alert("修改失败: " + error.message);
+    } else if (result.message) {
+      alert(result.message);
     }
     setLoading(false);
   };
 
   const handleSaveCharacter = async (char: Character) => {
-    const {
-      data: { user },
-    } = await getCurrentUser();
-    if (!user) return;
-
-    const dbChar = buildCharacterMutationPayload(char, {
-      userId: user.id,
-      typeFallback: "investigator",
-    });
-
-    if (editingChar) {
-      const { error } = await updateCharacter(char.id, dbChar);
-      if (!error) {
-        setMyCharacters((prev) =>
-          prev.map((c) => (c.id === char.id ? char : c))
-        );
-        setShowCharModal(false);
-      } else {
-        alert("更新失败: " + error.message);
-      }
-    } else {
-      const { data, error } = await createCharacter(dbChar);
-      if (data) {
-        setMyCharacters((prev) => [...prev, { ...char, id: data.id }]);
-        setShowCharModal(false);
-      } else if (error) {
-        alert("创建失败: " + error.message);
-      }
+    const result = await saveInvestigator(char, editingChar);
+    if (result.ok) {
+      setShowCharModal(false);
+    } else if (result.message) {
+      alert(result.message);
     }
   };
 
   const handleDeleteCharacter = async (id: string) => {
-    const { error } = await deleteCharacter(id);
-    if (!error) {
-      setMyCharacters((prev) => prev.filter((c) => c.id !== id));
+    const result = await deleteInvestigator(id);
+    if (result.ok) {
       setShowCharModal(false);
-    } else {
-      alert("删除失败: " + error.message);
+    } else if (result.message) {
+      alert(result.message);
     }
   };
-
-  const myRoomIds = new Set(myCharacters.map((c) => c.room_id).filter(Boolean));
-
-  const filteredRooms = rooms.filter((r: any) => {
-    const query = searchQuery.toLowerCase();
-    const matchesSearch =
-      r.title.toLowerCase().includes(query) ||
-      (r.description && r.description.toLowerCase().includes(query)) ||
-      (r.room_number && String(r.room_number).includes(query)) ||
-      (r.room_number && `#${r.room_number}`.toLowerCase().includes(query));
-
-    if (!matchesSearch) return false;
-
-    if (roomFilter === "all") {
-      // Default Lobby: Hide Archived
-      if (r.isArchived) return false;
-      return true;
-    }
-
-    if (roomFilter === "mine") {
-      return myRoomIds.has(r.id);
-    }
-    if (roomFilter === "created") {
-      return r.kp_id === currentUserId;
-    }
-    if (roomFilter === "kp_online") {
-      return onlineUsers.has(r.kp_id);
-    }
-
-    return true;
-  });
 
   return (
     <div className="h-[100dvh] overflow-hidden bg-[#020617] text-slate-200 flex flex-col font-sans">
@@ -962,7 +657,7 @@ export const Home: React.FC<HomeProps> = ({
                 )}
 
                 {/* Rooms Grid */}
-                {loading ? (
+                {isLoadingRooms ? (
                   <div className="flex flex-col items-center justify-center py-24 text-slate-500 animate-fade-in">
                     <Loader2 className="w-12 h-12 animate-spin mb-4 text-indigo-500" />
                     <p className="text-slate-400 font-medium">
