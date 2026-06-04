@@ -199,7 +199,18 @@ const applyCors = (req: VercelRequest, res: VercelResponse) => {
   const origin = getHeader(req.headers, "origin");
   if (!origin) return true;
 
-  if (!getAllowedOrigins().has(origin)) {
+  const host = getHeader(req.headers, "host");
+  const isSameOrigin = (() => {
+    if (!host) return false;
+
+    try {
+      return new URL(origin).host === host;
+    } catch {
+      return false;
+    }
+  })();
+
+  if (!isSameOrigin && !getAllowedOrigins().has(origin)) {
     return false;
   }
 
