@@ -1,5 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
-import { SignJWT } from "jose";
+import { createHmac } from "node:crypto";
 
 interface TokenBody {
   roomName?: string;
@@ -22,9 +22,12 @@ interface VercelResponse {
 }
 
 class TokenRequestError extends Error {
-  constructor(public statusCode: number, message: string) {
+  statusCode: number;
+
+  constructor(statusCode: number, message: string) {
     super(message);
     this.name = "TokenRequestError";
+    this.statusCode = statusCode;
   }
 }
 
@@ -67,6 +70,13 @@ const getAllowedOrigins = () => {
   ]);
 };
 
+const base64UrlEncode = (value: string | Buffer) =>
+  Buffer.from(value)
+    .toString("base64")
+    .replace(/=/g, "")
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_");
+
 const createLiveKitJwt = async ({
   apiKey,
   apiSecret,
@@ -80,21 +90,23 @@ const createLiveKitJwt = async ({
   participantName: string;
   roomName: string;
 }) => {
-  const secret = new TextEncoder().encode(apiSecret);
-
-  return new SignJWT({
+  const now = Math.floor(Date.now() / 1000);
+  const header = base64UrlEncode(JSON.stringify({ alg: "HS256", typ: "JWT" }));
+  const payload = base64UrlEncode(JSON.stringify({
+    iss: apiKey,
+    sub: identity,
+    nbf: 0,
+    exp: now + 6 * 60 * 60,
     name: participantName,
     video: {
       roomJoin: true,
       room: roomName,
     },
-  })
-    .setProtectedHeader({ alg: "HS256" })
-    .setIssuer(apiKey)
-    .setSubject(identity)
-    .setNotBefore(0)
-    .setExpirationTime("6h")
-    .sign(secret);
+  }));
+  const data = `${header}.${payload}`;
+  const signature = createHmac("sha256", apiSecret).update(data).digest();
+
+  return `${data}.${base64UrlEncode(signature)}`;
 };
 
 async function generateToken({
