@@ -23,11 +23,13 @@ interface VercelResponse {
 
 class TokenRequestError extends Error {
   statusCode: number;
+  code: string;
 
-  constructor(statusCode: number, message: string) {
+  constructor(statusCode: number, code: string, message: string) {
     super(message);
     this.name = "TokenRequestError";
     this.statusCode = statusCode;
+    this.code = code;
   }
 }
 
@@ -40,10 +42,14 @@ const getHeader = (
 };
 
 const parseBody = (body: unknown): TokenBody => {
-  if (typeof body === "string") {
-    return JSON.parse(body) as TokenBody;
+  try {
+    if (typeof body === "string") {
+      return JSON.parse(body) as TokenBody;
+    }
+    return (body || {}) as TokenBody;
+  } catch {
+    throw new TokenRequestError(400, "invalid_json", "Invalid JSON body");
   }
-  return (body || {}) as TokenBody;
 };
 
 const getAllowedOrigins = () => {
@@ -123,6 +129,7 @@ async function generateToken({
   if (!roomName || !participantName || !characterId) {
     throw new TokenRequestError(
       400,
+      "missing_fields",
       "Missing roomName, participantName, or characterId"
     );
   }
@@ -133,11 +140,11 @@ async function generateToken({
   const supabaseAnonKey = env.SUPABASE_ANON_KEY || env.VITE_SUPABASE_ANON_KEY;
 
   if (!apiKey || !apiSecret || !supabaseUrl || !supabaseAnonKey) {
-    throw new TokenRequestError(500, "Server misconfigured");
+    throw new TokenRequestError(500, "server_misconfigured", "Server misconfigured");
   }
 
   if (!authHeader) {
-    throw new TokenRequestError(401, "Missing authorization");
+    throw new TokenRequestError(401, "missing_authorization", "Missing authorization");
   }
 
   const supabase = createClient(supabaseUrl, supabaseAnonKey, {
@@ -151,7 +158,7 @@ async function generateToken({
   } = await supabase.auth.getUser();
 
   if (userError || !user) {
-    throw new TokenRequestError(401, "Unauthorized");
+    throw new TokenRequestError(401, "unauthorized", "Unauthorized");
   }
 
   const { data: room, error: roomError } = await supabase
@@ -161,13 +168,21 @@ async function generateToken({
     .single();
 
   if (roomError || !room || room.type !== "voice") {
-    throw new TokenRequestError(403, "Voice room not available");
+    throw new TokenRequestError(
+      403,
+      "voice_room_not_available",
+      "Voice room not available"
+    );
   }
 
   const isKeeper = room.kp_id === user.id;
   if (characterId === "pc") {
     if (!isKeeper) {
-      throw new TokenRequestError(403, "Only the keeper can join as KP");
+      throw new TokenRequestError(
+        403,
+        "keeper_only",
+        "Only the keeper can join as KP"
+      );
     }
   } else {
     const { data: character, error: characterError } = await supabase
@@ -182,7 +197,11 @@ async function generateToken({
       character.user_id !== user.id ||
       character.room_id !== roomName
     ) {
-      throw new TokenRequestError(403, "Character is not in this room");
+      throw new TokenRequestError(
+        403,
+        "character_not_in_room",
+        "Character is not in this room"
+      );
     }
   }
 
@@ -229,26 +248,48 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   if (!isAllowedOrigin) {
-    return res.status(403).json({ error: "Origin not allowed" });
+    return res
+      .status(403)
+      .json({ code: "origin_not_allowed", error: "Origin not allowed" });
   }
 
   if (req.method !== "POST") {
-    return res.status(405).json({ error: "Method not allowed" });
+    return res
+      .status(405)
+      .json({ code: "method_not_allowed", error: "Method not allowed" });
   }
 
   try {
+    const body = parseBody(req.body);
     const token = await generateToken({
-      body: parseBody(req.body),
+      body,
       authHeader: getHeader(req.headers, "authorization"),
       env: process.env,
     });
 
     return res.status(200).json({ token });
   } catch (error) {
-    console.error(error);
     if (error instanceof TokenRequestError) {
-      return res.status(error.statusCode).json({ error: error.message });
+      const body = (() => {
+        try {
+          return parseBody(req.body);
+        } catch {
+          return {};
+        }
+      })();
+      console.warn("voice-token rejected", {
+        code: error.code,
+        statusCode: error.statusCode,
+        roomName: body.roomName,
+        characterId: body.characterId,
+      });
+      return res
+        .status(error.statusCode)
+        .json({ code: error.code, error: error.message });
     }
-    return res.status(500).json({ error: "Could not generate token" });
+    console.error("voice-token failed", error);
+    return res
+      .status(500)
+      .json({ code: "token_generation_failed", error: "Could not generate token" });
   }
 }

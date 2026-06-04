@@ -55,7 +55,11 @@ import {
   updateRoomMusicState,
   updateRoomMusicUrl,
 } from "./services/rooms";
-import { requestVoiceToken } from "./services/livekit";
+import {
+  ensureMicrophonePermission,
+  getVoiceParticipantName,
+  requestVoiceToken,
+} from "./services/livekit";
 import {
   addMessage,
   deleteMessage,
@@ -73,6 +77,14 @@ import {
   updateCharacterStats as saveCharacterStats,
 } from "./services/characters";
 import { clearLocalSupabaseSession, getCurrentUser, signOut } from "./services/auth";
+
+type VoiceConnectionStatus =
+  | "idle"
+  | "requesting-token"
+  | "connecting"
+  | "connected"
+  | "disconnected"
+  | "error";
 
 const App: React.FC = () => {
   // Routing State
@@ -112,6 +124,9 @@ const App: React.FC = () => {
   const [roomType, setRoomType] = useState<"text" | "voice">("text");
   const [view, setView] = useState("main");
   const [token, setToken] = useState("");
+  const [voiceConnectionStatus, setVoiceConnectionStatus] =
+    useState<VoiceConnectionStatus>("idle");
+  const [voiceError, setVoiceError] = useState<string | null>(null);
 
   // ✅ 初始化为空数组/空对象，不再使用 DEFAULT_DATA
   const [characters, setCharacters] = useState<Character[]>([]);
@@ -133,13 +148,22 @@ const App: React.FC = () => {
 
   useEffect(() => {
     if (roomType === "voice" && currentRoomId && session?.access_token) {
+      let cancelled = false;
+
       (async () => {
+        setToken("");
+        setVoiceConnectionStatus("requesting-token");
+        setVoiceError(null);
+
         try {
-          const participantName =
-            activeCharId === "pc"
-              ? userNickname || "守秘人"
-              : characters.find((c) => c.id === activeCharId)?.name ||
-                "未知用户";
+          await ensureMicrophonePermission();
+          if (cancelled) return;
+
+          const participantName = getVoiceParticipantName(
+            activeCharId,
+            userNickname,
+            characters
+          );
 
           const voiceToken = await requestVoiceToken({
             accessToken: session.access_token,
@@ -147,17 +171,32 @@ const App: React.FC = () => {
             activeCharId,
             participantName,
           });
+          if (cancelled) return;
           setToken(voiceToken);
+          setVoiceConnectionStatus("connecting");
         } catch (e) {
+          if (cancelled) return;
+          const message =
+            e instanceof Error ? e.message : "无法获取语音房间凭证";
           console.error(e);
-          alert(
-            "语音连接失败: " +
-              (e instanceof Error ? e.message : "无法获取语音房间凭证")
-          );
+          console.warn("voice setup failed", {
+            roomId: currentRoomId,
+            activeCharId,
+            message,
+          });
+          setToken("");
+          setVoiceConnectionStatus("error");
+          setVoiceError(message);
         }
       })();
+
+      return () => {
+        cancelled = true;
+      };
     } else {
       setToken("");
+      setVoiceConnectionStatus("idle");
+      setVoiceError(null);
     }
   }, [roomType, currentRoomId, activeCharId, userNickname, characters, session]);
 
@@ -1257,6 +1296,9 @@ const App: React.FC = () => {
     setActiveCharId("pc");
     setBgMusicUrl(null);
     setOnlineUsers(new Set());
+    setToken("");
+    setVoiceConnectionStatus("idle");
+    setVoiceError(null);
     window.history.replaceState(null, "", window.location.pathname);
   }, []);
 
@@ -1354,6 +1396,23 @@ const App: React.FC = () => {
     );
   }
 
+  const voiceStatusText: Record<VoiceConnectionStatus, string> = {
+    idle: "",
+    "requesting-token": "正在检查麦克风并获取语音凭证",
+    connecting: "正在连接语音房间",
+    connected: "语音已连接",
+    disconnected: "语音连接已断开",
+    error: "语音连接失败",
+  };
+
+  const voiceStatusClass =
+    voiceConnectionStatus === "connected"
+      ? "bg-emerald-500"
+      : voiceConnectionStatus === "error" ||
+        voiceConnectionStatus === "disconnected"
+      ? "bg-rose-500"
+      : "bg-amber-400 animate-pulse";
+
   const appContent = (
     <Suspense fallback={<LoadingScreen />}>
       <div className="flex h-screen text-slate-200 font-sans selection:bg-indigo-500/30 overflow-hidden bg-[#020617]">
@@ -1386,8 +1445,8 @@ const App: React.FC = () => {
         isKP={isKP}
         kpOnline={kpId ? onlineUsers.has(kpId) : false}
         userNickname={userNickname}
-        roomType={token ? roomType : "text"}
-        isVoiceConnected={!!token}
+        roomType={roomType}
+        isVoiceConnected={voiceConnectionStatus === "connected"}
       />
 
       <main className="flex-1 flex flex-col relative min-w-0 z-10">
@@ -1431,6 +1490,22 @@ const App: React.FC = () => {
             </Button>
           </div>
         </header>
+
+        {roomType === "voice" && voiceConnectionStatus !== "idle" && (
+          <div className="shrink-0 px-4 md:px-8 py-2 border-b border-white/5 bg-slate-950/60">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+              <span className="inline-flex items-center gap-2 font-medium text-slate-200">
+                <span
+                  className={`h-2 w-2 rounded-full ${voiceStatusClass}`}
+                ></span>
+                {voiceStatusText[voiceConnectionStatus]}
+              </span>
+              {voiceError && (
+                <span className="text-rose-300 break-words">{voiceError}</span>
+              )}
+            </div>
+          </div>
+        )}
 
         {view !== "setup" && view !== "music" ? (
           <>
@@ -1605,10 +1680,18 @@ const App: React.FC = () => {
         }}
         video={false}
         data-lk-theme="default"
-        onDisconnected={handleLeaveRoom}
+        onConnected={() => {
+          setVoiceConnectionStatus("connected");
+          setVoiceError(null);
+        }}
+        onDisconnected={() => {
+          setVoiceConnectionStatus("disconnected");
+          setVoiceError("语音连接已断开，请刷新或重新进入房间。");
+        }}
         onError={(error) => {
           console.error("LiveKit Error:", error);
-          alert("语音房间连接异常: " + error.message);
+          setVoiceConnectionStatus("error");
+          setVoiceError(error.message || "语音房间连接异常");
         }}
       >
         {appContent}
