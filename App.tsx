@@ -20,6 +20,7 @@ import {
   ModuleModal,
   MusicPlayer,
   RoomAudioRenderer,
+  RoomTools,
   Sidebar,
   StartAudio,
   StatusModal,
@@ -99,6 +100,7 @@ const App: React.FC = () => {
     activeCharId,
     setActiveCharId,
     isKP,
+    roomMemberItems,
     kpId,
     onlineUsers,
     bgMusicUrl,
@@ -113,6 +115,7 @@ const App: React.FC = () => {
     deleteCurrentRoomMessage,
     buildCurrentRoomStory,
     removeRoomCharacter,
+    kickRoomMemberByUserId,
     concludeCurrentRoom,
     updateMusicUrl,
     updateMusicState,
@@ -288,6 +291,15 @@ const App: React.FC = () => {
     }
   };
 
+  const handleKickMember = async (userId: string) => {
+    const result = await kickRoomMemberByUserId(userId);
+    if (result.ok) {
+      setShowCharModal(false);
+    } else if (result.message) {
+      alert(result.message);
+    }
+  };
+
   const handleUpdateStatus = async (hp: number, san: number, mp: number) => {
     const result = await updateCharacterVitals(statusTargetId, hp, san, mp);
     if (result.ok) {
@@ -431,8 +443,10 @@ const App: React.FC = () => {
           setStatusTargetId(id);
           setShowStatusModal(true);
         }}
+        onKickMember={handleKickMember}
         isMobile={isMobile}
         isKP={isKP}
+        roomMemberItems={roomMemberItems}
         kpOnline={kpId ? onlineUsers.has(kpId) : false}
         userNickname={userNickname}
         roomType={roomType}
@@ -497,7 +511,7 @@ const App: React.FC = () => {
           </div>
         )}
 
-        {view !== "setup" && view !== "music" ? (
+        {view !== "setup" && view !== "music" && view !== "tools" ? (
           <>
             <ChatArea
               logs={logs}
@@ -553,6 +567,16 @@ const App: React.FC = () => {
             onConcludeGame={() => setShowConclusionModal(true)}
             isKP={isKP}
           />
+        ) : view === "tools" ? (
+          <RoomTools
+            roomId={currentRoomId}
+            isKP={isKP}
+            userId={session.user.id}
+            logs={logs}
+            characters={derivedCharacters}
+            roomMemberItems={roomMemberItems}
+            addLog={addLog}
+          />
         ) : null}
 
         {/* Music Player (Persistent) */}
@@ -565,7 +589,7 @@ const App: React.FC = () => {
             view === "music" ? "absolute inset-0 z-10 bg-slate-900 pt-16" : ""
           }
           isMobile={isMobile}
-          isHidden={view === "setup" || roomType === "voice"}
+          isHidden={view === "setup" || view === "tools" || roomType === "voice"}
           globalMute={globalMute}
           syncedIsPlaying={isMusicPlaying}
           syncedTrackIndex={musicTrackIndex}

@@ -10,6 +10,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Activity,
+  ClipboardList,
   Music,
   Mic,
   MicOff,
@@ -22,6 +23,7 @@ import {
 import { cn } from "./UI";
 import { Character } from "../types";
 import { useElasticScroll } from "../hooks/useElasticScroll";
+import type { RoomMemberPanelItem } from "../services/roomMembers";
 
 interface SidebarProps {
   isOpen: boolean;
@@ -32,8 +34,10 @@ interface SidebarProps {
   setActiveCharId: (id: string) => void;
   characters: Character[];
   onOpenStatusEdit: (charId: string) => void;
+  onKickMember?: (userId: string) => void;
   isMobile: boolean;
   isKP: boolean;
+  roomMemberItems?: RoomMemberPanelItem[];
   kpOnline?: boolean;
   roomType?: "text" | "voice";
   userNickname?: string;
@@ -397,6 +401,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               icon: Users,
               label: isKP ? "角色 & 模组" : "调查员名册",
             },
+            { id: "tools", icon: ClipboardList, label: "房间工具" },
             { id: "music", icon: Music, label: "背景音乐" },
           ]
             .filter((nav) => {

@@ -6,6 +6,7 @@ import {
   addRoomSystemMessage,
   concludeRoom,
   deleteRoom,
+  fetchCurrentRoomMembership,
   fetchProfileNickname,
   fetchRoomById,
   fetchRoomCharacters,
@@ -26,6 +27,25 @@ import { removeCharacterFromRoom } from "../services/characters";
 import { mapCharacterRow } from "../utils/characterMapper";
 import { buildStoryReport } from "../utils/storyReport";
 import { useRoomRealtime } from "./useRoomRealtime";
+import {
+  deriveRoomAuthority,
+  getRestoredRoomEntry,
+} from "../services/roomAuthority";
+import {
+  getJoinRoomBlockMessage,
+  getJoinRoomFailureMessage,
+} from "../services/roomJoinFeedback";
+import type {
+  RoomMembership,
+  RoomMemberRole,
+  RoomMemberStatus,
+} from "../services/roomAuthority";
+import {
+  buildRoomMemberPanelItems,
+  fetchRoomMembers,
+  removeRoomMemberByUserId,
+} from "../services/roomMembers";
+import type { RoomMemberPanelItem } from "../services/roomMembers";
 import {
   ensureMicrophonePermission,
   getVoiceParticipantName,
@@ -97,6 +117,11 @@ export function useRoomSessionState({
   const [roomPassword, setRoomPassword] = useState("");
   const [activeCharId, setActiveCharId] = useState("pc");
   const [isKP, setIsKP] = useState(false);
+  const [roomRole, setRoomRole] = useState<RoomMemberRole>("player");
+  const [roomMembershipStatus, setRoomMembershipStatus] = useState<
+    RoomMemberStatus | "unknown"
+  >("unknown");
+  const [roomMembers, setRoomMembers] = useState<RoomMembership[]>([]);
   const [kpId, setKpId] = useState<string | null>(null);
   const [onlineUsers, setOnlineUsers] = useState<Set<string>>(new Set());
   const [bgMusicUrl, setBgMusicUrl] = useState<string | null>(null);
@@ -110,7 +135,13 @@ export function useRoomSessionState({
   }, [characters]);
 
   const applyRoomSnapshot = useCallback(
-    (room: RoomSessionRoom, activeCharacterId: string, userIsKP: boolean) => {
+    (
+      room: RoomSessionRoom,
+      activeCharacterId: string,
+      userIsKP: boolean,
+      role: RoomMemberRole = userIsKP ? "keeper" : "player",
+      membershipStatus: RoomMemberStatus | "unknown" = "unknown"
+    ) => {
       setModuleInfo({
         title: room.title,
         description: room.description || "",
@@ -120,6 +151,8 @@ export function useRoomSessionState({
       setRoomPassword("");
       setActiveCharId(activeCharacterId);
       setIsKP(userIsKP);
+      setRoomRole(role);
+      setRoomMembershipStatus(membershipStatus);
       setKpId(room.kp_id);
       setBgMusicUrl(room.bg_music_url || null);
       setIsMusicPlaying(room.is_music_playing || false);
@@ -142,20 +175,19 @@ export function useRoomSessionState({
       const {
         data: { user },
       } = await getCurrentUser();
-      const userIsKP = user?.id === room.kp_id;
-
       if (!charId) {
         return { ok: false, message: "请选择角色！" };
       }
 
-      if (charId === "pc" && !userIsKP) {
-        return {
-          ok: false,
-          message: "权限不足：只有房主才能以守秘人身份进入！",
-        };
+      const { data: existingMembership } = user
+        ? await fetchCurrentRoomMembership(roomId, user.id)
+        : { data: null };
+      const blockMessage = getJoinRoomBlockMessage(existingMembership);
+      if (blockMessage) {
+        return { ok: false, message: blockMessage };
       }
 
-      const { error: joinError } = await joinRoomRpc({
+      const { data: membership, error: joinError } = await joinRoomRpc({
         roomId,
         characterId: charId === "pc" ? null : charId,
         password,
@@ -163,13 +195,27 @@ export function useRoomSessionState({
 
       if (joinError) {
         console.error("Failed to join room:", joinError);
-        const message = joinError.message.includes("Invalid room password")
-          ? "密码错误"
-          : joinError.message;
-        return { ok: false, message: `加入房间失败：${message}` };
+        return {
+          ok: false,
+          message: getJoinRoomFailureMessage(joinError.message),
+        };
       }
 
-      applyRoomSnapshot(room, charId, userIsKP);
+
+      const authority = deriveRoomAuthority({
+        userId: user?.id,
+        requestedCharacterId: charId,
+        room,
+        membership,
+      });
+
+      applyRoomSnapshot(
+        room,
+        authority.activeCharacterId,
+        authority.isKP,
+        authority.role,
+        authority.membershipStatus
+      );
 
       if (!isRestoring) {
         const url = new URL(window.location.href);
@@ -178,6 +224,8 @@ export function useRoomSessionState({
       }
 
       const { data: chars } = await fetchRoomCharacters(roomId);
+      const { data: members } = await fetchRoomMembers(roomId);
+      setRoomMembers((members || []) as RoomMembership[]);
       if (!chars) return { ok: true };
 
       const mappedChars = chars.map(mapCharacterRow);
@@ -221,19 +269,38 @@ export function useRoomSessionState({
 
     if (!roomId) return;
 
-    const { data: room, error } = await fetchRoomById(roomId);
-    if (error || !room) {
+    const {
+      data: { user },
+    } = await getCurrentUser();
+
+    if (!user) {
       window.history.replaceState(null, "", window.location.pathname);
       return;
     }
 
-    setKpId(room.kp_id);
-    setBgMusicUrl(room.bg_music_url || null);
-    setRoomType(room.type || "text");
-    setIsMusicPlaying(room.is_music_playing || false);
-    setMusicTrackIndex(room.music_track_index || 0);
+    const { data: membership } = await fetchCurrentRoomMembership(
+      roomId,
+      user.id
+    );
+    const restoredEntry = getRestoredRoomEntry(membership);
+    if (!restoredEntry) {
+      window.history.replaceState(null, "", window.location.pathname);
+      return;
+    }
+
+    const result = await joinRoomSession({
+      roomId: restoredEntry.roomId,
+      charId: restoredEntry.characterId,
+      isRestoring: true,
+    });
+
+    if (!result.ok) {
+      window.history.replaceState(null, "", window.location.pathname);
+      return;
+    }
+
     window.history.replaceState(null, "", window.location.pathname);
-  }, []);
+  }, [joinRoomSession]);
 
   const clearRoomSession = useCallback(() => {
     setCurrentRoomId(null);
@@ -241,6 +308,9 @@ export function useRoomSessionState({
     setLogs([]);
     setModuleInfo(EMPTY_MODULE_INFO);
     setIsKP(false);
+    setRoomRole("player");
+    setRoomMembershipStatus("unknown");
+    setRoomMembers([]);
     setActiveCharId("pc");
     setBgMusicUrl(null);
     setOnlineUsers(new Set());
@@ -451,10 +521,54 @@ export function useRoomSessionState({
       }
 
       setCharacters((prev) => prev.filter((item) => item.id !== characterId));
+      if (character.user_id) {
+        setRoomMembers((prev) =>
+          removeRoomMemberByUserId(prev, character.user_id!)
+        );
+      }
       if (activeCharId === characterId) setActiveCharId("pc");
       return { ok: true };
     },
     [activeCharId, currentRoomId, userId]
+  );
+
+  const kickRoomMemberByUserId = useCallback(
+    async (memberUserId: string): Promise<RoomSessionActionResult> => {
+      if (!memberUserId || !currentRoomId || !userId) return { ok: false };
+
+      const membership = roomMembers.find(
+        (item) => item.user_id === memberUserId && item.status === "active"
+      );
+      if (!membership || membership.role === "keeper") return { ok: false };
+
+      const character = membership.character_id
+        ? charactersRef.current.find((item) => item.id === membership.character_id)
+        : undefined;
+
+      try {
+        await kickRoomMember(currentRoomId, memberUserId);
+      } catch (error: any) {
+        console.error("移出失败:", error);
+        return { ok: false, message: "移出失败: " + error.message };
+      }
+
+      await addMessage({
+        roomId: currentRoomId,
+        userId,
+        type: "system",
+        content: `Keeper removed [${character?.name || "Player"}] from the room`,
+        meta: { type: "kick", userId: memberUserId },
+      });
+
+      setRoomMembers((prev) => removeRoomMemberByUserId(prev, memberUserId));
+      if (character) {
+        setCharacters((prev) => prev.filter((item) => item.id !== character.id));
+        if (activeCharId === character.id) setActiveCharId("pc");
+      }
+
+      return { ok: true };
+    },
+    [activeCharId, currentRoomId, roomMembers, userId]
   );
 
   const concludeCurrentRoom = useCallback(
@@ -664,6 +778,16 @@ export function useRoomSessionState({
     [characters, onlineUsers]
   );
 
+  const roomMemberItems: RoomMemberPanelItem[] = useMemo(
+    () =>
+      buildRoomMemberPanelItems({
+        memberships: roomMembers,
+        characters: derivedCharacters,
+        onlineUsers,
+      }),
+    [derivedCharacters, onlineUsers, roomMembers]
+  );
+
   return {
     currentRoomId,
     setCurrentRoomId,
@@ -692,6 +816,9 @@ export function useRoomSessionState({
     setActiveCharId,
     isKP,
     setIsKP,
+    roomRole,
+    roomMembershipStatus,
+    roomMemberItems,
     kpId,
     setKpId,
     onlineUsers,
@@ -712,6 +839,7 @@ export function useRoomSessionState({
     deleteCurrentRoomMessage,
     buildCurrentRoomStory,
     removeRoomCharacter,
+    kickRoomMemberByUserId,
     concludeCurrentRoom,
     updateMusicUrl,
     updateMusicState,

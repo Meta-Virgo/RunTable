@@ -27,6 +27,14 @@ interface UseRoomRealtimeOptions {
   onRoomDeleted: () => void;
 }
 
+export function isKickMessageForUser(message: any, userId: string) {
+  return (
+    message.type === "system" &&
+    message.meta?.type === "kick" &&
+    message.meta?.userId === userId
+  );
+}
+
 export function useRoomRealtime({
   currentRoomId,
   userId,
@@ -90,11 +98,7 @@ export function useRoomRealtime({
         async (payload) => {
           const msg = payload.new as any;
 
-          if (
-            msg.type === "system" &&
-            msg.meta?.type === "kick" &&
-            msg.meta?.userId === userId
-          ) {
+          if (isKickMessageForUser(msg, userId)) {
             alert("你已被移出房间");
             onKicked();
             return;

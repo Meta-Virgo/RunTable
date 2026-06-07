@@ -49,6 +49,37 @@ describe("parseDiceCommand", () => {
     });
   });
 
+  it("parses focused CoC rule automation commands", () => {
+    expect(parseDiceCommand(".growth SpotHidden 55 83")).toEqual({
+      type: "coc_rule",
+      payload: {
+        rule: "growth",
+        skill: "SpotHidden",
+        currentValue: 55,
+        roll: 83,
+      },
+    });
+
+    expect(parseDiceCommand(".bp bonus 7 2 4")).toEqual({
+      type: "coc_rule",
+      payload: {
+        rule: "bonus_penalty",
+        mode: "bonus",
+        tensRolls: [7, 2],
+        onesRoll: 4,
+      },
+    });
+
+    expect(parseDiceCommand(".opp Alice 60 32 Cultist 50 40")).toEqual({
+      type: "coc_rule",
+      payload: {
+        rule: "opposed",
+        challenger: { name: "Alice", target: 60, roll: 32 },
+        defender: { name: "Cultist", target: 50, roll: 40 },
+      },
+    });
+  });
+
   it("ignores regular chat messages", () => {
     expect(parseDiceCommand("我要调查门锁")).toBeNull();
   });

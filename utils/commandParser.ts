@@ -1,5 +1,5 @@
 export interface DiceCommand {
-  type: 'roll' | 'roll_hidden' | 'check' | 'sanity' | 'set' | 'help' | 'error';
+  type: 'roll' | 'roll_hidden' | 'check' | 'sanity' | 'set' | 'coc_rule' | 'help' | 'error';
   payload?: any;
   original?: string;
 }
@@ -119,6 +119,82 @@ export const parseDiceCommand = (input: string): DiceCommand | null => {
         failure: failureExpr,
         value: currentSan
       }
+    };
+  }
+
+  if (cmd === 'growth') {
+    const currentValue = parseInt(args[2]);
+    const roll = parseInt(args[3]);
+    if (!args[1] || isNaN(currentValue) || isNaN(roll)) {
+      return { type: 'error', payload: 'Usage: .growth skill currentValue roll' };
+    }
+
+    return {
+      type: 'coc_rule',
+      payload: {
+        rule: 'growth',
+        skill: args[1],
+        currentValue,
+        roll,
+      },
+    };
+  }
+
+  if (cmd === 'bp' || cmd === 'penalty') {
+    const mode = args[1] === 'penalty' || cmd === 'penalty' ? 'penalty' : 'bonus';
+    const tensRolls = args.slice(2, -1).map((value) => parseInt(value));
+    const onesRoll = parseInt(args[args.length - 1]);
+
+    if (tensRolls.length === 0 || tensRolls.some(isNaN) || isNaN(onesRoll)) {
+      return { type: 'error', payload: 'Usage: .bp bonus 7 2 4' };
+    }
+
+    return {
+      type: 'coc_rule',
+      payload: {
+        rule: 'bonus_penalty',
+        mode,
+        tensRolls,
+        onesRoll,
+      },
+    };
+  }
+
+  if (cmd === 'opp') {
+    const challengerTarget = parseInt(args[2]);
+    const challengerRoll = parseInt(args[3]);
+    const defenderTarget = parseInt(args[5]);
+    const defenderRoll = parseInt(args[6]);
+
+    if (
+      !args[1] ||
+      !args[4] ||
+      isNaN(challengerTarget) ||
+      isNaN(challengerRoll) ||
+      isNaN(defenderTarget) ||
+      isNaN(defenderRoll)
+    ) {
+      return {
+        type: 'error',
+        payload: 'Usage: .opp Alice 60 32 Cultist 50 40',
+      };
+    }
+
+    return {
+      type: 'coc_rule',
+      payload: {
+        rule: 'opposed',
+        challenger: {
+          name: args[1],
+          target: challengerTarget,
+          roll: challengerRoll,
+        },
+        defender: {
+          name: args[4],
+          target: defenderTarget,
+          roll: defenderRoll,
+        },
+      },
     };
   }
 

@@ -20,6 +20,10 @@ export const MusicPlayer = lazy(() =>
   import("./MusicPlayer").then((module) => ({ default: module.MusicPlayer }))
 );
 
+export const RoomTools = lazy(() =>
+  import("./RoomTools").then((module) => ({ default: module.RoomTools }))
+);
+
 export const ModuleModal = lazy(() =>
   import("./Modals").then((module) => ({ default: module.ModuleModal }))
 );

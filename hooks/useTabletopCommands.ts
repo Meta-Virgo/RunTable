@@ -2,6 +2,11 @@ import { useCallback } from "react";
 import { Character, Log } from "../types";
 import { updateCharacterStats as saveCharacterStats } from "../services/characters";
 import { parseDiceCommand } from "../utils/commandParser";
+import {
+  buildBonusPenaltyRoll,
+  buildGrowthCheck,
+  buildOpposedCheck,
+} from "../utils/cocAutomation";
 import { evaluateDiceExpression, resolveStatAlias } from "../utils/diceExpression";
 
 type AddLog = (
@@ -351,6 +356,40 @@ export function useTabletopCommands({
             addLog("system", "守秘人没有属性可以修改");
           }
           break;
+        case "coc_rule": {
+          if (cmd.payload.rule === "growth") {
+            const result = buildGrowthCheck(cmd.payload);
+            addLog("system", result.message, undefined, recipientId);
+            break;
+          }
+
+          if (cmd.payload.rule === "bonus_penalty") {
+            const result = buildBonusPenaltyRoll(cmd.payload);
+            addLog(
+              "dice",
+              JSON.stringify({
+                count: 1,
+                type: 100,
+                total: result.total,
+                details: [...result.tensRolls, result.onesRoll],
+                checkName: `${result.mode} die`,
+              }),
+              activeCharId === "pc" ? "pc" : activeCharId
+            );
+            break;
+          }
+
+          if (cmd.payload.rule === "opposed") {
+            const result = buildOpposedCheck(cmd.payload);
+            addLog(
+              "system",
+              `Opposed check: ${cmd.payload.challenger.name} (${result.challengerLevel}) vs ${cmd.payload.defender.name} (${result.defenderLevel}); winner: ${result.winner || "tie"}.`,
+              undefined,
+              recipientId
+            );
+          }
+          break;
+        }
         case "error":
           addLog("system", `指令错误: ${cmd.payload}`);
           break;

@@ -1,4 +1,5 @@
 import { supabase } from "../supabase";
+import type { RoomMembership } from "./roomAuthority";
 
 export const ROOM_SELECT =
   "id, created_at, kp_id, title, description, status, room_number, has_password, last_active_at, bg_music_url, type, is_music_playing, music_track_index";
@@ -129,6 +130,18 @@ export async function joinRoom(input: {
     p_character_id: input.characterId,
     p_password: input.password || null,
   });
+}
+
+export async function fetchCurrentRoomMembership(
+  roomId: string,
+  userId: string
+) {
+  return supabase
+    .from("room_members")
+    .select("room_id, user_id, character_id, role, status")
+    .eq("room_id", roomId)
+    .eq("user_id", userId)
+    .maybeSingle<RoomMembership>();
 }
 
 export async function kickRoomMember(roomId: string, userId: string) {

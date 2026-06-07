@@ -28,3 +28,6 @@ supabase/.temp
 *.sw?
 .env
 .trae
+.tools/
+.codex-run/
+run-output-*.png

@@ -1,43 +1,105 @@
 import { Log } from "../types";
 
+export interface SessionReportEntry {
+  logId: string;
+  at: string;
+  actor: string;
+  kind: "chat" | "system" | "roll" | "image";
+  text: string;
+}
+
+export interface SessionReport {
+  publicTimeline: SessionReportEntry[];
+  keeperOnlyTimeline: SessionReportEntry[];
+  publicMarkdown: string;
+  keeperOnlyMarkdown: string;
+}
+
+function getDisplayName(log: Log) {
+  return log.charRole === "Keeper" ? "Keeper" : log.charName;
+}
+
+function parseDiceText(log: Log, secret: boolean) {
+  try {
+    const dice = JSON.parse(log.content);
+    const name = dice.checkName ? ` ${dice.checkName}` : "";
+    const details = Array.isArray(dice.details)
+      ? ` [${dice.details.join(", ")}]`
+      : "";
+    return `${secret ? "secret roll" : "public roll"}${name}: ${dice.total}${details}`;
+  } catch {
+    return `${secret ? "secret roll" : "public roll"}: ${log.content}`;
+  }
+}
+
+function toReportEntry(log: Log, secret = false): SessionReportEntry {
+  const actor = getDisplayName(log);
+
+  if (log.type === "dice" || log.type === "dice_secret") {
+    return {
+      logId: log.id,
+      at: log.createdAt,
+      actor,
+      kind: "roll",
+      text: parseDiceText(log, secret),
+    };
+  }
+
+  if (log.type === "image") {
+    return {
+      logId: log.id,
+      at: log.createdAt,
+      actor,
+      kind: "image",
+      text: `image handout: ${log.content}`,
+    };
+  }
+
+  return {
+    logId: log.id,
+    at: log.createdAt,
+    actor,
+    kind: log.type === "system" || log.type === "status" ? "system" : "chat",
+    text: log.content.replace(/\*\*/g, ""),
+  };
+}
+
+function renderMarkdown(entries: SessionReportEntry[]) {
+  if (entries.length === 0) return "No reportable entries.";
+
+  return entries
+    .map((entry) => `- ${entry.at} [${entry.actor}] ${entry.text}`)
+    .join("\n");
+}
+
+export function buildSessionReport(sourceLogs: Log[]): SessionReport {
+  const sortedLogs = [...sourceLogs].sort((a, b) =>
+    a.createdAt.localeCompare(b.createdAt)
+  );
+  const publicTimeline: SessionReportEntry[] = [];
+  const keeperOnlyTimeline: SessionReportEntry[] = [];
+
+  sortedLogs.forEach((log) => {
+    if (log.recipientId) return;
+
+    if (log.type === "dice_secret") {
+      keeperOnlyTimeline.push(toReportEntry(log, true));
+      return;
+    }
+
+    publicTimeline.push(toReportEntry(log));
+  });
+
+  return {
+    publicTimeline,
+    keeperOnlyTimeline,
+    publicMarkdown: renderMarkdown(publicTimeline),
+    keeperOnlyMarkdown: renderMarkdown(keeperOnlyTimeline),
+  };
+}
+
 export function buildStoryReport(sourceLogs: Log[]) {
-  if (sourceLogs.length === 0) return "暂无记录。";
+  if (sourceLogs.length === 0) return "No reportable entries.";
 
-  return sourceLogs
-    .filter((log) => {
-      if (log.type !== "system") return true;
-
-      return (
-        !log.content.includes("已清空聊天记录") &&
-        !log.content.includes("进入了房间") &&
-        !log.content.includes("离开了房间")
-      );
-    })
-    .map((log) => {
-      const displayName = log.charRole === "Keeper" ? "守秘人" : log.charName;
-
-      if (log.type === "dice" || log.type === "dice_secret") {
-        try {
-          const dice = JSON.parse(log.content);
-          const prefix = log.type === "dice_secret" ? "(暗骰) " : "";
-          return `> [${displayName}] ${prefix}投掷了 ${dice.count}D${
-            dice.type || 6
-          }: ${dice.total} [${dice.details.join(", ")}]`;
-        } catch {
-          return `> [${displayName}] ${log.content}`;
-        }
-      }
-
-      if (["system", "status"].includes(log.type)) {
-        return `> [${displayName}] ${log.content}`;
-      }
-
-      if (log.type === "image") {
-        return `${displayName}: [图片]`;
-      }
-
-      const cleanContent = log.content.replace(/\*\*/g, "");
-      return `${displayName}: ${cleanContent}`;
-    })
-    .join("\n\n");
+  return buildSessionReport(sourceLogs).publicMarkdown;
 }
