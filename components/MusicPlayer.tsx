@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React from "react";
 import { createPortal } from "react-dom";
 import {
   Music,
@@ -15,16 +15,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { Button } from "./UI";
-import { useElasticScroll } from "../hooks/useElasticScroll";
-import { useDraggable } from "../hooks/useDraggable";
-import {
-  fetchPlayableSongUrl,
-  fetchPlaylistDetails,
-  fetchSongDetails,
-  formatMusicSource,
-  parseMusicInput,
-  parseMusicSource,
-} from "../services/musicCatalog";
+import { useMusicPlaybackController } from "../hooks/useMusicPlaybackController";
 
 interface MusicPlayerProps {
   url: string | null;
@@ -53,509 +44,65 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
   syncedTrackIndex,
   onUpdateSyncState,
 }) => {
-  // const [isMuted, setIsMuted] = useState(false); // Local mute (sets volume to 0 / pauses)
-  const [showInput, setShowInput] = useState(false);
-  const [inputUrl, setInputUrl] = useState("");
-  const [musicType, setMusicType] = useState<"song" | "playlist">("song");
-  const [playMode, setPlayMode] = useState<"sequence" | "single" | "shuffle">(
-    "sequence"
-  );
-
-  // State for internal player logic
-  const [parsedId, setParsedId] = useState<string | null>(null);
-  const [parsedType, setParsedType] = useState<number>(2); // 2 for song, 0 for playlist
-
-  // Custom Player State (Audio Element)
-  const audioRef = useRef<HTMLAudioElement | null>(null);
-  const lastScrollRef = useRef(0);
-  const isFirstMount = useRef(true);
-  const [isPlaying, setIsPlaying] = useState(false);
-  // const [volume, setVolume] = useState(0.5);
-  const [currentTime, setCurrentTime] = useState(0);
-  const [duration, setDuration] = useState(0);
-  const [retryCount, setRetryCount] = useState(0);
-  const [isLoadingSong, setIsLoadingSong] = useState(false);
-
-  // Playlist State
-  const [playlistTracks, setPlaylistTracks] = useState<any[]>([]);
-  const [allTrackIds, setAllTrackIds] = useState<any[]>([]);
-  const [currentTrackIndex, setCurrentTrackIndex] = useState(0);
-  const [visualTrackIndex, setVisualTrackIndex] = useState(0);
-  const [showPlaylist] = useState(!isMobile || mode === "sidebar");
-
-  // --- Sync Effects ---
-
-  // 1. Sync Props -> Internal State (PC Only)
-  useEffect(() => {
-    if (!isKP) {
-      if (syncedIsPlaying !== undefined && syncedIsPlaying !== isPlaying) {
-        setIsPlaying(syncedIsPlaying);
-        if (audioRef.current) {
-          if (syncedIsPlaying) {
-            audioRef.current.play().catch((e) => {
-              if (e.name !== "AbortError") console.error(e);
-            });
-          } else {
-            audioRef.current.pause();
-          }
-        }
-      }
-      if (
-        syncedTrackIndex !== undefined &&
-        syncedTrackIndex !== currentTrackIndex
-      ) {
-        setCurrentTrackIndex(syncedTrackIndex);
-        setVisualTrackIndex(syncedTrackIndex);
-      }
-    }
-  }, [syncedIsPlaying, syncedTrackIndex, isKP, isPlaying, currentTrackIndex]);
-
-  // 2. Sync Internal State -> DB (KP Only)
-  useEffect(() => {
-    if (isKP && onUpdateSyncState) {
-      onUpdateSyncState(isPlaying, currentTrackIndex);
-    }
-  }, [isPlaying, currentTrackIndex, isKP]);
-
-  // 3. Global Mute
-  useEffect(() => {
-    if (audioRef.current) {
-      audioRef.current.muted = globalMute;
-    }
-  }, [globalMute]);
-
-  // Sync visual track index with current track index
-  useEffect(() => {
-    setVisualTrackIndex(currentTrackIndex);
-  }, [currentTrackIndex]);
-
-  const [isLoadingPlaylist, setIsLoadingPlaylist] = useState(false);
-  const [isLoadingMore, setIsLoadingMore] = useState(false);
-  const [isCollapsed, setIsCollapsed] = useState(false);
-
-  useEffect(() => {
-    if (!isCollapsed) {
-      setVisualTrackIndex(currentTrackIndex);
-    }
-  }, [isCollapsed, currentTrackIndex]);
-
-  // Draggable logic
-  const { position, handleMouseDown, hasMoved } = useDraggable(
-    null,
-    "music_player_pos"
-  );
-
-  useEffect(() => {
-    // Restore volume from local storage
-    // const savedVol = localStorage.getItem("runtable_bgm_volume");
-    // if (savedVol) {
-    //   // setVolume(parseFloat(savedVol));
-    // }
-  }, []);
-
-  // Sync input state when not editing
-  useEffect(() => {
-    if (!showInput && parsedId) {
-      setInputUrl(parsedId);
-      setMusicType(parsedType === 0 ? "playlist" : "song");
-    } else if (!showInput && !parsedId) {
-      setInputUrl("");
-      setMusicType("song");
-    }
-  }, [parsedId, parsedType, showInput]);
-
-  // Fetch Playlist if needed
-  const previousPlaylistIdRef = useRef<string | null>(null);
-
-  useEffect(() => {
-    if (url) {
-      const { id, type } = parseMusicSource(url);
-
-      setParsedId(id);
-      setParsedType(type);
-
-      // Fetch Playlist if needed
-      if (type === 0 && id) {
-        // Only fetch if ID changed
-        if (previousPlaylistIdRef.current !== id) {
-          previousPlaylistIdRef.current = id;
-          fetchPlaylist(id);
-        }
-      } else if (type === 2 && id) {
-        // Fetch single song detail
-        const fetchSingleSong = async () => {
-          setIsLoadingPlaylist(true);
-          setPlaylistTracks([]);
-          setAllTrackIds([{ id }]); // Pseudo track ID
-
-          // Set single loop mode
-          setPlayMode("single");
-          setCurrentTrackIndex(0);
-          setVisualTrackIndex(0);
-
-          try {
-            const songs = await fetchSongDetails([id]);
-            if (songs.length > 0) {
-              setPlaylistTracks(songs);
-            } else {
-              console.warn("Failed to fetch song details for UI");
-            }
-          } catch {
-            console.warn("Failed to fetch song details for UI");
-          }
-          setIsLoadingPlaylist(false);
-        };
-
-        fetchSingleSong();
-        previousPlaylistIdRef.current = null;
-      } else {
-        setPlaylistTracks([]);
-        previousPlaylistIdRef.current = null;
-      }
-    } else {
-      setParsedId(null);
-      setPlaylistTracks([]);
-      previousPlaylistIdRef.current = null;
-    }
-  }, [url]);
-
-  const fetchPlaylist = async (id: string) => {
-    setIsLoadingPlaylist(true);
-    setPlaylistTracks([]);
-    setAllTrackIds([]);
-
-    // Stop current audio immediately when starting to fetch new playlist
-    if (audioRef.current) {
-      audioRef.current.pause();
-      setIsPlaying(false);
-    }
-
-    try {
-      const { tracks, trackIds } = await fetchPlaylistDetails(id);
-      setPlaylistTracks(tracks);
-      setAllTrackIds(trackIds);
-      setCurrentTrackIndex(0);
-    } catch (error) {
-      console.error("All playlist fetch strategies failed", error);
-    }
-
-    setIsLoadingPlaylist(false);
-  };
-
-  const loadMoreTracks = async () => {
-    if (isLoadingMore || playlistTracks.length >= allTrackIds.length) return;
-
-    setIsLoadingMore(true);
-
-    try {
-      const startIndex = playlistTracks.length;
-      const batchSize = 50;
-      // Get next batch of IDs
-      const nextIds = allTrackIds
-        .slice(startIndex, startIndex + batchSize)
-        .map((t: any) => t.id);
-
-      if (nextIds.length === 0) {
-        setIsLoadingMore(false);
-        return;
-      }
-
-      const newTracks = await fetchSongDetails(nextIds.map(String));
-      if (newTracks.length > 0) {
-        setPlaylistTracks((prev) => [...prev, ...newTracks]);
-      }
-    } catch (e) {
-      console.error("Failed to load more tracks", e);
-    } finally {
-      setIsLoadingMore(false);
-    }
-  };
-
-  // Scroll to active track
-  const activeTrackRef = useRef<HTMLDivElement>(null);
-
-  const playlistScrollRef = useRef<HTMLDivElement>(null);
-  const playlistContentRef = useRef<HTMLDivElement>(null);
-  useElasticScroll(playlistScrollRef, playlistContentRef);
-
-  // Infinite Scroll Observer (Sidebar Mode)
-  const loadMoreRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (
-          entries[0].isIntersecting &&
-          !isLoadingMore &&
-          playlistTracks.length < allTrackIds.length
-        ) {
-          loadMoreTracks();
-        }
-      },
-      { threshold: 0.1 }
-    );
-
-    if (loadMoreRef.current) {
-      observer.observe(loadMoreRef.current);
-    }
-
-    return () => observer.disconnect();
-  }, [isLoadingMore, playlistTracks.length, allTrackIds.length]);
-
-  // Infinite Scroll Check (Fixed Mode)
-  useEffect(() => {
-    if (mode === "fixed" && !isHidden && parsedType === 0) {
-      // If we are viewing a track near the end of the loaded list, load more
-      if (
-        !isLoadingMore &&
-        playlistTracks.length < allTrackIds.length &&
-        visualTrackIndex >= playlistTracks.length - 10
-      ) {
-        loadMoreTracks();
-      }
-    }
-  }, [
-    visualTrackIndex,
-    playlistTracks.length,
-    allTrackIds.length,
+  const music = useMusicPlaybackController({
+    url,
+    isKP,
+    onUpdateUrl,
     mode,
+    isMobile,
     isHidden,
-    isLoadingMore,
-  ]);
+    globalMute,
+    syncedIsPlaying,
+    syncedTrackIndex,
+    onUpdateSyncState,
+  });
 
-  useEffect(() => {
-    if (activeTrackRef.current && showPlaylist) {
-      activeTrackRef.current.scrollIntoView({
-        behavior: "smooth",
-        block: "center",
-      });
-    }
-  }, [currentTrackIndex, showPlaylist]);
-
-  // Audio Element Management
-  useEffect(() => {
-    let isMounted = true;
-
-    const loadAudio = async () => {
-      // Determine current track ID
-      let trackId = null;
-      if (parsedType === 2) {
-        trackId = parsedId;
-      } else if (parsedType === 0 && playlistTracks.length > 0) {
-        trackId = playlistTracks[currentTrackIndex]?.id;
-      }
-
-      if (trackId && audioRef.current) {
-        // If it's the same ID and we have a valid src, don't reload
-        // But we don't store the current ID in ref easily, so checking src might be tricky if it's a signed URL
-        // Let's rely on a ref to track current loaded ID
-        if (audioRef.current.dataset.currentId === String(trackId)) return;
-
-        // New track detected: Stop old track immediately
-        audioRef.current.pause();
-        setIsPlaying(false);
-        setRetryCount(0);
-        setIsLoadingSong(true);
-
-        try {
-          const realUrl = await fetchPlayableSongUrl(String(trackId));
-          if (!isMounted) return;
-
-          if (!realUrl || realUrl.includes("404")) {
-            console.warn("Song appears unavailable:", trackId);
-            if (parsedType === 0) {
-              // Auto skip unavailable songs in playlist
-              console.log("Auto-skipping unavailable track...");
-              setTimeout(() => playNext(true), 1500);
-            }
-            return;
-          }
-
-          audioRef.current.src = realUrl;
-          audioRef.current.dataset.currentId = String(trackId);
-
-          // Auto play if not muted locally
-          // if (!isMuted) {
-          const shouldPlay =
-            !isFirstMount.current || (!isKP && syncedIsPlaying);
-
-          if (shouldPlay) {
-            const playPromise = audioRef.current.play();
-            if (playPromise !== undefined) {
-              playPromise.catch((e) => {
-                if (e.name !== "AbortError") {
-                  console.warn("Auto-play blocked:", e);
-                }
-              });
-            }
-            setIsPlaying(true);
-          }
-
-          // Always clear first mount flag after first load attempt
-          if (isFirstMount.current) {
-            isFirstMount.current = false;
-          }
-          // }
-        } catch (e) {
-          console.error("Error loading audio:", e);
-        } finally {
-          if (isMounted) setIsLoadingSong(false);
-        }
-      }
-    };
-
-    loadAudio();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [
+  const {
+    showInput,
+    setShowInput,
+    inputUrl,
+    musicType,
+    setMusicType,
+    playMode,
     parsedId,
     parsedType,
+    audioRef,
+    lastScrollRef,
+    isPlaying,
+    currentTime,
+    duration,
+    isLoadingSong,
     playlistTracks,
+    allTrackIds,
     currentTrackIndex,
-    syncedIsPlaying,
-    isKP,
-  ]);
-
-  // Auto-open input in sidebar mode if no music playing
-  useEffect(() => {
-    if (mode === "sidebar" && !parsedId && isKP) {
-      setShowInput(true);
-    }
-  }, [mode, parsedId, isKP]);
-
-  // Handle Play/Pause
-  const togglePlay = () => {
-    if (isLoadingSong) return;
-    if (!audioRef.current) return;
-    if (isPlaying) {
-      audioRef.current.pause();
-    } else {
-      audioRef.current.play().catch((e) => {
-        if (e.name !== "AbortError") console.error("Play error:", e);
-      });
-    }
-    setIsPlaying(!isPlaying);
-  };
-
-  const playNext = (isAuto = false) => {
-    if (isLoadingSong && !isAuto) return;
-    if (parsedType === 0 && playlistTracks.length > 0) {
-      if (isAuto && playMode === "single") {
-        if (audioRef.current) {
-          audioRef.current.currentTime = 0;
-          audioRef.current.play().catch((e) => {
-            if (e.name !== "AbortError") console.error("Play error:", e);
-          });
-          setIsPlaying(true);
-        }
-        return;
-      }
-
-      if (playMode === "shuffle") {
-        let nextIndex = Math.floor(Math.random() * playlistTracks.length);
-        // Try to avoid same song if length > 1
-        if (playlistTracks.length > 1 && nextIndex === currentTrackIndex) {
-          nextIndex = (nextIndex + 1) % playlistTracks.length;
-        }
-        setCurrentTrackIndex(nextIndex);
-      } else {
-        setCurrentTrackIndex((prev) => (prev + 1) % playlistTracks.length);
-      }
-    }
-  };
-
-  const playPrev = () => {
-    if (isLoadingSong) return;
-    if (parsedType === 0 && playlistTracks.length > 0) {
-      if (playMode === "shuffle") {
-        let prevIndex = Math.floor(Math.random() * playlistTracks.length);
-        if (playlistTracks.length > 1 && prevIndex === currentTrackIndex) {
-          prevIndex =
-            (prevIndex - 1 + playlistTracks.length) % playlistTracks.length;
-        }
-        setCurrentTrackIndex(prevIndex);
-      } else {
-        setCurrentTrackIndex(
-          (prev) => (prev - 1 + playlistTracks.length) % playlistTracks.length
-        );
-      }
-    }
-  };
-
-  const togglePlayMode = () => {
-    setPlayMode((prev) => {
-      if (prev === "sequence") return "shuffle";
-      if (prev === "shuffle") return "single";
-      return "sequence";
-    });
-  };
-
-  // Handle Volume
-  // const handleVolumeChange = (newVol: number) => {
-  //   setVolume(newVol);
-  //   localStorage.setItem("runtable_bgm_volume", newVol.toString());
-  //   if (audioRef.current) {
-  //     audioRef.current.volume = newVol;
-  //   }
-  //   if (newVol === 0) {
-  //     setIsMuted(true);
-  //   } else if (isMuted) {
-  //     setIsMuted(false);
-  //   }
-  // };
-
-  // Sync Audio Events
-  const onTimeUpdate = () => {
-    if (audioRef.current) {
-      setCurrentTime(audioRef.current.currentTime);
-      setDuration(audioRef.current.duration || 0);
-    }
-  };
-
-  const onEnded = () => {
-    setIsPlaying(false);
-    if (parsedType === 0 && playlistTracks.length > 0) {
-      // Auto play next
-      playNext(true);
-    } else {
-      // Loop single song
-      if (audioRef.current) {
-        audioRef.current.currentTime = 0;
-        audioRef.current.play().catch((e) => {
-          if (e.name !== "AbortError") console.error("Play error:", e);
-        });
-        setIsPlaying(true);
-      }
-    }
-  };
-
-  const handleInputChange = (val: string) => {
-    const parsed = parseMusicInput(val);
-    setInputUrl(parsed.inputUrl);
-    if (parsed.musicType) setMusicType(parsed.musicType);
-  };
-
-  const handleSave = () => {
-    const finalUrl = formatMusicSource(inputUrl, musicType);
-    if (!finalUrl) {
-      onUpdateUrl("");
-      setShowInput(false);
-      return;
-    }
-
-    onUpdateUrl(finalUrl);
-    setShowInput(false);
-  };
-
-  // Format time
-  const formatTime = (time: number) => {
-    if (!time) return "0:00";
-    const m = Math.floor(time / 60);
-    const s = Math.floor(time % 60);
-    return `${m}:${s.toString().padStart(2, "0")}`;
-  };
+    setCurrentTrackIndex,
+    visualTrackIndex,
+    setVisualTrackIndex,
+    isLoadingPlaylist,
+    isLoadingMore,
+    isCollapsed,
+    setIsCollapsed,
+    activeTrackRef,
+    playlistScrollRef,
+    playlistContentRef,
+    loadMoreRef,
+    position,
+    handleMouseDown,
+    hasMoved,
+    fetchPlaylist,
+    loadMoreTracks,
+    togglePlay,
+    playNext,
+    playPrev,
+    togglePlayMode,
+    onTimeUpdate,
+    onEnded,
+    handleAudioError,
+    handleInputChange,
+    handleSave,
+    formatTime,
+    setDuration,
+  } = music;
 
   const containerClass =
     mode === "sidebar"
@@ -595,34 +142,7 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
         }}
         onEnded={onEnded}
         onError={(e) => {
-          const error = e.currentTarget.error;
-          // Ignore abort errors (code 1) which happen during track switching
-          if (error && error.code === 1) return;
-
-          console.error("Audio Load Error", error || e);
-
-          // Retry logic for single song
-          if (parsedType === 2 && parsedId) {
-            if (retryCount === 0) {
-              console.log("Primary URL failed, trying fallback outer URL...");
-              setRetryCount(1);
-              // Use direct outer link for fallback
-              const fallbackUrl = `https://music.163.com/song/media/outer/url?id=${parsedId}.mp3`;
-              if (audioRef.current) {
-                audioRef.current.src = fallbackUrl;
-                audioRef.current
-                  .play()
-                  .catch((err) => console.error("Fallback play error:", err));
-              }
-              return;
-            }
-          }
-
-          if (parsedType === 0) {
-            // Try next song if current fails
-            console.log("Track failed to load, skipping to next...");
-            setTimeout(() => playNext(true), 1500);
-          }
+          handleAudioError(e.currentTarget.error, e);
         }}
         className="hidden"
       />
@@ -631,21 +151,6 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
   const uiContent =
     !isKP && mode === "fixed" ? null : (
       <div className={containerClass} style={containerStyle}>
-        <style>{`
-        @keyframes marquee {
-          0% { transform: translateX(0); }
-          100% { transform: translateX(-50%); }
-        }
-        .animate-marquee {
-          display: inline-block;
-          white-space: nowrap;
-          animation: marquee 10s linear infinite;
-        }
-        .animate-marquee:hover {
-          animation-play-state: paused;
-        }
-      `}</style>
-
         {/* Audio used to be here, now moved out to persist */}
 
         <div className={innerClass}>
@@ -857,27 +362,9 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
                                 ? playlistTracks[currentTrackIndex]?.name ||
                                   "未知歌曲"
                                 : "背景音乐";
-                            // Calculate visual length (Chinese ~ 2, English ~ 1)
-                            const visualLength = trackName
-                              .split("")
-                              .reduce(
-                                (acc: number, char: string) =>
-                                  acc + (char.charCodeAt(0) > 127 ? 2 : 1),
-                                0
-                              );
-                            const shouldScroll = visualLength > 12; // > 6 Chinese chars or 12 English chars
                             return (
-                              <div
-                                className={`text-xs font-bold text-slate-200 absolute top-0 left-0 ${
-                                  shouldScroll
-                                    ? "animate-marquee"
-                                    : "truncate w-full"
-                                }`}
-                              >
-                                <span className="pr-8">{trackName}</span>
-                                {shouldScroll && (
-                                  <span className="pr-8">{trackName}</span>
-                                )}
+                              <div className="text-xs font-bold text-slate-200 truncate w-full">
+                                {trackName}
                               </div>
                             );
                           })()}
@@ -914,13 +401,6 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
                           <button
                             onClick={togglePlayMode}
                             className="w-6 h-6 rounded-full text-slate-400 hover:text-white flex items-center justify-center transition-all mr-1"
-                            title={
-                              playMode === "sequence"
-                                ? "顺序播放"
-                                : playMode === "shuffle"
-                                ? "随机播放"
-                                : "单曲循环"
-                            }
                           >
                             {playMode === "sequence" ? (
                               <Repeat size={14} fill="currentColor" />
@@ -1116,7 +596,6 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
                       <div
                         onClick={togglePlay}
                         className="relative z-10 cursor-pointer group scale-90 sm:scale-100 transition-transform duration-300 active:scale-95"
-                        title={isPlaying ? "点击暂停" : "点击播放"}
                       >
                         {/* Vinyl Disc */}
                         <div
@@ -1300,7 +779,6 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
                                       setCurrentTrackIndex(realIndex);
                                     }
                                   }}
-                                  title={track.name}
                                 >
                                   {track.album?.picUrl || track.al?.picUrl ? (
                                     <img
@@ -1405,7 +883,6 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
                       ? "bg-indigo-600 text-white"
                       : "bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-white"
                   }`}
-                  title="设置背景音乐"
                 >
                   <Music size={20} />
                 </button>
@@ -1423,6 +900,10 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
         {createPortal(uiContent, document.body)}
       </>
     );
+  }
+
+  if (isHidden) {
+    return <>{audioContent}</>;
   }
 
   return (

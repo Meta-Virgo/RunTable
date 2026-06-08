@@ -148,6 +148,7 @@ export function mapMessageToLog(
       minute: "2-digit",
     }),
     createdAt: message.created_at,
+    userId: message.user_id,
     charId: message.character_id || "pc",
     charName,
     charRole,

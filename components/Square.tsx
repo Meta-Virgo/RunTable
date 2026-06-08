@@ -41,6 +41,14 @@ import {
   likeComment,
   unlikeComment,
 } from "../services/square";
+import {
+  applyCommentLikeState,
+  applyPostCommentAdded,
+  applyPostCommentDeleted,
+} from "../services/squareFeedModel";
+import { summarizeMarkdown } from "../services/squareMarkdown";
+import { SquareMarkdown } from "./SquareMarkdown";
+import { SquareMarkdownEditor } from "./SquareMarkdownEditor";
 
 const MAX_POST_LENGTH = 140;
 
@@ -123,16 +131,22 @@ const formatDetailTime = (dateStr: string) => {
 
 const PostContent: React.FC<{ content: string }> = ({ content }) => {
   const [expanded, setExpanded] = useState(false);
-  const shouldTruncate = content.length > MAX_POST_LENGTH;
+  const shouldTruncate =
+    summarizeMarkdown(content, MAX_POST_LENGTH + 1).length > MAX_POST_LENGTH;
 
   return (
-    <div className="text-slate-300 text-sm leading-relaxed mb-2 whitespace-pre-wrap">
-      {shouldTruncate && !expanded
-        ? content.slice(0, MAX_POST_LENGTH) + "..."
-        : content}
+    <div className="mb-2">
+      <div
+        className={cn(
+          "text-slate-300 text-sm leading-relaxed",
+          shouldTruncate && !expanded && "max-h-36 overflow-hidden"
+        )}
+      >
+        <SquareMarkdown source={content} variant="preview" />
+      </div>
       {shouldTruncate && (
         <button
-          className="ml-1 text-indigo-400 hover:text-indigo-300 text-xs font-bold hover:underline"
+          className="mt-1 text-indigo-400 hover:text-indigo-300 text-xs font-bold hover:underline"
           onClick={(e) => {
             e.stopPropagation();
             setExpanded(!expanded);
@@ -411,20 +425,10 @@ export const Square: React.FC<SquareProps> = ({ onScrollChange }) => {
       };
 
       setPosts((prev) =>
-        prev.map((p) => {
-          if (p.id === postId) {
-            // Update latest_comments (prepend)
-            const newLatest = [
-              newCommentObj,
-              ...(p.latest_comments || []),
-            ].slice(0, 1);
-            return {
-              ...p,
-              comment_count: (p.comment_count || 0) + 1,
-              latest_comments: newLatest,
-            };
-          }
-          return p;
+        applyPostCommentAdded({
+          posts: prev,
+          postId,
+          comment: newCommentObj,
         })
       );
     }
@@ -446,34 +450,26 @@ export const Square: React.FC<SquareProps> = ({ onScrollChange }) => {
     if (comment.is_liked) {
       const { error } = await unlikeComment(commentId, currentUser.id);
       if (!error) {
-        setComments((prev) => ({
-          ...prev,
-          [postId]: prev[postId].map((c) =>
-            c.id === commentId
-              ? {
-                  ...c,
-                  like_count: Math.max(0, (c.like_count || 0) - 1),
-                  is_liked: false,
-                }
-              : c
-          ),
-        }));
+        setComments((prev) =>
+          applyCommentLikeState({
+            comments: prev,
+            postId,
+            commentId,
+            liked: false,
+          })
+        );
       }
     } else {
       const { error } = await likeComment(commentId, currentUser.id);
       if (!error) {
-        setComments((prev) => ({
-          ...prev,
-          [postId]: prev[postId].map((c) =>
-            c.id === commentId
-              ? {
-                  ...c,
-                  like_count: (c.like_count || 0) + 1,
-                  is_liked: true,
-                }
-              : c
-          ),
-        }));
+        setComments((prev) =>
+          applyCommentLikeState({
+            comments: prev,
+            postId,
+            commentId,
+            liked: true,
+          })
+        );
 
         if (comment.user_id !== currentUser.id) {
           await createNotification({
@@ -507,14 +503,10 @@ export const Square: React.FC<SquareProps> = ({ onScrollChange }) => {
         [postId]: (prev[postId] || []).filter((x) => x.id !== commentId),
       }));
       setPosts((prev) =>
-        prev.map((p) =>
-          p.id === postId
-            ? {
-                ...p,
-                comment_count: Math.max(0, (p.comment_count || 0) - 1),
-              }
-            : p
-        )
+        applyPostCommentDeleted({
+          posts: prev,
+          postId,
+        })
       );
     }
   };
@@ -791,7 +783,7 @@ export const Square: React.FC<SquareProps> = ({ onScrollChange }) => {
                                 </p>
                                 {n.post?.content && (
                                   <p className="text-xs text-slate-500 truncate mt-1">
-                                    "{n.post.content}"
+                                    "{summarizeMarkdown(n.post.content)}"
                                   </p>
                                 )}
                                 <p className="text-[10px] text-slate-600 mt-1">
@@ -805,7 +797,6 @@ export const Square: React.FC<SquareProps> = ({ onScrollChange }) => {
                                 <button
                                   className="text-slate-500 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity p-1"
                                   onClick={(e) => deleteNotification(e, n.id)}
-                                  title="删除"
                                 >
                                   <Trash2 size={14} />
                                 </button>
@@ -838,20 +829,7 @@ export const Square: React.FC<SquareProps> = ({ onScrollChange }) => {
               onDragOver={(e) => e.preventDefault()}
               onDrop={handleDrop}
             >
-              <div className="flex gap-3 md:gap-4">
-                <div className="w-10 h-10 rounded-full bg-indigo-500/20 flex items-center justify-center shrink-0 overflow-hidden">
-                  {currentUser?.avatar_url ? (
-                    <img
-                      src={currentUser.avatar_url}
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <span className="text-indigo-400 font-bold">
-                      {currentUser?.nickname?.[0] || "?"}
-                    </span>
-                  )}
-                </div>
-                <div className="flex-1 min-w-0">
+              <div className="min-w-0">
                   {pendingImage && (
                     <div className="mb-2 relative inline-block group">
                       <img
@@ -867,14 +845,17 @@ export const Square: React.FC<SquareProps> = ({ onScrollChange }) => {
                       </button>
                     </div>
                   )}
-                  <textarea
-                    className="w-full bg-transparent border-none focus:ring-0 outline-none text-slate-200 placeholder:text-slate-500 resize-none min-h-[80px] custom-scrollbar"
+                  <SquareMarkdownEditor
                     placeholder={`在 #${
                       activeChannel?.name || "..."
                     } 发起讨论...`}
                     value={newPostContent}
-                    onChange={(e) => setNewPostContent(e.target.value)}
+                    onChange={setNewPostContent}
                     onPaste={handlePaste}
+                    showModeSwitch={false}
+                    renderedEditing
+                    textareaClassName="min-h-[80px]"
+                    previewVariant="preview"
                   />
                   <div className="flex justify-between items-center mt-2 pt-2 border-t border-white/5 relative z-20">
                     <div className="flex gap-2">
@@ -902,7 +883,6 @@ export const Square: React.FC<SquareProps> = ({ onScrollChange }) => {
                     </Button>
                   </div>
                 </div>
-              </div>
             </div>
 
             {/* Posts */}
@@ -935,7 +915,6 @@ export const Square: React.FC<SquareProps> = ({ onScrollChange }) => {
                     <div className="w-10 h-10 rounded-full bg-slate-700 flex items-center justify-center text-slate-300 font-bold shrink-0 overflow-hidden">
                       <button
                         className="w-full h-full"
-                        title="查看资料"
                         onClick={() => openProfile(post.user_id)}
                       >
                         {post.profiles?.avatar_url ? (
@@ -1071,8 +1050,8 @@ export const Square: React.FC<SquareProps> = ({ onScrollChange }) => {
                                     <span className="font-bold text-slate-200 mr-2 shrink-0">
                                       {c.profiles?.nickname || "未知"}:
                                     </span>
-                                    <span className="line-clamp-2 break-all whitespace-pre-wrap">
-                                      {c.content}
+                                    <span className="line-clamp-2 break-all">
+                                      {summarizeMarkdown(c.content)}
                                     </span>
                                   </div>
                                 ))}
@@ -1535,8 +1514,8 @@ const PostDetailModal: React.FC<{
       <div className="flex-1 overflow-y-auto custom-scrollbar">
         <div className="p-4">
           {/* Content */}
-          <div className="text-slate-200 text-base leading-relaxed whitespace-pre-wrap mb-4">
-            {post.content}
+          <div className="text-slate-200 text-base leading-relaxed mb-4">
+            <SquareMarkdown source={post.content} variant="detail" />
           </div>
 
           {post.image_url && (
@@ -1633,11 +1612,14 @@ const PostDetailModal: React.FC<{
                             <span className="font-bold text-slate-400">
                               @{comment.quote.profiles?.nickname || "未知用户"}:
                             </span>{" "}
-                            {comment.quote.content}
+                            {summarizeMarkdown(comment.quote.content, 80)}
                           </div>
                         )}
-                        <div className="text-sm text-slate-200 whitespace-pre-wrap leading-relaxed">
-                          {comment.content}
+                        <div className="text-sm text-slate-200 leading-relaxed">
+                          <SquareMarkdown
+                            source={comment.content}
+                            variant="comment"
+                          />
                         </div>
                         <div className="flex items-center gap-3 text-xs text-slate-500 mt-1">
                           <span>{formatTime(comment.created_at)}</span>
@@ -1715,17 +1697,21 @@ const PostDetailModal: React.FC<{
           </div>
         )}
         <div className="flex items-center gap-3">
-          <div className="flex-1 bg-slate-800/50 rounded-full px-4 py-2 flex items-center gap-2 cursor-text border border-transparent hover:border-slate-700 transition-colors">
-            <textarea
-              className="bg-transparent border-none outline-none text-sm text-slate-200 placeholder:text-slate-500 flex-1 resize-none leading-snug"
+          <div className="flex-1 bg-slate-800/50 rounded-xl px-3 py-2 cursor-text border border-transparent hover:border-slate-700 transition-colors">
+            <SquareMarkdownEditor
+              value={newComment}
+              onChange={setNewComment}
               placeholder={
                 replyTo
                   ? `回复 @${replyTo.profiles?.nickname || "..."}...`
                   : "发言要友善，畅聊不引战"
               }
-              value={newComment}
-              onChange={(e) => setNewComment(e.target.value)}
               rows={1}
+              showToolbar={false}
+              showModeSwitch={false}
+              previewVariant="comment"
+              textareaClassName="text-sm leading-snug"
+              maxHeight={120}
             />
           </div>
           <Button

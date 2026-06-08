@@ -39,6 +39,12 @@ export const useElasticScroll = (
 
     const handleWheel = (e: WheelEvent) => {
       if (e.defaultPrevented) return;
+      if (
+        e.target instanceof Element &&
+        e.target.closest("[data-elastic-scroll-ignore='true']")
+      ) {
+        return;
+      }
 
       const { scrollTop, scrollHeight, clientHeight } = scrollEl;
       const isAtTop = scrollTop <= 0;

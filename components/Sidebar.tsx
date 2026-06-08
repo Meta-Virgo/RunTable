@@ -1,4 +1,4 @@
-import React from "react";
+﻿import React from "react";
 import {
   Dice5,
   MessageSquare,
@@ -129,7 +129,6 @@ const MicrophoneButton = ({ isOpen }: { isOpen: boolean }) => {
           : "text-rose-400 hover:text-white hover:bg-white/5 border-transparent",
         !isOpen && "justify-center"
       )}
-      title={enabled ? "静音" : "取消静音"}
     >
       {enabled ? (
         <Mic
@@ -419,7 +418,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     : "text-slate-400 hover:text-white hover:bg-white/5 border border-transparent",
                   !isOpen && "justify-center"
                 )}
-                title={nav.label}
               >
                 <nav.icon
                   size={20}

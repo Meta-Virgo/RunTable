@@ -1,6 +1,6 @@
-import { Dispatch, MutableRefObject, SetStateAction, useEffect } from "react";
+import { MutableRefObject, useEffect } from "react";
 import { supabase } from "../supabase";
-import { Character, Log, ModuleInfo } from "../types";
+import { Character, Log } from "../types";
 import { mapCharacterRow, mergeCharacterRow } from "../utils/characterMapper";
 import {
   fetchLatestMessages,
@@ -15,16 +15,21 @@ interface UseRoomRealtimeOptions {
   userNickname: string;
   pageSize: number;
   charactersRef: MutableRefObject<Character[]>;
-  setCharacters: Dispatch<SetStateAction<Character[]>>;
-  setLogs: Dispatch<SetStateAction<Log[]>>;
-  setHasMoreLogs: Dispatch<SetStateAction<boolean>>;
-  setModuleInfo: Dispatch<SetStateAction<ModuleInfo>>;
-  setBgMusicUrl: Dispatch<SetStateAction<string | null>>;
-  setIsMusicPlaying: Dispatch<SetStateAction<boolean>>;
-  setMusicTrackIndex: Dispatch<SetStateAction<number>>;
-  setOnlineUsers: Dispatch<SetStateAction<Set<string>>>;
+  adapter: RoomRealtimeAdapter;
   onKicked: () => void;
   onRoomDeleted: () => void;
+}
+
+export interface RoomRealtimeAdapter {
+  replaceCharacters: (characters: Character[]) => void;
+  upsertCharacter: (character: Character) => void;
+  mergeCharacter: (row: any) => void;
+  replaceLogs: (logs: Log[]) => void;
+  appendLog: (log: Log) => void;
+  removeLog: (logId: string) => void;
+  setHasMoreLogs: (hasMore: boolean) => void;
+  applyRoomPatch: (room: any) => void;
+  syncPresence: (userIds: Set<string>) => void;
 }
 
 export function isKickMessageForUser(message: any, userId: string) {
@@ -35,30 +40,37 @@ export function isKickMessageForUser(message: any, userId: string) {
   );
 }
 
+export function createRealtimeLifecycleGuard() {
+  let active = true;
+
+  return {
+    isActive: () => active,
+    cancel: () => {
+      active = false;
+    },
+  };
+}
+
 export function useRoomRealtime({
   currentRoomId,
   userId,
   userNickname,
   pageSize,
   charactersRef,
-  setCharacters,
-  setLogs,
-  setHasMoreLogs,
-  setModuleInfo,
-  setBgMusicUrl,
-  setIsMusicPlaying,
-  setMusicTrackIndex,
-  setOnlineUsers,
+  adapter,
   onKicked,
   onRoomDeleted,
 }: UseRoomRealtimeOptions) {
   useEffect(() => {
     if (!currentRoomId || !userId) return;
 
+    const lifecycle = createRealtimeLifecycleGuard();
+
     const fetchCharacters = async () => {
       const { data: chars } = await fetchRoomCharacters(currentRoomId);
+      if (!lifecycle.isActive()) return;
       if (chars) {
-        setCharacters(chars.map(mapCharacterRow));
+        adapter.replaceCharacters(chars.map(mapCharacterRow));
       }
     };
     fetchCharacters();
@@ -73,14 +85,17 @@ export function useRoomRealtime({
         console.error("Error fetching messages:", msgError);
       }
 
+      if (!lifecycle.isActive()) return;
+
       if (msgs && msgs.length > 0) {
         msgs.reverse();
         const formattedLogs = await mapMessagesToLogs(msgs, userId);
-        setHasMoreLogs(msgs.length === pageSize);
-        setLogs(formattedLogs);
+        if (!lifecycle.isActive()) return;
+        adapter.setHasMoreLogs(msgs.length === pageSize);
+        adapter.replaceLogs(formattedLogs);
       } else {
-        setLogs([]);
-        setHasMoreLogs(false);
+        adapter.replaceLogs([]);
+        adapter.setHasMoreLogs(false);
       }
     };
     fetchMessages();
@@ -96,6 +111,7 @@ export function useRoomRealtime({
           filter: `room_id=eq.${currentRoomId}`,
         },
         async (payload) => {
+          if (!lifecycle.isActive()) return;
           const msg = payload.new as any;
 
           if (isKickMessageForUser(msg, userId)) {
@@ -110,10 +126,8 @@ export function useRoomRealtime({
             charactersRef.current
           );
 
-          setLogs((prev) => {
-            if (prev.some((log) => log.id === newLog.id)) return prev;
-            return [...prev, newLog];
-          });
+          if (!lifecycle.isActive()) return;
+          adapter.appendLog(newLog);
         }
       )
       .on(
@@ -125,13 +139,9 @@ export function useRoomRealtime({
           filter: `room_id=eq.${currentRoomId}`,
         },
         (payload) => {
+          if (!lifecycle.isActive()) return;
           const newChar = payload.new as any;
-          setCharacters((prev) => {
-            if (prev.find((character) => character.id === newChar.id)) {
-              return prev;
-            }
-            return [...prev, mapCharacterRow(newChar)];
-          });
+          adapter.upsertCharacter(mapCharacterRow(newChar));
         }
       )
       .on(
@@ -143,22 +153,9 @@ export function useRoomRealtime({
           filter: `room_id=eq.${currentRoomId}`,
         },
         (payload) => {
+          if (!lifecycle.isActive()) return;
           const newChar = payload.new as any;
-          const exists = charactersRef.current.some(
-            (character) => character.id === newChar.id
-          );
-
-          if (exists) {
-            setCharacters((prev) =>
-              prev.map((character) =>
-                character.id === newChar.id
-                  ? mergeCharacterRow(character, newChar)
-                  : character
-              )
-            );
-          } else {
-            setCharacters((prev) => [...prev, mapCharacterRow(newChar)]);
-          }
+          adapter.mergeCharacter(newChar);
         }
       )
       .on(
@@ -170,8 +167,9 @@ export function useRoomRealtime({
           filter: `room_id=eq.${currentRoomId}`,
         },
         (payload) => {
+          if (!lifecycle.isActive()) return;
           const deletedId = payload.old.id;
-          setLogs((prev) => prev.filter((log) => log.id !== deletedId));
+          adapter.removeLog(deletedId);
         }
       )
       .on(
@@ -183,6 +181,7 @@ export function useRoomRealtime({
           filter: `id=eq.${currentRoomId}`,
         },
         () => {
+          if (!lifecycle.isActive()) return;
           alert("房间已被房主解散");
           onRoomDeleted();
         }
@@ -196,27 +195,13 @@ export function useRoomRealtime({
           filter: `id=eq.${currentRoomId}`,
         },
         (payload) => {
+          if (!lifecycle.isActive()) return;
           const newRoom = payload.new as any;
-          if (newRoom.bg_music_url !== undefined) {
-            setBgMusicUrl(newRoom.bg_music_url);
-          }
-          if (newRoom.is_music_playing !== undefined) {
-            setIsMusicPlaying(newRoom.is_music_playing);
-          }
-          if (newRoom.music_track_index !== undefined) {
-            setMusicTrackIndex(newRoom.music_track_index);
-          }
-          setModuleInfo((prev) => ({
-            ...prev,
-            title: newRoom.title !== undefined ? newRoom.title : prev.title,
-            description:
-              newRoom.description !== undefined
-                ? newRoom.description
-                : prev.description,
-          }));
+          adapter.applyRoomPatch(newRoom);
         }
       )
       .on("presence", { event: "sync" }, () => {
+        if (!lifecycle.isActive()) return;
         const newState = channel.presenceState();
         const userIds = new Set<string>();
         for (const id in newState) {
@@ -224,9 +209,10 @@ export function useRoomRealtime({
             if (presence.user_id) userIds.add(presence.user_id);
           });
         }
-        setOnlineUsers(userIds);
+        adapter.syncPresence(userIds);
       })
       .subscribe(async (status) => {
+        if (!lifecycle.isActive()) return;
         if (status === "SUBSCRIBED") {
           await channel.track({
             user_id: userId,
@@ -236,23 +222,84 @@ export function useRoomRealtime({
       });
 
     return () => {
+      lifecycle.cancel();
       supabase.removeChannel(channel);
     };
   }, [
+    adapter,
     charactersRef,
     currentRoomId,
     onKicked,
     onRoomDeleted,
     pageSize,
-    setBgMusicUrl,
-    setCharacters,
-    setHasMoreLogs,
-    setIsMusicPlaying,
-    setLogs,
-    setModuleInfo,
-    setMusicTrackIndex,
-    setOnlineUsers,
     userId,
     userNickname,
   ]);
+}
+
+export function createRoomRealtimeAdapter(input: {
+  getCharacters: () => Character[];
+  replaceCharacters: (updater: (previous: Character[]) => Character[]) => void;
+  replaceLogs: (updater: (previous: Log[]) => Log[]) => void;
+  setHasMoreLogs: (hasMore: boolean) => void;
+  updateModuleInfo: (updater: (previous: any) => any) => void;
+  setBgMusicUrl: (url: string | null) => void;
+  setIsMusicPlaying: (isPlaying: boolean) => void;
+  setMusicTrackIndex: (trackIndex: number) => void;
+  syncPresence: (userIds: Set<string>) => void;
+}): RoomRealtimeAdapter {
+  return {
+    replaceCharacters: (characters) => input.replaceCharacters(() => characters),
+    upsertCharacter: (character) => {
+      input.replaceCharacters((previous) => {
+        if (previous.some((item) => item.id === character.id)) return previous;
+        return [...previous, character];
+      });
+    },
+    mergeCharacter: (row) => {
+      const exists = input
+        .getCharacters()
+        .some((character) => character.id === row.id);
+
+      if (exists) {
+        input.replaceCharacters((previous) =>
+          previous.map((character) =>
+            character.id === row.id ? mergeCharacterRow(character, row) : character
+          )
+        );
+        return;
+      }
+
+      input.replaceCharacters((previous) => [...previous, mapCharacterRow(row)]);
+    },
+    replaceLogs: (logs) => input.replaceLogs(() => logs),
+    appendLog: (log) => {
+      input.replaceLogs((previous) => {
+        if (previous.some((item) => item.id === log.id)) return previous;
+        return [...previous, log];
+      });
+    },
+    removeLog: (logId) => {
+      input.replaceLogs((previous) => previous.filter((log) => log.id !== logId));
+    },
+    setHasMoreLogs: input.setHasMoreLogs,
+    applyRoomPatch: (room) => {
+      if (room.bg_music_url !== undefined) {
+        input.setBgMusicUrl(room.bg_music_url);
+      }
+      if (room.is_music_playing !== undefined) {
+        input.setIsMusicPlaying(room.is_music_playing);
+      }
+      if (room.music_track_index !== undefined) {
+        input.setMusicTrackIndex(room.music_track_index);
+      }
+      input.updateModuleInfo((previous) => ({
+        ...previous,
+        title: room.title !== undefined ? room.title : previous.title,
+        description:
+          room.description !== undefined ? room.description : previous.description,
+      }));
+    },
+    syncPresence: input.syncPresence,
+  };
 }

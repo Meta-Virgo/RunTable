@@ -28,7 +28,7 @@ export const Button: React.FC<ButtonProps> = ({
   className = "",
   icon: Icon,
   disabled,
-  title,
+  title: _title,
   size = "md",
   active,
   type = "button",
@@ -63,7 +63,6 @@ export const Button: React.FC<ButtonProps> = ({
       type={type}
       onClick={onClick}
       disabled={disabled}
-      title={title}
       className={cn(
         "flex items-center justify-center rounded-xl font-semibold transition-all duration-200 active:scale-95 disabled:opacity-50 disabled:active:scale-100",
         sizeClasses[size],
@@ -266,6 +265,7 @@ interface ModalProps {
   title?: React.ReactNode;
   icon?: LucideIcon;
   headerClassName?: string;
+  instant?: boolean;
 }
 
 export const Modal: React.FC<ModalProps> = ({
@@ -275,16 +275,23 @@ export const Modal: React.FC<ModalProps> = ({
   title,
   icon: Icon,
   headerClassName,
+  instant = false,
 }) => {
   return createPortal(
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 animate-fade-in">
+    <div
+      className={cn(
+        "fixed inset-0 z-[100] flex items-center justify-center p-4",
+        !instant && "animate-fade-in"
+      )}
+    >
       <div
         className="absolute inset-0 bg-black/80 backdrop-blur-sm"
         onClick={onClose}
       ></div>
       <div
         className={cn(
-          "glass-panel bg-[#0f172a] rounded-3xl w-full relative z-10 overflow-hidden animate-slide-up shadow-2xl flex flex-col max-h-[90vh]",
+          "glass-panel bg-[#0f172a] rounded-3xl w-full relative z-10 overflow-hidden shadow-2xl flex flex-col max-h-[90vh]",
+          !instant && "animate-slide-up",
           className
         )}
       >

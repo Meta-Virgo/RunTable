@@ -11,7 +11,7 @@ export async function fetchProfileSummary(userId: string) {
 export async function fetchProfileDetails(userId: string) {
   return supabase
     .from("profiles")
-    .select("user_code, nickname, bio, created_at, is_vip, avatar_url")
+    .select("id, user_code, nickname, bio, created_at, is_vip, avatar_url, level")
     .eq("id", userId)
     .single();
 }

@@ -78,27 +78,26 @@ const App: React.FC = () => {
   // Level System
   const levelInfo = useLevelSystem(session);
 
+  const roomSession = useRoomSessionState({
+    userId: session?.user?.id,
+    userNickname,
+    pageSize: PAGE_SIZE,
+    voiceAccessToken: session?.access_token,
+  });
   const {
     currentRoomId,
     roomType,
     token,
     voiceConnectionStatus,
-    setVoiceConnectionStatus,
     voiceError,
-    setVoiceError,
     characters,
-    setCharacters,
     derivedCharacters,
     logs,
     hasMoreLogs,
     isLoadingMore,
-    loadMoreLogs,
     moduleInfo,
-    setModuleInfo,
     roomPassword,
-    setRoomPassword,
     activeCharId,
-    setActiveCharId,
     isKP,
     roomMemberItems,
     kpId,
@@ -106,6 +105,8 @@ const App: React.FC = () => {
     bgMusicUrl,
     isMusicPlaying,
     musicTrackIndex,
+  } = roomSession.snapshot;
+  const {
     restoreRoomFromUrl,
     joinRoomSession,
     leaveCurrentRoom,
@@ -119,13 +120,18 @@ const App: React.FC = () => {
     concludeCurrentRoom,
     updateMusicUrl,
     updateMusicState,
+    loadMoreLogs,
     clearRoomSession,
-  } = useRoomSessionState({
-    userId: session?.user?.id,
-    userNickname,
-    pageSize: PAGE_SIZE,
-    voiceAccessToken: session?.access_token,
-  });
+  } = roomSession.actions;
+  const {
+    replaceCharacters,
+    selectActiveCharacter,
+    applyModuleSettings,
+    markVoiceConnected,
+    markVoiceReconnecting,
+    markVoiceDisconnected,
+    markVoiceError,
+  } = roomSession.localUpdates;
 
   // Application State
   const [view, setView] = useState("main");
@@ -186,9 +192,8 @@ const App: React.FC = () => {
     currentRoomId,
     userId: session?.user?.id,
     characters,
-    activeCharId,
-    setCharacters,
-    setActiveCharId,
+    setCharacters: replaceCharacters,
+    setActiveCharId: selectActiveCharacter,
     addLog,
   });
 
@@ -437,7 +442,7 @@ const App: React.FC = () => {
         view={view}
         setView={setView}
         activeCharId={activeCharId}
-        setActiveCharId={setActiveCharId}
+        setActiveCharId={selectActiveCharacter}
         characters={derivedCharacters}
         onOpenStatusEdit={(id) => {
           setStatusTargetId(id);
@@ -579,7 +584,6 @@ const App: React.FC = () => {
           />
         ) : null}
 
-        {/* Music Player (Persistent) */}
         <MusicPlayer
           url={bgMusicUrl}
           isKP={isKP}
@@ -632,8 +636,7 @@ const App: React.FC = () => {
                 }
               }
               // Local update for immediate feedback (Realtime will also trigger)
-              setModuleInfo(info);
-              if (password !== undefined) setRoomPassword(password);
+              applyModuleSettings(info, password);
             }
           }}
           onClose={() => setShowModuleModal(false)}
@@ -703,23 +706,19 @@ const App: React.FC = () => {
         video={false}
         data-lk-theme="default"
         onConnected={() => {
-          setVoiceConnectionStatus("connected");
-          setVoiceError(null);
+          markVoiceConnected();
         }}
         onDisconnected={() => {
           if (isPageHidden) {
-            setVoiceConnectionStatus("connecting");
-            setVoiceError(null);
+            markVoiceReconnecting();
             return;
           }
 
-          setVoiceConnectionStatus("disconnected");
-          setVoiceError("语音连接已断开，正在尝试保持当前房间连接。");
+          markVoiceDisconnected("语音连接已断开，正在尝试保持当前房间连接。");
         }}
         onError={(error) => {
           console.error("LiveKit Error:", error);
-          setVoiceConnectionStatus("error");
-          setVoiceError(error.message || "语音房间连接异常");
+          markVoiceError(error.message || "语音房间连接异常");
         }}
       >
         {appContent}

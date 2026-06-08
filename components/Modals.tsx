@@ -352,7 +352,6 @@ const ItemListEditor: React.FC<{
             <div className="flex items-center justify-between">
               <span
                 className="text-sm text-slate-300 font-medium truncate flex-1 mr-2"
-                title={item.name}
               >
                 {item.name}
               </span>
@@ -375,14 +374,12 @@ const ItemListEditor: React.FC<{
                         <button
                           onClick={() => handleEdit(idx)}
                           className="p-1 hover:text-indigo-400 text-slate-500 transition-colors"
-                          title="编辑"
                         >
                           <Edit size={12} />
                         </button>
                         <button
                           onClick={() => handleRemove(idx)}
                           className="p-1 hover:text-red-400 text-slate-500 transition-colors"
-                          title="删除"
                         >
                           <Trash2 size={12} />
                         </button>
@@ -804,7 +801,6 @@ export const CharacterModal: React.FC<{
                   <div className="flex justify-between items-center">
                     <span
                       className="text-xs text-slate-300 font-bold truncate"
-                      title={name}
                     >
                       {name}
                     </span>

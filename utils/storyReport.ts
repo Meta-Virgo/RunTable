@@ -16,20 +16,58 @@ export interface SessionReport {
 }
 
 function getDisplayName(log: Log) {
-  return log.charRole === "Keeper" ? "Keeper" : log.charName;
+  return log.charRole === "Keeper" ? "守秘人" : log.charName;
 }
 
 function parseDiceText(log: Log, secret: boolean) {
   try {
     const dice = JSON.parse(log.content);
-    const name = dice.checkName ? ` ${dice.checkName}` : "";
-    const details = Array.isArray(dice.details)
-      ? ` [${dice.details.join(", ")}]`
+    const total = dice.total ?? log.content;
+    const expression = dice.expression || `${dice.count || 1}D${dice.type || 100}`;
+    const target =
+      dice.checkTarget !== undefined && dice.checkTarget !== null
+        ? `/${dice.checkTarget}`
+        : "";
+    const result = dice.checkResult
+      ? `，${formatCheckResult(dice.checkResult)}`
       : "";
-    return `${secret ? "secret roll" : "public roll"}${name}: ${dice.total}${details}`;
+    const prefix = dice.checkName
+      ? `${secret ? "暗骰：" : ""}${dice.checkName}检定`
+      : secret
+      ? "暗骰"
+      : "掷骰";
+    return `${prefix}：${expression} = ${total}${target}${result}`;
   } catch {
-    return `${secret ? "secret roll" : "public roll"}: ${log.content}`;
+    return `${secret ? "暗骰" : "掷骰"}：${log.content}`;
   }
+}
+
+function formatCheckResult(result: string) {
+  switch (result) {
+    case "critical_success":
+      return "大成功";
+    case "success":
+      return "成功";
+    case "failure":
+      return "失败";
+    case "critical_failure":
+      return "大失败";
+    default:
+      return result;
+  }
+}
+
+function formatReportTime(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+
+  return date.toLocaleString("zh-CN", {
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
 }
 
 function toReportEntry(log: Log, secret = false): SessionReportEntry {
@@ -51,7 +89,7 @@ function toReportEntry(log: Log, secret = false): SessionReportEntry {
       at: log.createdAt,
       actor,
       kind: "image",
-      text: `image handout: ${log.content}`,
+      text: `展示图片：${log.content}`,
     };
   }
 
@@ -68,7 +106,7 @@ function renderMarkdown(entries: SessionReportEntry[]) {
   if (entries.length === 0) return "No reportable entries.";
 
   return entries
-    .map((entry) => `- ${entry.at} [${entry.actor}] ${entry.text}`)
+    .map((entry) => `${formatReportTime(entry.at)} ${entry.actor} ${entry.text}`)
     .join("\n");
 }
 

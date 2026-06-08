@@ -131,6 +131,7 @@ export interface Log {
   id: string;
   timestamp: string;
   createdAt: string; // ISO String for sorting/pagination
+  userId?: string;
   charId: string;
   charName: string;
   charRole: string;

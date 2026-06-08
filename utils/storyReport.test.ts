@@ -29,12 +29,12 @@ describe("session report generation", () => {
       "2",
       "5",
     ]);
-    expect(report.publicMarkdown).toContain("The door opens.");
-    expect(report.publicMarkdown).toContain("public roll");
-    expect(report.publicMarkdown).toContain("image handout");
+    expect(report.publicMarkdown).toContain("06/07 20:01 Alice The door opens.");
+    expect(report.publicMarkdown).toContain("Alice Spot Hidden检定：1D100 = 41");
+    expect(report.publicMarkdown).toContain("Alice 展示图片：https://example.com/handout.png");
     expect(report.publicMarkdown).not.toContain("private whisper");
     expect(report.publicMarkdown).not.toContain("Hidden cultist");
-    expect(report.keeperOnlyMarkdown).toContain("secret roll");
+    expect(report.keeperOnlyMarkdown).toContain("Alice 暗骰：Hidden cultist检定");
     expect(report.keeperOnlyMarkdown).toContain("Hidden cultist");
   });
 });

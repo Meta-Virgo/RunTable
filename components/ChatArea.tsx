@@ -17,11 +17,12 @@ import {
   Trash2,
   Quote,
 } from "lucide-react";
-import { cn, Button, NumberStepper } from "./UI";
-import { Log, Character, ModuleInfo } from "../types";
+import { cn, Button, Modal, NumberStepper } from "./UI";
+import { Log, Character, ModuleInfo, Profile } from "../types";
 import { Lock, Unlock, Sparkles, RefreshCw } from "lucide-react";
 import { callDeepSeekAI, buildContext } from "../services/ai";
 import { useElasticScroll } from "../hooks/useElasticScroll";
+import { fetchProfileDetails } from "../services/profiles";
 
 interface ChatAreaProps {
   logs: Log[];
@@ -108,6 +109,10 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   const [showSkillSelect, setShowSkillSelect] = useState(false);
   const [activeMessageId, setActiveMessageId] = useState<string | null>(null);
   const [menuPosition, setMenuPosition] = useState<React.CSSProperties>({});
+  const [selectedProfile, setSelectedProfile] = useState<Profile | null>(null);
+  const [profileLoadingUserId, setProfileLoadingUserId] = useState<string | null>(
+    null
+  );
   const diceButtonRef = useRef<HTMLButtonElement>(null);
   const attrButtonRef = useRef<HTMLButtonElement>(null);
   const skillButtonRef = useRef<HTMLButtonElement>(null);
@@ -313,6 +318,21 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
     setInputText("");
     setQuoteMessage(null);
     setActiveMessageId(null);
+  };
+
+  const openUserProfile = async (userId?: string | null) => {
+    if (!userId || profileLoadingUserId) return;
+
+    setProfileLoadingUserId(userId);
+    const { data, error } = await fetchProfileDetails(userId);
+    setProfileLoadingUserId(null);
+
+    if (error || !data) {
+      alert("用户信息加载失败，请稍后重试");
+      return;
+    }
+
+    setSelectedProfile(data as Profile);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -570,7 +590,6 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                       <button
                         onClick={() => onDeleteMessage(log.id)}
                         className="p-2 text-slate-600 hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100"
-                        title="撤回"
                       >
                         <Trash2 size={16} />
                       </button>
@@ -599,6 +618,9 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                 ? "text-indigo-400"
                 : "text-purple-400";
 
+            const logCharacter = characters.find((char) => char.id === log.charId);
+            const profileUserId = log.userId || logCharacter?.user_id || null;
+
             // DisplayName is already calculated above
 
             return (
@@ -610,11 +632,15 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                 )}
               >
                 <div className="mt-1 shrink-0">
-                  <div
+                  <button
+                    type="button"
+                    disabled={!profileUserId || profileLoadingUserId === profileUserId}
+                    onClick={() => openUserProfile(profileUserId)}
                     className={cn(
                       "rounded-lg bg-slate-800/80 border border-slate-700/50 shadow-lg relative overflow-hidden flex items-center justify-center",
                       log.charAvatar ? "w-9 h-9 p-0" : "p-1.5 md:p-2",
-                      !log.charAvatar && iconColor
+                      !log.charAvatar && iconColor,
+                      profileUserId ? "cursor-pointer" : "cursor-default"
                     )}
                   >
                     {log.charAvatar ? (
@@ -626,7 +652,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                     ) : (
                       getCharIcon(log.charRole, 20)
                     )}
-                  </div>
+                  </button>
                 </div>
                 <div
                   className={cn(
@@ -718,7 +744,6 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                           setActiveMessageId(null);
                         }}
                         className="p-1.5 text-slate-500 hover:text-indigo-400 transition-all"
-                        title="引用"
                       >
                         <Quote size={14} />
                       </button>
@@ -729,7 +754,6 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                             setActiveMessageId(null);
                           }}
                           className="p-1.5 text-slate-500 hover:text-red-400 transition-all"
-                          title="撤回"
                         >
                           <Trash2 size={14} />
                         </button>
@@ -828,7 +852,6 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                             }
                           }}
                           className="flex items-center justify-center px-3 bg-[#020617] border border-slate-700 rounded-xl h-10 shadow-sm hover:border-slate-500 transition-all active:bg-slate-900 group min-w-[3.5rem]"
-                          title="属性判定"
                         >
                           <span className="text-sm font-bold text-slate-300 font-mono group-hover:text-white">
                             属性
@@ -889,7 +912,6 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                             }
                           }}
                           className="flex items-center justify-center px-3 bg-[#020617] border border-slate-700 rounded-xl h-10 shadow-sm hover:border-slate-500 transition-all active:bg-slate-900 group min-w-[3.5rem]"
-                          title="技能判定"
                         >
                           <span className="text-sm font-bold text-slate-300 font-mono group-hover:text-white">
                             技能
@@ -1007,7 +1029,6 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                           ? "bg-purple-500/20 text-purple-400 border-purple-500/50"
                           : "bg-transparent text-slate-400 border-transparent hover:bg-slate-800 hover:text-indigo-400"
                       )}
-                      title={isSecret ? "暗骰模式已开启" : "开启暗骰模式"}
                     >
                       {isSecret ? <EyeOff size={20} /> : <Eye size={20} />}
                     </button>
@@ -1016,7 +1037,6 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                   <button
                     onClick={() => onRollDice(diceCount, diceType, isSecret)}
                     className="p-2 md:p-1.5 hover:bg-slate-800 rounded-xl text-slate-400 hover:text-indigo-400 transition-colors h-10 w-10 flex items-center justify-center border border-transparent hover:border-slate-700 shrink-0"
-                    title="投掷"
                   >
                     <Dice5 size={20} />
                   </button>
@@ -1025,7 +1045,6 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                   <button
                     onClick={onShowStory}
                     className="p-2 text-slate-500 hover:text-slate-300 transition-colors hover:bg-white/5 rounded-lg shrink-0"
-                    title="战报预览"
                   >
                     <FileText size={18} />
                   </button>
@@ -1034,7 +1053,6 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                   <button
                     onClick={() => setShowAIModal(true)}
                     className="p-2 text-purple-400 hover:text-purple-300 transition-colors hover:bg-purple-500/10 rounded-lg shrink-0"
-                    title="AI 辅助"
                   >
                     <Sparkles size={18} />
                   </button>
@@ -1157,7 +1175,6 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                       ? "bg-indigo-500/10 border-indigo-500/30 text-indigo-300 hover:bg-indigo-500/20"
                       : "bg-slate-900 border-slate-700 text-slate-400 hover:border-slate-500 hover:text-slate-300"
                   )}
-                  title="选择发送对象"
                 >
                   {recipientId ? (
                     <Lock size={14} className="opacity-70" />
@@ -1182,6 +1199,55 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
           </div>
         </div>
       </div>
+
+      {selectedProfile && (
+        <Modal
+          onClose={() => setSelectedProfile(null)}
+          className="max-w-md"
+          title="用户信息"
+        >
+          <div className="p-6">
+            <div className="flex items-start gap-4">
+              <div className="h-16 w-16 shrink-0 overflow-hidden rounded-2xl border border-white/10 bg-slate-800">
+                {selectedProfile.avatar_url ? (
+                  <img
+                    src={selectedProfile.avatar_url}
+                    alt={selectedProfile.nickname || "用户头像"}
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  <div className="flex h-full w-full items-center justify-center text-xl font-bold text-indigo-300">
+                    {selectedProfile.nickname?.[0] || "?"}
+                  </div>
+                )}
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <h3 className="truncate text-lg font-bold text-white">
+                    {selectedProfile.nickname || "未知用户"}
+                  </h3>
+                  {selectedProfile.is_vip && (
+                    <span className="rounded border border-purple-400/30 bg-purple-500/15 px-1.5 py-0.5 text-[10px] font-bold text-purple-200">
+                      VIP
+                    </span>
+                  )}
+                  <span className="rounded bg-slate-800 px-1.5 py-0.5 text-[10px] font-bold text-slate-300">
+                    LV.{selectedProfile.level || 1}
+                  </span>
+                </div>
+                {selectedProfile.user_code && (
+                  <p className="mt-1 text-xs font-mono text-slate-500">
+                    UID: {selectedProfile.user_code}
+                  </p>
+                )}
+              </div>
+            </div>
+            <div className="mt-5 rounded-xl border border-white/10 bg-slate-950/50 p-4 text-sm leading-relaxed text-slate-300">
+              {selectedProfile.bio || "这个人很神秘，什么都没有写..."}
+            </div>
+          </div>
+        </Modal>
+      )}
 
       {/* AI Modal */}
       {showAIModal && (
