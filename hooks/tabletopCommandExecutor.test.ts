@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createTabletopCommandExecutor } from "./tabletopCommandExecutor";
+import { createTabletopCommandExecutor } from "../services/tabletopCommandExecutor";
 import type { Character, Log } from "../types";
 
 const investigator = {

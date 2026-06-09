@@ -7,7 +7,6 @@ import {
   Check,
   Trash2,
   AlertTriangle,
-  Copy,
   FileText,
   X,
   LogOut,
@@ -17,155 +16,15 @@ import {
   Minus,
   Edit,
 } from "lucide-react";
-import { Modal, Input, Textarea, Button, NumberStepper, cn } from "./UI";
-import { AvatarUpload } from "./AvatarUpload";
-import { AttributeRadar } from "./AttributeRadar";
-import { ModuleInfo, Character, InventoryItem } from "../types";
-import { calculateDBAndBuild } from "../utils/cocRules";
-
-const ATTR_MAP = [
-  { key: "str", label: "力量 STR" },
-  { key: "con", label: "体质 CON" },
-  { key: "siz", label: "体型 SIZ" },
-  { key: "dex", label: "敏捷 DEX" },
-  { key: "app", label: "外貌 APP" },
-  { key: "int", label: "智力 INT" },
-  { key: "pow", label: "意志 POW" },
-  { key: "edu", label: "教育 EDU" },
-  { key: "luck", label: "幸运 LUCK" },
-];
-
-const STAT_ALIASES: Record<string, string> = {
-  力量: "str",
-  str: "str",
-  体质: "con",
-  con: "con",
-  体型: "siz",
-  siz: "siz",
-  敏捷: "dex",
-  dex: "dex",
-  外貌: "app",
-  app: "app",
-  智力: "int",
-  int: "int",
-  灵感: "int",
-  意志: "pow",
-  pow: "pow",
-  教育: "edu",
-  edu: "edu",
-  幸运: "luck",
-  luck: "luck",
-  运气: "luck",
-  hp: "hp",
-  体力: "hp",
-  san: "san",
-  理智: "san",
-  san值: "san",
-  理智值: "san",
-  mp: "mp",
-  魔法: "mp",
-};
-
-const SKILL_ALIASES: Record<string, string> = {
-  // computer_use
-  计算机: "计算机使用",
-  电脑: "计算机使用",
-  // library_use
-  图书馆: "图书馆使用",
-  // drive_auto
-  驾驶: "汽车驾驶",
-  汽车: "汽车驾驶",
-  // credit_rating
-  信用: "信用评级",
-  信誉: "信用评级",
-  // navigate
-  领航: "导航",
-  // natural_world
-  博物学: "自然学",
-  // charm
-  取悦: "魅惑",
-  // cthulhu_mythos
-  克苏鲁: "克苏鲁神话",
-  cm: "克苏鲁神话",
-  // locksmith
-  开锁: "锁匠",
-  撬锁: "锁匠",
-  // op_hvy_machine
-  重型操作: "重型机械",
-  操作重型机械: "重型机械",
-  重型: "重型机械",
-  // other
-  侦查: "侦察",
-};
-
-// --- Module Info Modal ---
-export const ModuleModal: React.FC<{
-  info: ModuleInfo;
-  password?: string;
-  onSave: (info: ModuleInfo, password?: string) => Promise<void>;
-  onClose: () => void;
-}> = ({ info, password, onSave, onClose }) => {
-  const [localInfo, setLocalInfo] = useState(info);
-  const [localPassword, setLocalPassword] = useState(password || "");
-  const [loading, setLoading] = useState(false);
-
-  const handleSave = async () => {
-    if (!localInfo.title.trim()) return;
-    setLoading(true);
-    await onSave(localInfo, localPassword);
-    setLoading(false);
-    onClose();
-  };
-
-  return (
-    <Modal
-      onClose={onClose}
-      title="编辑房间信息"
-      icon={BookOpen}
-      className="max-w-2xl"
-    >
-      <div className="p-6 md:p-8 space-y-6 overflow-y-auto custom-scrollbar">
-        <Input
-          label="房间标题"
-          value={localInfo.title}
-          onChange={(e) =>
-            setLocalInfo({ ...localInfo, title: e.target.value })
-          }
-          placeholder="例如：无尽食欲..."
-        />
-        <Input
-          label="房间密码 (留空公开)"
-          value={localPassword}
-          onChange={(e) => setLocalPassword(e.target.value)}
-          type="password"
-          placeholder="留空则为公开房间"
-        />
-        <Textarea
-          label="背景故事 / 守秘人笔记"
-          value={localInfo.description}
-          onChange={(e) =>
-            setLocalInfo({ ...localInfo, description: e.target.value })
-          }
-          rows={10}
-          placeholder="剧情大纲..."
-        />
-      </div>
-      <div className="px-6 md:px-8 py-4 md:py-6 border-t border-white/10 bg-white/5 flex justify-end gap-3">
-        <Button onClick={onClose} variant="ghost">
-          取消
-        </Button>
-        <Button
-          onClick={handleSave}
-          variant="primary"
-          size="lg"
-          disabled={loading}
-        >
-          {loading ? "保存中..." : "保存修改"}
-        </Button>
-      </div>
-    </Modal>
-  );
-};
+import { Modal, Input, Textarea, Button, NumberStepper, cn } from "../UI";
+import { AvatarUpload } from "../AvatarUpload";
+import { AttributeRadar } from "../AttributeRadar";
+import { Character, InventoryItem } from "../../types";
+import { calculateDBAndBuild } from "../../utils/cocRules";
+import {
+  CHARACTER_IMPORT_ATTRIBUTES,
+  applyCharacterImport,
+} from "../../services/characterImportModel";
 
 const ItemListEditor: React.FC<{
   title: string;
@@ -508,26 +367,7 @@ export const CharacterModal: React.FC<{
 
   const handleImport = () => {
     if (!importText.trim()) return;
-
-    const regex = /([\u4e00-\u9fa5a-zA-Z]+)(\d+)/g;
-    let match;
-    const updates: any = {};
-    const newSkills: Record<string, number> = { ...form.skills };
-
-    while ((match = regex.exec(importText)) !== null) {
-      const key = match[1].toLowerCase();
-      const val = parseInt(match[2], 10);
-
-      if (STAT_ALIASES[key]) {
-        updates[STAT_ALIASES[key]] = val;
-      } else {
-        // Skill
-        const skillName = SKILL_ALIASES[match[1]] || match[1];
-        newSkills[skillName] = val;
-      }
-    }
-
-    setForm((prev) => ({ ...prev, ...updates, skills: newSkills }));
+    setForm((prev) => applyCharacterImport({ character: prev, text: importText }));
     setShowImport(false);
     setImportText("");
   };
@@ -724,7 +564,7 @@ export const CharacterModal: React.FC<{
             <Activity size={12} /> 基础属性
           </h4>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-            {ATTR_MAP.map((attr) => (
+            {CHARACTER_IMPORT_ATTRIBUTES.map((attr) => (
               <div
                 key={attr.key}
                 className="flex flex-col group items-center p-2 bg-slate-950/30 rounded-xl border border-white/5"
@@ -996,210 +836,4 @@ export const CharacterModal: React.FC<{
   );
 };
 
-// --- Status Edit Modal ---
-export const StatusModal: React.FC<{
-  char: Character;
-  onSave: (hp: number, san: number, mp: number) => void;
-  onClose: () => void;
-}> = ({ char, onSave, onClose }) => {
-  const [s, setS] = useState({ hp: char.hp, san: char.san, mp: char.mp });
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div
-        className="absolute inset-0 bg-black/80 backdrop-blur-sm"
-        onClick={onClose}
-      ></div>
-      <div className="glass-panel rounded-3xl w-full max-w-md relative z-10 overflow-hidden animate-slide-up bg-[#0f172a]">
-        <div className="p-6 border-b border-white/10 bg-slate-900/50 text-center">
-          <h3 className="font-bold text-white text-lg">
-            快速状态调整: {char.name}
-          </h3>
-          <p className="text-xs text-slate-500 mt-1">
-            直接修改数值，系统会自动记录变动
-          </p>
-        </div>
-        <div className="p-8 grid grid-cols-1 sm:grid-cols-3 gap-6">
-          {[
-            { label: "HP", color: "text-red-400", key: "hp", min: -10 },
-            { label: "SAN", color: "text-emerald-400", key: "san", min: 0 },
-            { label: "MP", color: "text-blue-400", key: "mp", min: 0 },
-          ].map((item) => (
-            <div key={item.key} className="space-y-2 text-center">
-              <label
-                className={cn(
-                  "text-xs font-bold uppercase tracking-wider",
-                  item.color
-                )}
-              >
-                {item.label}
-              </label>
-              <NumberStepper
-                value={s[item.key as keyof typeof s]}
-                onChange={(val) => setS({ ...s, [item.key]: val })}
-                min={item.min}
-                className="w-full"
-              />
-            </div>
-          ))}
-        </div>
-        <div className="p-6 bg-slate-900/50 flex justify-center border-t border-white/10">
-          <Button
-            onClick={() => onSave(s.hp, s.san, s.mp)}
-            variant="primary"
-            className="w-full"
-            size="lg"
-          >
-            确认变更
-          </Button>
-        </div>
-      </div>
-    </div>
-  );
-};
 
-// --- Story Modal ---
-export const StoryModal: React.FC<{
-  content: string;
-  onClose: () => void;
-  isLoading?: boolean;
-}> = ({ content, onClose, isLoading }) => (
-  <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-    <div
-      className="absolute inset-0 bg-black/90 backdrop-blur-sm"
-      onClick={onClose}
-    ></div>
-    <div className="bg-[#f8f9fa] rounded-3xl w-full max-w-3xl h-[85vh] flex flex-col relative z-10 shadow-2xl overflow-hidden animate-slide-up">
-      <div className="px-6 md:px-8 py-5 border-b flex justify-between items-center bg-white">
-        <h3 className="font-bold text-slate-800 flex items-center gap-2 text-lg">
-          <FileText size={20} className="text-indigo-600" /> 战报预览
-        </h3>
-        <button onClick={onClose}>
-          <div className="text-slate-400 hover:text-slate-800 transition-colors">
-            <X size={24} />
-          </div>
-        </button>
-      </div>
-      <div className="flex-1 p-6 md:p-10 overflow-y-auto font-serif text-slate-800 leading-relaxed whitespace-pre-wrap text-base md:text-lg bg-[#fdfdfd]">
-        {isLoading ? (
-          <div className="flex flex-col items-center justify-center h-full text-slate-500 gap-4">
-            <div className="w-8 h-8 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin"></div>
-            <p>正在生成战报，请稍候...</p>
-          </div>
-        ) : (
-          content
-        )}
-      </div>
-      <div className="p-6 border-t bg-slate-50 flex justify-end">
-        <Button
-          onClick={() => navigator.clipboard.writeText(content)}
-          variant="secondary"
-          className="bg-white border-slate-300 text-slate-700 hover:bg-slate-100 shadow-sm"
-          icon={Copy}
-          disabled={isLoading}
-        >
-          复制全文
-        </Button>
-      </div>
-    </div>
-  </div>
-);
-
-// --- Conclusion Modal ---
-export const ConclusionModal: React.FC<{
-  characters: Character[];
-  onConfirm: (outcomes: Record<string, string>) => Promise<void>;
-  onClose: () => void;
-}> = ({ characters, onConfirm, onClose }) => {
-  const [outcomes, setOutcomes] = useState<Record<string, string>>({});
-  const [loading, setLoading] = useState(false);
-
-  // Initialize outcomes
-  useEffect(() => {
-    const initial: Record<string, string> = {};
-    characters.forEach((c) => {
-      if (c.user_id) {
-        initial[c.user_id] = "存活";
-      }
-    });
-    setOutcomes(initial);
-  }, [characters]);
-
-  const handleSubmit = async () => {
-    setLoading(true);
-    await onConfirm(outcomes);
-    setLoading(false);
-  };
-
-  return (
-    <Modal
-      onClose={onClose}
-      title="结团结算"
-      icon={Check}
-      className="max-w-2xl"
-    >
-      <div className="p-6 space-y-6">
-        <div className="bg-indigo-500/10 border border-indigo-500/20 p-4 rounded-xl text-sm text-indigo-300">
-          结团后，房间状态将变为“已完成”，并生成永久的跑团履历。<br></br>
-          请确认每位玩家角色的最终结局，这将记录在他们的个人履历中。<br></br>
-          <span className="text-amber-400 font-bold">
-            注意：结团会删除房间数据，请务必提前留存好战报！
-          </span>
-        </div>
-
-        <div className="space-y-4">
-          {characters.map((char) => (
-            <div
-              key={char.id}
-              className="flex items-center justify-between p-4 bg-slate-900/50 rounded-xl border border-white/5"
-            >
-              <div className="flex items-center gap-3">
-                <AvatarUpload
-                  url={char.avatar_url}
-                  onUpload={() => {}}
-                  editable={false}
-                  size={40}
-                />
-                <div>
-                  <div className="font-bold text-white">{char.name}</div>
-                  <div className="text-xs text-slate-500">{char.role}</div>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <label className="text-xs text-slate-400">结局:</label>
-                <select
-                  className="bg-slate-800 border border-slate-600 rounded px-2 py-1 text-sm text-white focus:outline-none focus:border-indigo-500"
-                  value={outcomes[char.user_id!] || "存活"}
-                  onChange={(e) =>
-                    setOutcomes({
-                      ...outcomes,
-                      [char.user_id!]: e.target.value,
-                    })
-                  }
-                  disabled={!char.user_id}
-                >
-                  <option value="存活">存活</option>
-                  <option value="死亡">死亡</option>
-                  <option value="失踪">失踪</option>
-                  <option value="疯狂">疯狂</option>
-                </select>
-              </div>
-            </div>
-          ))}
-          {characters.length === 0 && (
-            <div className="text-center text-slate-500 py-8">
-              没有需要结算的调查员角色。
-            </div>
-          )}
-        </div>
-      </div>
-      <div className="px-6 py-4 border-t border-white/10 bg-white/5 flex justify-end gap-3">
-        <Button variant="ghost" onClick={onClose} disabled={loading}>
-          取消
-        </Button>
-        <Button onClick={handleSubmit} variant="primary" disabled={loading}>
-          {loading ? "结算中..." : "确认结团"}
-        </Button>
-      </div>
-    </Modal>
-  );
-};

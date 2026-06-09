@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useMemo } from "react";
 import {
   CalendarClock,
   ClipboardList,
@@ -21,29 +21,25 @@ import {
   linkClueToEvidence,
   listVisibleClues,
   updateClue,
-  type RoomClue,
 } from "../services/clueWall";
 import {
   createRoomInvite,
   createRoomSchedule,
   getVisibleInviteSummary,
-  type RoomInvite,
-  type RoomSchedule,
 } from "../services/invitations";
 import {
   createKeeperPersonaTemplate,
   createPersonaMessage,
   createSecretBatchRolls,
-  type KeeperPersonaKind,
   type KeeperPersonaTemplate,
 } from "../services/keeperToolbox";
 import {
   createSessionSnapshots,
   listVisibleSnapshots,
-  type SessionCharacterSnapshot,
 } from "../services/sessionSnapshots";
 import { buildSessionReport } from "../utils/storyReport";
 import type { RoomMemberPanelItem } from "../services/roomMembers";
+import { nowIso, parseTags, useRoomToolsState } from "../hooks/useRoomToolsState";
 
 type AddLog = (
   type: Log["type"],
@@ -71,29 +67,6 @@ const tabs = [
   { id: "toolbox", label: "KP工具", icon: UserCog },
 ] as const;
 
-type ToolTab = (typeof tabs)[number]["id"];
-
-interface PersistedRoomToolsState {
-  clues: RoomClue[];
-  invite: RoomInvite | null;
-  schedule: RoomSchedule | null;
-  snapshots: SessionCharacterSnapshot[];
-  personas: KeeperPersonaTemplate[];
-}
-
-const nowIso = () => new Date().toISOString();
-
-const toLocalDateTimeValue = (date: Date) => {
-  const offsetMs = date.getTimezoneOffset() * 60_000;
-  return new Date(date.getTime() - offsetMs).toISOString().slice(0, 16);
-};
-
-const parseTags = (value: string) =>
-  value
-    .split(/[,\s]+/)
-    .map((tag) => tag.trim())
-    .filter(Boolean);
-
 export const RoomTools: React.FC<RoomToolsProps> = ({
   roomId,
   isKP,
@@ -103,58 +76,44 @@ export const RoomTools: React.FC<RoomToolsProps> = ({
   roomMemberItems,
   addLog,
 }) => {
-  const [activeTab, setActiveTab] = useState<ToolTab>("report");
-  const [clues, setClues] = useState<RoomClue[]>([]);
-  const [clueTitle, setClueTitle] = useState("");
-  const [clueBody, setClueBody] = useState("");
-  const [clueTags, setClueTags] = useState("");
-  const [keeperNote, setKeeperNote] = useState("");
-  const [invite, setInvite] = useState<RoomInvite | null>(null);
-  const [schedule, setSchedule] = useState<RoomSchedule | null>(null);
-  const [startsAt, setStartsAt] = useState(() =>
-    toLocalDateTimeValue(new Date(Date.now() + 24 * 60 * 60 * 1000))
-  );
-  const [scheduleNote, setScheduleNote] = useState("");
-  const [snapshots, setSnapshots] = useState<SessionCharacterSnapshot[]>([]);
-  const [personaName, setPersonaName] = useState("");
-  const [personaKind, setPersonaKind] = useState<KeeperPersonaKind>("npc");
-  const [personaDescription, setPersonaDescription] = useState("");
-  const [personaLine, setPersonaLine] = useState("");
-  const [personas, setPersonas] = useState<KeeperPersonaTemplate[]>([]);
-  const [batchReason, setBatchReason] = useState("");
-  const [batchTargets, setBatchTargets] = useState("");
-  const hasHydrated = useRef(false);
-
-  useEffect(() => {
-    hasHydrated.current = false;
-    try {
-      const raw = localStorage.getItem(`runtable-room-tools:${roomId}`);
-      if (raw) {
-        const parsed = JSON.parse(raw) as PersistedRoomToolsState;
-        setClues(parsed.clues || []);
-        setInvite(parsed.invite || null);
-        setSchedule(parsed.schedule || null);
-        setSnapshots(parsed.snapshots || []);
-        setPersonas(parsed.personas || []);
-      }
-    } catch (error) {
-      console.warn("Failed to load room tools state", error);
-    } finally {
-      hasHydrated.current = true;
-    }
-  }, [roomId]);
-
-  useEffect(() => {
-    if (!hasHydrated.current) return;
-    const payload: PersistedRoomToolsState = {
-      clues,
-      invite,
-      schedule,
-      snapshots,
-      personas,
-    };
-    localStorage.setItem(`runtable-room-tools:${roomId}`, JSON.stringify(payload));
-  }, [clues, invite, personas, roomId, schedule, snapshots]);
+  const {
+    activeTab,
+    setActiveTab,
+    clues,
+    setClues,
+    clueTitle,
+    setClueTitle,
+    clueBody,
+    setClueBody,
+    clueTags,
+    setClueTags,
+    keeperNote,
+    setKeeperNote,
+    invite,
+    setInvite,
+    schedule,
+    setSchedule,
+    startsAt,
+    setStartsAt,
+    scheduleNote,
+    setScheduleNote,
+    snapshots,
+    setSnapshots,
+    personaName,
+    setPersonaName,
+    personaKind,
+    setPersonaKind,
+    personaDescription,
+    setPersonaDescription,
+    personaLine,
+    setPersonaLine,
+    personas,
+    setPersonas,
+    batchReason,
+    setBatchReason,
+    batchTargets,
+    setBatchTargets,
+  } = useRoomToolsState(roomId);
 
   const report = useMemo(() => buildSessionReport(logs), [logs]);
   const viewerRole = isKP ? "keeper" : "player";

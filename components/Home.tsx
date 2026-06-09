@@ -3,29 +3,27 @@ import { Room, Character } from "../types";
 import { Button, Input, Textarea, Modal, cn } from "./UI";
 import {
   Plus,
-  Search,
   User,
-  LogOut,
   Loader2,
-  Users,
   Edit2,
   BookOpen,
   Lock,
-  History,
-  Crown,
-  Skull,
   ArrowUp,
-  Mic,
-  MessageSquare,
 } from "lucide-react";
-import { CharacterModal } from "./Modals";
+import { CharacterModal } from "./modals/CharacterModal";
 import { AvatarUpload } from "./AvatarUpload";
 import { Friends } from "./Friends";
-import { RoomCard } from "./RoomCard";
 import { useElasticScroll } from "../hooks/useElasticScroll";
 import { useLobbyCatalog } from "../hooks/useLobbyCatalog";
 import { useHomeProfileData } from "../hooks/useHomeProfileData";
 import { useInvestigatorLibrary } from "../hooks/useInvestigatorLibrary";
+import {
+  HomeHeader,
+  HomeMobileNav,
+  type HomeTab,
+} from "./home/HomeNavigation";
+import { HomeHistoryModal } from "./home/HomeHistoryModal";
+import { HomeLobbyView } from "./home/HomeLobbyView";
 import {
   createRoom,
   setRoomPassword,
@@ -87,9 +85,7 @@ export const Home: React.FC<HomeProps> = ({
   onlineUsers = new Set(),
   levelInfo,
 }) => {
-  const [activeTab, setActiveTab] = useState<
-    "rooms" | "characters" | "friends" | "profile" | "square"
-  >("rooms");
+  const [activeTab, setActiveTab] = useState<HomeTab>("rooms");
   const [loading, setLoading] = useState(false);
 
   // Rooms State
@@ -141,10 +137,6 @@ export const Home: React.FC<HomeProps> = ({
   } = useHomeProfileData();
   const { myCharacters, saveInvestigator, deleteInvestigator } =
     useInvestigatorLibrary();
-  const myRoomIds = React.useMemo(
-    () => new Set(myCharacters.map((c) => c.room_id).filter(Boolean)),
-    [myCharacters]
-  );
   const {
     filteredRooms,
     isLoadingRooms,
@@ -155,7 +147,7 @@ export const Home: React.FC<HomeProps> = ({
     refreshRooms,
   } = useLobbyCatalog({
     currentUserId,
-    characterRoomIds: myRoomIds,
+    characters: myCharacters,
     onlineUsers,
   });
 
@@ -339,78 +331,13 @@ export const Home: React.FC<HomeProps> = ({
 
   return (
     <div className="h-[100dvh] overflow-hidden bg-[#020617] text-slate-200 flex flex-col font-sans">
-      {/* Header */}
-      <header
-        className={`min-h-[4rem] h-auto pt-safe border-b border-white/5 bg-slate-900/50 backdrop-blur-md flex items-center justify-between px-6 sticky top-0 z-20 transition-all duration-300 ease-in-out ${
-          showHeader
-            ? "translate-y-0"
-            : "-translate-y-full -mb-[4.1rem] opacity-0 pointer-events-none"
-        }`}
-      >
-        <div className="flex items-center gap-4">
-          <h1 className="text-xl font-bold text-white tracking-tight">
-            RunTable Pro
-          </h1>
-          <nav className="hidden md:flex bg-slate-800/50 p-1 rounded-lg">
-            <button
-              onClick={() => setActiveTab("rooms")}
-              className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${
-                activeTab === "rooms"
-                  ? "bg-indigo-600 text-white shadow-lg"
-                  : "text-slate-400 hover:text-white"
-              }`}
-            >
-              大厅
-            </button>
-            <button
-              onClick={() => setActiveTab("square")}
-              className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${
-                activeTab === "square"
-                  ? "bg-indigo-600 text-white shadow-lg"
-                  : "text-slate-400 hover:text-white"
-              }`}
-            >
-              广场
-            </button>
-            <button
-              onClick={() => setActiveTab("characters")}
-              className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${
-                activeTab === "characters"
-                  ? "bg-indigo-600 text-white shadow-lg"
-                  : "text-slate-400 hover:text-white"
-              }`}
-            >
-              车卡
-            </button>
-            <button
-              onClick={() => setActiveTab("friends")}
-              className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all relative ${
-                activeTab === "friends"
-                  ? "bg-indigo-600 text-white shadow-lg"
-                  : "text-slate-400 hover:text-white"
-              }`}
-            >
-              好友
-              {friendRequestCount > 0 && (
-                <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-slate-900 animate-pulse"></span>
-              )}
-            </button>
-            <button
-              onClick={() => setActiveTab("profile")}
-              className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${
-                activeTab === "profile"
-                  ? "bg-indigo-600 text-white shadow-lg"
-                  : "text-slate-400 hover:text-white"
-              }`}
-            >
-              我的
-            </button>
-          </nav>
-        </div>
-        <Button variant="ghost" icon={LogOut} onClick={onLogout}>
-          退出
-        </Button>
-      </header>
+      <HomeHeader
+        activeTab={activeTab}
+        showHeader={showHeader}
+        friendRequestCount={friendRequestCount}
+        onSelectTab={setActiveTab}
+        onLogout={onLogout}
+      />
 
       <main
         ref={mainRef}
@@ -422,48 +349,13 @@ export const Home: React.FC<HomeProps> = ({
       >
         {activeTab === "square" ? (
           <>
-            <div
-              key="mobile-nav-square"
-              className={`md:hidden flex bg-slate-800/50 p-1 rounded-lg m-4 shrink-0 overflow-hidden transition-all duration-300 ease-in-out ${
-                showHeader
-                  ? "translate-y-0 opacity-100"
-                  : "-translate-y-full -mt-16 opacity-0 pointer-events-none"
-              }`}
-            >
-              <button
-                onClick={() => setActiveTab("rooms")}
-                className="flex-1 py-2 rounded-md text-sm font-medium text-slate-400"
-              >
-                大厅
-              </button>
-              <button
-                onClick={() => setActiveTab("square")}
-                className="flex-1 py-2 rounded-md text-sm font-medium bg-indigo-600 text-white"
-              >
-                广场
-              </button>
-              <button
-                onClick={() => setActiveTab("characters")}
-                className="flex-1 py-2 rounded-md text-sm font-medium text-slate-400"
-              >
-                车卡
-              </button>
-              <button
-                onClick={() => setActiveTab("friends")}
-                className="flex-1 py-2 rounded-md text-sm font-medium relative text-slate-400"
-              >
-                好友
-                {friendRequestCount > 0 && (
-                  <span className="absolute top-1 right-2 w-2 h-2 bg-red-500 rounded-full animate-pulse"></span>
-                )}
-              </button>
-              <button
-                onClick={() => setActiveTab("profile")}
-                className="flex-1 py-2 rounded-md text-sm font-medium text-slate-400"
-              >
-                我的
-              </button>
-            </div>
+            <HomeMobileNav
+              activeTab={activeTab}
+              friendRequestCount={friendRequestCount}
+              onSelectTab={setActiveTab}
+              mode="square"
+              showHeader={showHeader}
+            />
             <div className="flex-1 min-h-0 relative">
               <Suspense
                 fallback={
@@ -482,208 +374,37 @@ export const Home: React.FC<HomeProps> = ({
             className="container mx-auto p-4 md:p-8 max-w-6xl"
           >
             {/* Mobile Nav */}
-            <div
-              key="mobile-nav-default"
-              className="md:hidden flex bg-slate-800/50 p-1 rounded-lg mb-6"
-            >
-              <button
-                onClick={() => setActiveTab("rooms")}
-                className={`flex-1 py-2 rounded-md text-sm font-medium ${
-                  activeTab === "rooms"
-                    ? "bg-indigo-600 text-white"
-                    : "text-slate-400"
-                }`}
-              >
-                大厅
-              </button>
-              <button
-                onClick={() => setActiveTab("square")}
-                className={`flex-1 py-2 rounded-md text-sm font-medium ${
-                  (activeTab as string) === "square"
-                    ? "bg-indigo-600 text-white"
-                    : "text-slate-400"
-                }`}
-              >
-                广场
-              </button>
-              <button
-                onClick={() => setActiveTab("characters")}
-                className={`flex-1 py-2 rounded-md text-sm font-medium ${
-                  activeTab === "characters"
-                    ? "bg-indigo-600 text-white"
-                    : "text-slate-400"
-                }`}
-              >
-                车卡
-              </button>
-              <button
-                onClick={() => setActiveTab("friends")}
-                className={`flex-1 py-2 rounded-md text-sm font-medium relative ${
-                  activeTab === "friends"
-                    ? "bg-indigo-600 text-white"
-                    : "text-slate-400"
-                }`}
-              >
-                好友
-                {friendRequestCount > 0 && (
-                  <span className="absolute top-1 right-2 w-2 h-2 bg-red-500 rounded-full animate-pulse"></span>
-                )}
-              </button>
-              <button
-                onClick={() => setActiveTab("profile")}
-                className={`flex-1 py-2 rounded-md text-sm font-medium ${
-                  activeTab === "profile"
-                    ? "bg-indigo-600 text-white"
-                    : "text-slate-400"
-                }`}
-              >
-                我的
-              </button>
-            </div>
+            <HomeMobileNav
+              activeTab={activeTab}
+              friendRequestCount={friendRequestCount}
+              onSelectTab={setActiveTab}
+              mode="default"
+            />
 
             {activeTab === "rooms" ? (
-              <div className="space-y-6">
-                {/* Room Controls */}
-                <div className="flex flex-col gap-4">
-                  <div className="flex flex-col md:flex-row gap-4 justify-between items-center">
-                    <div className="relative w-full md:w-96 group">
-                      <Search
-                        className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-indigo-400 transition-colors"
-                        size={18}
-                      />
-                      <input
-                        type="text"
-                        placeholder="搜索房间..."
-                        className="w-full bg-slate-900/50 border border-slate-700/50 rounded-xl pl-10 pr-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 transition-all text-sm"
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                      />
-                    </div>
-                    <Button icon={Plus} onClick={() => setShowCreateRoom(true)}>
-                      创建房间
-                    </Button>
-                  </div>
-
-                  {/* Filters */}
-                  <div className="flex gap-2 overflow-x-auto pb-2">
-                    {[
-                      { id: "all", label: "全部" },
-                      { id: "mine", label: "我的角色" },
-                      { id: "created", label: "我的房间" },
-                      { id: "kp_online", label: "KP在线" },
-                    ].map((f) => (
-                      <button
-                        key={f.id}
-                        onClick={() => setRoomFilter(f.id as any)}
-                        className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all whitespace-nowrap ${
-                          roomFilter === f.id
-                            ? "bg-indigo-500/20 text-indigo-400 border border-indigo-500/30"
-                            : "bg-slate-800/50 text-slate-400 border border-transparent hover:bg-slate-800 hover:text-slate-300"
-                        }`}
-                      >
-                        {f.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Create Room Form (Inline) */}
-                {showCreateRoom && (
-                  <div className="bg-slate-800/30 border border-indigo-500/30 rounded-2xl p-6 animate-scale-in">
-                    <h3 className="text-lg font-bold text-white mb-4">
-                      新建跑团房间
-                    </h3>
-                    <div className="space-y-4">
-                      <div className="flex gap-4">
-                        <button
-                          onClick={() => setNewRoomType("text")}
-                          className={`flex-1 py-3 rounded-xl border flex flex-col items-center gap-2 transition-all ${
-                            newRoomType === "text"
-                              ? "bg-indigo-500/20 border-indigo-500 text-indigo-400"
-                              : "bg-slate-900/50 border-slate-700/50 text-slate-500 hover:border-slate-600"
-                          }`}
-                        >
-                          <MessageSquare size={24} />
-                          <span className="text-sm font-bold">文字团</span>
-                        </button>
-                        <button
-                          onClick={() => setNewRoomType("voice")}
-                          className={`flex-1 py-3 rounded-xl border flex flex-col items-center gap-2 transition-all ${
-                            newRoomType === "voice"
-                              ? "bg-pink-500/20 border-pink-500 text-pink-400"
-                              : "bg-slate-900/50 border-slate-700/50 text-slate-500 hover:border-slate-600"
-                          }`}
-                        >
-                          <Mic size={24} />
-                          <span className="text-sm font-bold">语音团</span>
-                        </button>
-                      </div>
-                      <Input
-                        label="房间标题"
-                        value={newRoomTitle}
-                        onChange={(e) => setNewRoomTitle(e.target.value)}
-                        placeholder="例如：印斯茅斯之影"
-                      />
-                      <Input
-                        label="房间密码 (可选)"
-                        value={newRoomPassword}
-                        onChange={(e) => setNewRoomPassword(e.target.value)}
-                        placeholder="留空则为公开房间"
-                        type="password"
-                      />
-                      <Textarea
-                        label="简介 (可选)"
-                        value={newRoomDesc}
-                        onChange={(e) => setNewRoomDesc(e.target.value)}
-                        placeholder="简单的模组介绍或招募要求..."
-                      />
-                      <div className="flex justify-end gap-3 pt-4 border-t border-white/10">
-                        <Button
-                          variant="ghost"
-                          onClick={() => setShowCreateRoom(false)}
-                        >
-                          取消
-                        </Button>
-                        <Button
-                          onClick={handleCreateRoom}
-                          disabled={!newRoomTitle.trim() || loading}
-                          icon={loading ? Loader2 : Plus}
-                        >
-                          {loading ? "创建中..." : "立即创建"}
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Rooms Grid */}
-                {isLoadingRooms ? (
-                  <div className="flex flex-col items-center justify-center py-24 text-slate-500 animate-fade-in">
-                    <Loader2 className="w-12 h-12 animate-spin mb-4 text-indigo-500" />
-                    <p className="text-slate-400 font-medium">
-                      正在加载房间...
-                    </p>
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 animate-fade-in">
-                    {filteredRooms.map((room) => (
-                      <RoomCard
-                        key={room.id}
-                        room={room}
-                        currentUserId={currentUserId}
-                        myCharacters={myCharacters}
-                        onJoinRoom={onJoinRoom}
-                      />
-                    ))}
-                    {filteredRooms.length === 0 && (
-                      <div className="col-span-full py-12 text-center text-slate-500">
-                        <Users size={48} className="mx-auto mb-3 opacity-20" />
-                        <p>暂无房间</p>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
+              <HomeLobbyView
+                currentUserId={currentUserId}
+                filteredRooms={filteredRooms}
+                isLoadingRooms={isLoadingRooms}
+                searchQuery={searchQuery}
+                setSearchQuery={setSearchQuery}
+                roomFilter={roomFilter}
+                setRoomFilter={setRoomFilter}
+                myCharacters={myCharacters}
+                onJoinRoom={onJoinRoom}
+                showCreateRoom={showCreateRoom}
+                setShowCreateRoom={setShowCreateRoom}
+                newRoomTitle={newRoomTitle}
+                setNewRoomTitle={setNewRoomTitle}
+                newRoomDesc={newRoomDesc}
+                setNewRoomDesc={setNewRoomDesc}
+                newRoomPassword={newRoomPassword}
+                setNewRoomPassword={setNewRoomPassword}
+                newRoomType={newRoomType}
+                setNewRoomType={setNewRoomType}
+                loading={loading}
+                onCreateRoom={handleCreateRoom}
+              />
             ) : activeTab === "characters" ? (
               <div className="space-y-6">
                 <div className="flex justify-between items-center">
@@ -1075,172 +796,14 @@ export const Home: React.FC<HomeProps> = ({
         />
       )}
 
-      {/* Game History Modal */}
-      {showHistoryModal && (
-        <Modal
-          onClose={() => setShowHistoryModal(false)}
-          title="跑团履历"
-          icon={History}
-          className="max-w-2xl"
-        >
-          <div className="flex border-b border-white/5">
-            <button
-              onClick={() => setHistoryTab("player")}
-              className={`flex-1 py-3 text-sm font-bold transition-colors ${
-                historyTab === "player"
-                  ? "bg-slate-800/50 text-white border-b-2 border-indigo-500"
-                  : "text-slate-500 hover:text-slate-300 hover:bg-slate-800/30"
-              }`}
-            >
-              参与的团 ({playerHistory.length})
-            </button>
-            <button
-              onClick={() => setHistoryTab("kp")}
-              className={`flex-1 py-3 text-sm font-bold transition-colors ${
-                historyTab === "kp"
-                  ? "bg-slate-800/50 text-white border-b-2 border-indigo-500"
-                  : "text-slate-500 hover:text-slate-300 hover:bg-slate-800/30"
-              }`}
-            >
-              主持的团 ({kpHistory.length})
-            </button>
-          </div>
-
-          <div className="p-4 max-h-[60vh] overflow-y-auto custom-scrollbar">
-            {historyTab === "player" ? (
-              <div className="space-y-3">
-                {playerHistory.map((item) => {
-                  const snapshot = item.character_snapshot;
-                  const latest = (item as any).latest_character;
-                  const char = latest || snapshot;
-
-                  // Safely extract data from either structure
-                  const name = char.name;
-                  const avatarUrl =
-                    char.info?.avatar_url ||
-                    char.avatar_url ||
-                    snapshot.info?.avatar_url ||
-                    snapshot.avatar_url;
-                  const job =
-                    char.info?.job ||
-                    char.job ||
-                    snapshot.info?.job ||
-                    snapshot.job ||
-                    "无职业";
-                  const sex =
-                    char.info?.sex ||
-                    char.sex ||
-                    snapshot.info?.sex ||
-                    snapshot.sex ||
-                    "未知";
-
-                  const isDead = item.outcome === "死亡";
-                  const isLost = item.outcome === "失踪";
-                  const isCrazy = item.outcome === "疯狂";
-
-                  return (
-                    <div
-                      key={item.id}
-                      className={`relative p-4 rounded-xl border transition-all ${
-                        isDead
-                          ? "bg-slate-950 border-slate-800 grayscale"
-                          : "bg-slate-800/50 border-slate-700/50 hover:border-indigo-500/30"
-                      }`}
-                    >
-                      <div className="flex justify-between items-start mb-3">
-                        <div>
-                          <h4 className="font-bold text-white text-base line-clamp-1">
-                            {item.game_history.room_title}
-                          </h4>
-                          <div className="text-xs text-slate-500 flex items-center gap-2 mt-1">
-                            <History size={12} />
-                            {new Date(
-                              item.game_history.created_at
-                            ).toLocaleDateString()}
-                            <span className="w-1 h-1 rounded-full bg-slate-600"></span>
-                            KP: {item.game_history.kp_nickname}
-                          </div>
-                        </div>
-                        <div
-                          className={`px-2 py-0.5 rounded text-[10px] font-bold border uppercase tracking-wider flex items-center gap-1 ${
-                            isDead
-                              ? "bg-slate-800 text-slate-400 border-slate-700"
-                              : isLost
-                              ? "bg-amber-900/20 text-amber-400 border-amber-500/20"
-                              : isCrazy
-                              ? "bg-purple-900/20 text-purple-400 border-purple-500/20"
-                              : "bg-emerald-900/20 text-emerald-400 border-emerald-500/20"
-                          }`}
-                        >
-                          {isDead && <Skull size={10} />}
-                          {item.outcome}
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-3 bg-slate-950/30 p-2 rounded-lg border border-white/5">
-                        <AvatarUpload
-                          url={avatarUrl}
-                          onUpload={() => {}}
-                          editable={false}
-                          size={40}
-                        />
-                        <div>
-                          <div className="font-bold text-sm text-slate-200">
-                            {name}
-                          </div>
-                          <div className="text-[10px] text-slate-500">
-                            {job} · {sex}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-                {playerHistory.length === 0 && (
-                  <div className="text-center py-8 text-slate-500 text-sm">
-                    暂无参与记录
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {kpHistory.map((item) => (
-                  <div
-                    key={item.id}
-                    className="bg-slate-800/50 border border-slate-700/50 p-4 rounded-xl hover:border-indigo-500/30 transition-all"
-                  >
-                    <div className="flex justify-between items-start mb-2">
-                      <h4 className="font-bold text-white text-base">
-                        {item.room_title}
-                      </h4>
-                      <div className="px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 flex items-center gap-1">
-                        <Crown size={10} />
-                        Keeper
-                      </div>
-                    </div>
-                    <p className="text-xs text-slate-400 line-clamp-2 mb-3">
-                      {item.room_description || "暂无描述..."}
-                    </p>
-                    <div className="text-[10px] text-slate-500 font-mono bg-slate-950/50 px-2 py-1 rounded inline-block">
-                      结团于: {new Date(item.created_at).toLocaleString()}
-                    </div>
-                  </div>
-                ))}
-                {kpHistory.length === 0 && (
-                  <div className="text-center py-8 text-slate-500 text-sm">
-                    暂无主持记录
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-          <div className="px-6 py-4 border-t border-white/10 bg-white/5 flex justify-end">
-            <Button variant="ghost" onClick={() => setShowHistoryModal(false)}>
-              关闭
-            </Button>
-          </div>
-        </Modal>
-      )}
+      <HomeHistoryModal
+        open={showHistoryModal}
+        historyTab={historyTab}
+        setHistoryTab={setHistoryTab}
+        kpHistory={kpHistory}
+        playerHistory={playerHistory}
+        onClose={() => setShowHistoryModal(false)}
+      />
 
       {/* Change Password Modal */}
       {showChangePwdModal && (

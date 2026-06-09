@@ -39,10 +39,6 @@ import {
 } from "./hooks/useRoomSessionState";
 import { useTabletopCommands } from "./hooks/useTabletopCommands";
 import { useRoomCharacterActions } from "./hooks/useRoomCharacterActions";
-import {
-  setRoomPassword as saveRoomPassword,
-  updateRoomModule,
-} from "./services/rooms";
 import { clearLocalSupabaseSession, signOut } from "./services/auth";
 
 const App: React.FC = () => {
@@ -118,6 +114,7 @@ const App: React.FC = () => {
     removeRoomCharacter,
     kickRoomMemberByUserId,
     concludeCurrentRoom,
+    updateModuleSettings,
     updateMusicUrl,
     updateMusicState,
     loadMoreLogs,
@@ -126,7 +123,6 @@ const App: React.FC = () => {
   const {
     replaceCharacters,
     selectActiveCharacter,
-    applyModuleSettings,
     markVoiceConnected,
     markVoiceReconnecting,
     markVoiceDisconnected,
@@ -617,26 +613,9 @@ const App: React.FC = () => {
           info={moduleInfo}
           password={roomPassword}
           onSave={async (info, password) => {
-            if (!currentRoomId) return;
-            const updates: any = {
-              title: info.title,
-              description: info.description,
-            };
-            const { error } = await updateRoomModule(currentRoomId, updates);
-
-            if (error) {
-              alert("保存失败: " + error.message);
-            } else {
-              if (password !== undefined) {
-                try {
-                  await saveRoomPassword(currentRoomId, password);
-                } catch (passwordError: any) {
-                  alert("Password save failed: " + passwordError.message);
-                  return;
-                }
-              }
-              // Local update for immediate feedback (Realtime will also trigger)
-              applyModuleSettings(info, password);
+            const result = await updateModuleSettings(info, password);
+            if (!result.ok && result.message) {
+              alert(result.message);
             }
           }}
           onClose={() => setShowModuleModal(false)}

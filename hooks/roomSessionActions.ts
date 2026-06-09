@@ -54,6 +54,41 @@ export async function concludeRoomSession(input: {
   return { ok: true };
 }
 
+export async function updateRoomSessionModuleSettings(input: {
+  roomId: string | null;
+  isKeeper: boolean;
+  info: { title: string; description: string | null };
+  password?: string;
+  updateRoomModule: (
+    roomId: string,
+    updates: Record<string, any>
+  ) => RemoteResult;
+  setRoomPassword: (roomId: string, password: string) => Promise<void>;
+}): Promise<RoomSessionActionResult> {
+  if (!input.roomId || !input.isKeeper) return { ok: false };
+
+  const { error } = await input.updateRoomModule(input.roomId, {
+    title: input.info.title,
+    description: input.info.description,
+  });
+
+  if (error) {
+    console.error("Failed to update room module:", error);
+    return buildRoomActionFailureResult("淇濆瓨澶辫触", error);
+  }
+
+  if (input.password !== undefined) {
+    try {
+      await input.setRoomPassword(input.roomId, input.password);
+    } catch (error: any) {
+      console.error("Failed to update room password:", error);
+      return buildRoomActionFailureResult("Password save failed", error);
+    }
+  }
+
+  return { ok: true };
+}
+
 export async function updateRoomSessionMusicUrl(input: {
   roomId: string | null;
   isKeeper: boolean;

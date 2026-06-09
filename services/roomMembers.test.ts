@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildRoomMemberPanelItems,
   removeRoomMemberByUserId,
-} from "./roomMembers";
+} from "./roomAuthority";
 import type { Character } from "../types";
 import type { RoomMembership } from "./roomAuthority";
 

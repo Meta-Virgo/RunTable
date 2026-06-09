@@ -4,7 +4,7 @@ import {
   deleteNotification as deleteSquareNotification,
   fetchNotifications,
   markNotificationRead,
-} from "../services/square";
+} from "../services/squareNotificationsRepository";
 
 export function useSquareNotifications(currentUser: any, shouldRefresh: boolean) {
   const [notifications, setNotifications] = useState<Notification[]>([]);

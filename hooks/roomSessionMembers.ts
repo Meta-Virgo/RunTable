@@ -1,7 +1,10 @@
 import type { Character } from "../types";
-import type { RoomMembership } from "../services/roomAuthority";
 import {
   applyRoomMemberRemovedLocally,
+  findKickableRoomMembership,
+  type RoomMembership,
+} from "../services/roomAuthority";
+import {
   buildRoomActionFailureResult,
   buildRoomCharacterRemovedMessage,
   buildRoomMemberKickedMessage,
@@ -102,10 +105,11 @@ export async function kickRoomMemberFromSession({
 }): Promise<RoomMemberActionResult> {
   if (!memberUserId || !context.roomId || !context.userId) return { ok: false };
 
-  const membership = context.roomMembers.find(
-    (item) => item.user_id === memberUserId && item.status === "active"
+  const membership = findKickableRoomMembership(
+    context.roomMembers,
+    memberUserId
   );
-  if (!membership || membership.role === "keeper") return { ok: false };
+  if (!membership) return { ok: false };
 
   const character = membership.character_id
     ? context.characters.find((item) => item.id === membership.character_id)

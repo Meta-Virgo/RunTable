@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { Character, Log } from "../types";
 import { updateCharacterStats as saveCharacterStats } from "../services/characters";
-import { createTabletopCommandExecutor } from "./tabletopCommandExecutor";
+import { createTabletopCommandExecutor } from "../services/tabletopCommandExecutor";
 
 type AddLog = (
   type: Log["type"],

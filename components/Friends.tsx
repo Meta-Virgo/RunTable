@@ -1,11 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { supabase } from "../supabase";
-import {
-  Profile,
-  Friendship,
-  GameHistory,
-  GameHistoryParticipant,
-} from "../types";
+import { Profile, Friendship, GameHistory } from "../types";
 import { Button, Modal } from "./UI";
 import {
   Search,
@@ -13,7 +7,6 @@ import {
   UserCheck,
   UserX,
   History,
-  Skull,
   Crown,
   Loader2,
   User,
@@ -21,6 +14,19 @@ import {
 } from "lucide-react";
 import { AvatarUpload } from "./AvatarUpload";
 import { useElasticScroll } from "../hooks/useElasticScroll";
+import { HomeHistoryModal } from "./home/HomeHistoryModal";
+import {
+  fetchFriendsProfileHistory,
+  getFriendsHistoryCharacterDisplay,
+  type FriendsPlayerHistoryItem,
+} from "../services/friendsProfileModel";
+import {
+  fetchFriendsOverview,
+  requestFriendship,
+  searchFriendProfiles,
+} from "../services/friendsModel";
+import * as friendsProfileRepository from "../services/friendsProfileRepository";
+import * as friendsRepository from "../services/friendsRepository";
 
 interface FriendsProps {
   currentUser: Profile | null;
@@ -42,7 +48,7 @@ export const Friends: React.FC<FriendsProps> = ({ currentUser }) => {
   const [showHistoryModal, setShowHistoryModal] = useState(false); // Added for standalone history modal
   const [kpHistory, setKpHistory] = useState<GameHistory[]>([]);
   const [playerHistory, setPlayerHistory] = useState<
-    (GameHistoryParticipant & { game_history: GameHistory })[]
+    FriendsPlayerHistoryItem[]
   >([]);
   const [historyTab, setHistoryTab] = useState<"kp" | "player">("player");
   const [historyLoading, setHistoryLoading] = useState(false);
@@ -55,65 +61,21 @@ export const Friends: React.FC<FriendsProps> = ({ currentUser }) => {
   const resumeContentRef = React.useRef<HTMLDivElement>(null);
   useElasticScroll(resumeScrollRef, resumeContentRef);
 
-  const historyScrollRef = React.useRef<HTMLDivElement>(null);
-  const historyContentRef = React.useRef<HTMLDivElement>(null);
-  useElasticScroll(historyScrollRef, historyContentRef);
-
   useEffect(() => {
     if (currentUser) {
-      fetchFriends();
-      fetchRequests();
+      fetchFriendsOverviewForUser();
     }
   }, [currentUser, activeTab]);
 
-  const fetchFriends = async () => {
+  const fetchFriendsOverviewForUser = async () => {
     if (!currentUser) return;
 
-    // Fetch accepted friendships where I am user_id OR friend_id
-    const { data } = await supabase
-      .from("friendships")
-      .select(
-        `
-        *,
-        friend_profile:friend_id (id, nickname, avatar_url, user_code, bio, is_vip, level, created_at),
-        user_profile:user_id (id, nickname, avatar_url, user_code, bio, is_vip, level, created_at)
-      `
-      )
-      .or(`user_id.eq.${currentUser.id},friend_id.eq.${currentUser.id}`)
-      .eq("status", "accepted");
-
-    if (data) {
-      // Normalize: I want the "other person" as friend_profile
-      const normalized = data.map((f: any) => {
-        const isMeSender = f.user_id === currentUser.id;
-        return {
-          ...f,
-          friend_profile: isMeSender ? f.friend_profile : f.user_profile,
-        };
-      });
-      setFriends(normalized);
-    }
-  };
-
-  const fetchRequests = async () => {
-    if (!currentUser) return;
-    // Fetch pending requests where I am the RECEIVER (friend_id)
-    const { data } = await supabase
-      .from("friendships")
-      .select(
-        `
-        *,
-        user_profile:user_id (id, nickname, avatar_url, user_code, bio, is_vip, level, created_at)
-      `
-      )
-      .eq("friend_id", currentUser.id)
-      .eq("status", "pending");
-
-    if (data) {
-      setRequests(
-        data.map((r: any) => ({ ...r, friend_profile: r.user_profile }))
-      );
-    }
+    const overview = await fetchFriendsOverview({
+      currentUserId: currentUser.id,
+      repository: friendsRepository,
+    });
+    setFriends(overview.friends);
+    setRequests(overview.requests);
   };
 
   const handleSearch = async () => {
@@ -121,99 +83,40 @@ export const Friends: React.FC<FriendsProps> = ({ currentUser }) => {
     setIsSearching(true);
     setSearchResults([]);
 
-    let query = supabase
-      .from("profiles")
-      .select(
-        "id, nickname, avatar_url, user_code, bio, is_vip, level, created_at"
-      )
-      .neq("id", currentUser.id); // Exclude self
-
-    // Check if query is numeric (UID) or string (Nickname)
-    if (/^\d+$/.test(searchQuery)) {
-      query = query.eq("user_code", parseInt(searchQuery));
-    } else {
-      query = query.ilike("nickname", `%${searchQuery}%`);
-    }
-
-    const { data } = await query;
-    if (data) {
-      setSearchResults(data);
-    }
+    const results = await searchFriendProfiles({
+      currentUserId: currentUser.id,
+      query: searchQuery,
+      repository: friendsRepository,
+    });
+    setSearchResults(results);
     setIsSearching(false);
   };
 
   const sendFriendRequest = async (targetUserId: string) => {
     if (!currentUser) return;
 
-    // Rate Limit Check (30s per target user)
-    const lastRequestTime = localStorage.getItem(
-      `last_friend_request_${targetUserId}`
-    );
-    if (lastRequestTime) {
-      const timeDiff = Date.now() - parseInt(lastRequestTime);
-      if (timeDiff < 30000) {
-        alert(
-          `操作过于频繁，请等待 ${Math.ceil(
-            (30000 - timeDiff) / 1000
-          )} 秒后再试`
-        );
-        return;
-      }
-    }
-
-    // Check if already friends or requested
-    const { data: existing } = await supabase
-      .from("friendships")
-      .select("*")
-      .or(
-        `and(user_id.eq.${currentUser.id},friend_id.eq.${targetUserId}),and(user_id.eq.${targetUserId},friend_id.eq.${currentUser.id})`
-      )
-      .single();
-
-    if (existing) {
-      if (existing.status === "accepted") alert("你们已经是好友了");
-      else if (existing.user_id === currentUser.id) alert("已发送过申请");
-      else alert("对方已经向你发送了申请，请去处理");
-      return;
-    }
-
-    const { error } = await supabase.from("friendships").insert({
-      user_id: currentUser.id,
-      friend_id: targetUserId,
-      status: "pending",
+    const result = await requestFriendship({
+      currentUserId: currentUser.id,
+      targetUserId,
+      repository: friendsRepository,
+      storage: localStorage,
     });
-
-    if (error) {
-      alert("申请发送失败: " + error.message);
-    } else {
-      localStorage.setItem(
-        `last_friend_request_${targetUserId}`,
-        Date.now().toString()
-      );
-      alert("好友申请已发送");
-    }
+    alert(result.message);
   };
 
   const handleAccept = async (friendshipId: string) => {
-    const { error } = await supabase
-      .from("friendships")
-      .update({ status: "accepted" })
-      .eq("id", friendshipId);
+    const { error } = await friendsRepository.acceptFriendRequest(friendshipId);
 
     if (!error) {
-      fetchRequests();
-      fetchFriends();
+      fetchFriendsOverviewForUser();
     }
   };
 
   const handleReject = async (friendshipId: string) => {
-    const { error } = await supabase
-      .from("friendships")
-      .delete()
-      .eq("id", friendshipId);
+    const { error } = await friendsRepository.rejectFriendRequest(friendshipId);
 
     if (!error) {
-      fetchRequests();
+      fetchFriendsOverviewForUser();
     }
   };
 
@@ -225,10 +128,7 @@ export const Friends: React.FC<FriendsProps> = ({ currentUser }) => {
   const confirmDeleteFriend = async () => {
     if (!deleteTargetId) return;
 
-    const { error } = await supabase
-      .from("friendships")
-      .delete()
-      .eq("id", deleteTargetId);
+    const { error } = await friendsRepository.deleteFriendship(deleteTargetId);
 
     if (error) {
       alert("删除失败: " + error.message);
@@ -241,57 +141,12 @@ export const Friends: React.FC<FriendsProps> = ({ currentUser }) => {
 
   const fetchUserHistory = async (userId: string) => {
     setHistoryLoading(true);
-    // 1. Fetch KP History
-    const { data: kpData } = await supabase
-      .from("game_histories")
-      .select("*")
-      .eq("kp_id", userId)
-      .order("created_at", { ascending: false });
-
-    if (kpData) setKpHistory(kpData);
-
-    // 2. Fetch Player History
-    const { data: playerData } = await supabase
-      .from("game_history_participants")
-      .select(
-        `
-        *,
-        game_history:game_histories (*)
-      `
-      )
-      .eq("user_id", userId)
-      .order("id", { ascending: false });
-
-    if (playerData) {
-      // Fetch latest character data to ensure avatar/job are up to date
-      const charIds = playerData
-        .map((p: any) => p.character_snapshot?.id)
-        .filter(Boolean);
-
-      let charMap = new Map();
-      if (charIds.length > 0) {
-        const { data: latestChars } = await supabase
-          .from("characters")
-          .select("*")
-          .in("id", charIds);
-        if (latestChars) {
-          charMap = new Map(latestChars.map((c) => [c.id, c]));
-        }
-      }
-
-      const sorted = (playerData as any[])
-        .map((p) => ({
-          ...p,
-          latest_character: charMap.get(p.character_snapshot?.id),
-        }))
-        .sort((a, b) => {
-          return (
-            new Date(b.game_history.created_at).getTime() -
-            new Date(a.game_history.created_at).getTime()
-          );
-        });
-      setPlayerHistory(sorted);
-    }
+    const history = await fetchFriendsProfileHistory({
+      userId,
+      repository: friendsProfileRepository,
+    });
+    setKpHistory(history.kpHistory);
+    setPlayerHistory(history.playerHistory);
     setHistoryLoading(false);
   };
 
@@ -707,39 +562,14 @@ export const Friends: React.FC<FriendsProps> = ({ currentUser }) => {
                       </div>
                     )}
                     {playerHistory.map((item) => {
-                      const snapshot = item.character_snapshot;
-                      const latest = (item as any).latest_character;
-                      const char = latest || snapshot;
-
-                      // Safely extract data from either structure
-                      const name = char.name;
-                      const avatarUrl =
-                        char.info?.avatar_url ||
-                        char.avatar_url ||
-                        snapshot.info?.avatar_url ||
-                        snapshot.avatar_url;
-                      const job =
-                        char.info?.job ||
-                        char.job ||
-                        snapshot.info?.job ||
-                        snapshot.job ||
-                        "无职业";
-                      const sex =
-                        char.info?.sex ||
-                        char.sex ||
-                        snapshot.info?.sex ||
-                        snapshot.sex ||
-                        "未知";
-
-                      const isDead = item.outcome === "死亡";
-                      const isLost = item.outcome === "失踪";
-                      const isCrazy = item.outcome === "疯狂";
+                      const characterDisplay =
+                        getFriendsHistoryCharacterDisplay(item);
 
                       return (
                         <div
                           key={item.id}
                           className={`relative p-3 rounded-xl border transition-all ${
-                            isDead
+                            characterDisplay.isDead
                               ? "bg-slate-950 border-slate-800 grayscale"
                               : "bg-slate-800/50 border-slate-700/50 hover:border-indigo-500/30"
                           }`}
@@ -760,11 +590,11 @@ export const Friends: React.FC<FriendsProps> = ({ currentUser }) => {
                             </div>
                             <div
                               className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
-                                isDead
+                                characterDisplay.isDead
                                   ? "bg-red-950 text-red-500 border border-red-900"
-                                  : isLost
+                                  : characterDisplay.isLost
                                   ? "bg-yellow-950 text-yellow-500 border border-yellow-900"
-                                  : isCrazy
+                                  : characterDisplay.isCrazy
                                   ? "bg-purple-950 text-purple-500 border border-purple-900"
                                   : "bg-emerald-950 text-emerald-500 border border-emerald-900"
                               }`}
@@ -776,7 +606,7 @@ export const Friends: React.FC<FriendsProps> = ({ currentUser }) => {
                           <div className="flex items-center gap-2 bg-slate-900/50 p-1.5 rounded-lg">
                             <div className="w-6 h-6 flex items-center justify-center">
                               <AvatarUpload
-                                url={avatarUrl}
+                                url={characterDisplay.avatarUrl}
                                 onUpload={() => {}}
                                 editable={false}
                                 size={24}
@@ -784,10 +614,10 @@ export const Friends: React.FC<FriendsProps> = ({ currentUser }) => {
                             </div>
                             <div className="flex-1 min-w-0">
                               <div className="text-xs font-medium text-slate-300 truncate">
-                                {name}
+                                {characterDisplay.name}
                               </div>
                               <div className="text-[10px] text-slate-500">
-                                {job} · {sex}
+                                {characterDisplay.job} · {characterDisplay.sex}
                               </div>
                             </div>
                           </div>
@@ -831,177 +661,14 @@ export const Friends: React.FC<FriendsProps> = ({ currentUser }) => {
           </div>
         </Modal>
       )}
-      {/* Game History Modal - Standalone */}
-      {showHistoryModal && (
-        <Modal
-          onClose={() => setShowHistoryModal(false)}
-          title="跑团履历"
-          icon={History}
-          className="max-w-2xl"
-        >
-          <div className="flex border-b border-white/5">
-            <button
-              onClick={() => setHistoryTab("player")}
-              className={`flex-1 py-3 text-sm font-bold transition-colors ${
-                historyTab === "player"
-                  ? "bg-slate-800/50 text-white border-b-2 border-indigo-500"
-                  : "text-slate-500 hover:text-slate-300 hover:bg-slate-800/30"
-              }`}
-            >
-              参与的团 ({playerHistory.length})
-            </button>
-            <button
-              onClick={() => setHistoryTab("kp")}
-              className={`flex-1 py-3 text-sm font-bold transition-colors ${
-                historyTab === "kp"
-                  ? "bg-slate-800/50 text-white border-b-2 border-indigo-500"
-                  : "text-slate-500 hover:text-slate-300 hover:bg-slate-800/30"
-              }`}
-            >
-              主持的团 ({kpHistory.length})
-            </button>
-          </div>
-
-          <div
-            ref={historyScrollRef}
-            className="p-4 max-h-[60vh] overflow-y-auto custom-scrollbar overscroll-y-none"
-          >
-            <div ref={historyContentRef}>
-              {historyTab === "player" ? (
-                <div className="space-y-3">
-                  {playerHistory.length === 0 && (
-                    <div className="text-center text-slate-500 py-4 text-sm">
-                      暂无参与记录
-                    </div>
-                  )}
-                  {playerHistory.map((item) => {
-                    const snapshot = item.character_snapshot;
-                    const latest = (item as any).latest_character;
-                    const char = latest || snapshot;
-
-                    // Safely extract data from either structure
-                    const name = char.name;
-                    const avatarUrl =
-                      char.info?.avatar_url ||
-                      char.avatar_url ||
-                      snapshot.info?.avatar_url ||
-                      snapshot.avatar_url;
-                    const job =
-                      char.info?.job ||
-                      char.job ||
-                      snapshot.info?.job ||
-                      snapshot.job ||
-                      "无职业";
-                    const sex =
-                      char.info?.sex ||
-                      char.sex ||
-                      snapshot.info?.sex ||
-                      snapshot.sex ||
-                      "未知";
-
-                    const isDead = item.outcome === "死亡";
-                    const isLost = item.outcome === "失踪";
-                    const isCrazy = item.outcome === "疯狂";
-
-                    return (
-                      <div
-                        key={item.id}
-                        className={`relative p-4 rounded-xl border transition-all ${
-                          isDead
-                            ? "bg-slate-950 border-slate-800 grayscale"
-                            : "bg-slate-800/50 border-slate-700/50 hover:border-indigo-500/30"
-                        }`}
-                      >
-                        <div className="flex justify-between items-start mb-3">
-                          <div>
-                            <h4 className="font-bold text-white text-base line-clamp-1">
-                              {item.game_history.room_title}
-                            </h4>
-                            <div className="text-xs text-slate-500 flex items-center gap-2 mt-1">
-                              <History size={12} />
-                              {new Date(
-                                item.game_history.created_at
-                              ).toLocaleDateString()}
-                              <span className="w-1 h-1 rounded-full bg-slate-600"></span>
-                              KP: {item.game_history.kp_nickname}
-                            </div>
-                          </div>
-                          <div
-                            className={`px-2 py-0.5 rounded text-[10px] font-bold border uppercase tracking-wider flex items-center gap-1 ${
-                              isDead
-                                ? "bg-slate-800 text-slate-400 border-slate-700"
-                                : isLost
-                                ? "bg-amber-900/20 text-amber-400 border-amber-500/20"
-                                : isCrazy
-                                ? "bg-purple-900/20 text-purple-400 border-purple-500/20"
-                                : "bg-emerald-900/20 text-emerald-400 border-emerald-500/20"
-                            }`}
-                          >
-                            {isDead && <Skull size={10} />}
-                            {item.outcome}
-                          </div>
-                        </div>
-
-                        <div className="flex items-center gap-3 bg-slate-950/30 p-2 rounded-lg border border-white/5">
-                          <AvatarUpload
-                            url={avatarUrl}
-                            onUpload={() => {}}
-                            editable={false}
-                            size={40}
-                          />
-                          <div>
-                            <div className="font-bold text-sm text-slate-200">
-                              {name}
-                            </div>
-                            <div className="text-[10px] text-slate-500">
-                              {job} · {sex}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {kpHistory.map((item) => (
-                    <div
-                      key={item.id}
-                      className="bg-slate-800/50 border border-slate-700/50 p-4 rounded-xl hover:border-indigo-500/30 transition-all"
-                    >
-                      <div className="flex justify-between items-start mb-2">
-                        <h4 className="font-bold text-white text-base">
-                          {item.room_title}
-                        </h4>
-                        <div className="px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 flex items-center gap-1">
-                          <Crown size={10} />
-                          Keeper
-                        </div>
-                      </div>
-                      <p className="text-xs text-slate-400 line-clamp-2 mb-3">
-                        {item.room_description || "暂无描述..."}
-                      </p>
-                      <div className="text-[10px] text-slate-500 font-mono bg-slate-950/50 px-2 py-1 rounded inline-block">
-                        结团于: {new Date(item.created_at).toLocaleString()}
-                      </div>
-                    </div>
-                  ))}
-                  {kpHistory.length === 0 && (
-                    <div className="text-center py-8 text-slate-500 text-sm">
-                      暂无主持记录
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
-          <div className="px-6 py-4 border-t border-white/10 bg-white/5 flex justify-end">
-            <Button variant="ghost" onClick={() => setShowHistoryModal(false)}>
-              关闭
-            </Button>
-          </div>
-        </Modal>
-      )}
+      <HomeHistoryModal
+        open={showHistoryModal}
+        historyTab={historyTab}
+        setHistoryTab={setHistoryTab}
+        kpHistory={kpHistory}
+        playerHistory={playerHistory}
+        onClose={() => setShowHistoryModal(false)}
+      />
       {/* Delete Confirmation Modal */}
       {showDeleteModal && (
         <Modal

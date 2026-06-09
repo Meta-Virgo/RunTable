@@ -61,18 +61,22 @@ vi.mock("../hooks/useSquareFeed", () => ({
   }),
 }));
 
-vi.mock("../services/square", () => ({
+vi.mock("../services/squareCommentsRepository", () => ({
   createComment: vi.fn(),
   createNotification: vi.fn(),
   deleteComment: vi.fn(),
-  fetchCharactersByIds: vi.fn(),
-  fetchKpHistory: vi.fn(),
-  fetchPlayerHistory: vi.fn(),
   fetchPostComments: vi.fn(),
   fetchProfileById: vi.fn(),
   fetchProfilesByIds: vi.fn(),
   likeComment: vi.fn(),
   unlikeComment: vi.fn(),
+}));
+
+vi.mock("../services/squareProfileRepository", () => ({
+  fetchCharactersByIds: vi.fn(),
+  fetchKpHistory: vi.fn(),
+  fetchPlayerHistory: vi.fn(),
+  fetchProfileById: vi.fn(),
 }));
 
 describe("Square Markdown integration", () => {

@@ -1,3 +1,5 @@
+import type { Character } from "../types";
+
 export type RoomMemberRole = "keeper" | "player" | "observer";
 export type RoomMemberStatus = "active" | "kicked" | "left";
 
@@ -32,6 +34,25 @@ export interface RoomAuthority {
 export interface RestoredRoomEntry {
   roomId: string;
   characterId: string;
+}
+
+export interface RoomMemberPanelItem {
+  userId: string;
+  role: RoomMemberRole;
+  status: "active";
+  isOnline: boolean;
+  canKick: boolean;
+  kickUserId: string | null;
+  displayName: string;
+  roleLabel: string;
+  characterId: string | null;
+  characterName: string | null;
+}
+
+interface BuildRoomMemberPanelItemsInput {
+  memberships: RoomMembership[];
+  characters: Character[];
+  onlineUsers: Set<string>;
 }
 
 export function getRestoredRoomEntry(
@@ -83,5 +104,101 @@ export function deriveRoomAuthority({
     isKP: isLegacyKeeper,
     canManageRoom: isLegacyKeeper,
     activeCharacterId: isLegacyKeeper ? "pc" : requestedCharacterId,
+  };
+}
+
+export function canKickRoomMembership(membership?: RoomMembership | null) {
+  return Boolean(
+    membership && membership.status === "active" && membership.role !== "keeper"
+  );
+}
+
+export function findKickableRoomMembership(
+  memberships: RoomMembership[],
+  userId: string
+) {
+  const membership = memberships.find(
+    (item) => item.user_id === userId && item.status === "active"
+  );
+
+  return canKickRoomMembership(membership) ? membership : null;
+}
+
+export function buildRoomMemberPanelItems({
+  memberships,
+  characters,
+  onlineUsers,
+}: BuildRoomMemberPanelItemsInput): RoomMemberPanelItem[] {
+  const charactersById = new Map(
+    characters.map((character) => [character.id, character])
+  );
+
+  return memberships
+    .filter((membership) => membership.status === "active")
+    .map((membership) => {
+      const character = membership.character_id
+        ? charactersById.get(membership.character_id)
+        : undefined;
+      const isKeeper = membership.role === "keeper";
+      const characterName = character?.name || null;
+      const roleLabel =
+        membership.role === "keeper"
+          ? "Keeper"
+          : membership.role === "observer"
+            ? "Observer"
+            : "Player";
+
+      return {
+        userId: membership.user_id,
+        role: membership.role,
+        status: "active" as const,
+        isOnline: onlineUsers.has(membership.user_id),
+        canKick: !isKeeper,
+        kickUserId: isKeeper ? null : membership.user_id,
+        displayName: isKeeper ? "Keeper" : characterName || roleLabel,
+        roleLabel,
+        characterId: membership.character_id,
+        characterName,
+      };
+    })
+    .sort((a, b) => {
+      if (a.role === b.role) return a.displayName.localeCompare(b.displayName);
+      if (a.role === "keeper") return -1;
+      if (b.role === "keeper") return 1;
+      return 0;
+    });
+}
+
+export function removeRoomMemberByUserId(
+  memberships: RoomMembership[],
+  userId: string
+) {
+  return memberships.filter((membership) => membership.user_id !== userId);
+}
+
+export function applyRoomMemberRemovedLocally(input: {
+  characters: Character[];
+  roomMembers: RoomMembership[];
+  activeCharId: string;
+  removedCharacterId?: string | null;
+  removedUserId?: string | null;
+}) {
+  const nextCharacters = input.removedCharacterId
+    ? input.characters.filter(
+        (character) => character.id !== input.removedCharacterId
+      )
+    : input.characters;
+  const nextRoomMembers = input.removedUserId
+    ? removeRoomMemberByUserId(input.roomMembers, input.removedUserId)
+    : input.roomMembers;
+  const nextActiveCharId =
+    input.removedCharacterId && input.activeCharId === input.removedCharacterId
+      ? "pc"
+      : input.activeCharId;
+
+  return {
+    characters: nextCharacters,
+    roomMembers: nextRoomMembers,
+    activeCharId: nextActiveCharId,
   };
 }

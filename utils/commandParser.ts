@@ -1,8 +1,57 @@
-export interface DiceCommand {
-  type: 'roll' | 'roll_hidden' | 'check' | 'sanity' | 'set' | 'coc_rule' | 'help' | 'error';
-  payload?: any;
-  original?: string;
-}
+export type StatChange = {
+  stat: string;
+  type: "=" | "+" | "-";
+  value: number;
+};
+
+export type CocRuleCommandPayload =
+  | {
+      rule: "growth";
+      skill: string;
+      currentValue: number;
+      roll: number;
+    }
+  | {
+      rule: "bonus_penalty";
+      mode: "bonus" | "penalty";
+      tensRolls: number[];
+      onesRoll: number;
+    }
+  | {
+      rule: "opposed";
+      challenger: { name: string; target: number; roll: number };
+      defender: { name: string; target: number; roll: number };
+    };
+
+export type DiceCommand =
+  | {
+      type: "roll" | "roll_hidden";
+      payload: {
+        expression: string;
+        reason: string;
+      };
+      original?: string;
+    }
+  | {
+      type: "check";
+      payload:
+        | { targetExpression: string; skill?: never; modifier?: never }
+        | { skill: string; modifier?: string; targetExpression?: never };
+      original?: string;
+    }
+  | {
+      type: "sanity";
+      payload: {
+        success: string;
+        failure: string;
+        value?: number;
+      };
+      original?: string;
+    }
+  | { type: "set"; payload: StatChange[]; original?: string }
+  | { type: "coc_rule"; payload: CocRuleCommandPayload; original?: string }
+  | { type: "help"; original?: string }
+  | { type: "error"; payload: string; original?: string };
 
 export const parseDiceCommand = (input: string): DiceCommand | null => {
   if (!input.startsWith('.') && !input.startsWith('。')) return null;
@@ -213,9 +262,9 @@ export const parseDiceCommand = (input: string): DiceCommand | null => {
        return { type: 'help' }; // or error
     }
 
-    const changes = matches.map(m => ({
+    const changes = matches.map((m): StatChange => ({
       stat: m[1],
-      type: m[2] || '=',
+      type: (m[2] || '=') as StatChange["type"],
       value: parseInt(m[3])
     }));
 

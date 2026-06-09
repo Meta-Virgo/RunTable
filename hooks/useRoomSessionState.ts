@@ -1,34 +1,10 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef } from "react";
 import type { Log } from "../types";
-import { getCurrentUser } from "../services/auth";
-import {
-  addRoomSystemMessage,
-  concludeRoom,
-  deleteRoom,
-  fetchCurrentRoomMembership,
-  fetchProfileNickname,
-  fetchRoomById,
-  fetchRoomCharacters,
-  joinRoom as joinRoomRpc,
-  kickRoomMember,
-  updateRoomMusicState,
-  updateRoomMusicUrl,
-} from "../services/rooms";
-import {
-  addMessage,
-  deleteMessage,
-  deleteRoomMessages,
-  fetchMessagesBefore,
-  fetchMessagesPage,
-  mapMessagesToLogs,
-} from "../services/messages";
-import { removeCharacterFromRoom } from "../services/characters";
-import { mapCharacterRow } from "../utils/characterMapper";
-import { buildStoryReport } from "../utils/storyReport";
 import {
   clearRoomSessionChat,
   concludeRoomSession,
   deleteRoomSession,
+  updateRoomSessionModuleSettings,
   updateRoomSessionMusicState,
   updateRoomSessionMusicUrl,
 } from "./roomSessionActions";
@@ -52,16 +28,17 @@ import {
   type RoomSessionState,
 } from "./roomSessionReducer";
 import { buildRoomStory } from "./roomSessionStory";
+import { createRoomSessionRemoteAdapters } from "./roomSessionRemoteAdapters";
 import {
   createRoomRealtimeAdapter,
   useRoomRealtime,
 } from "./useRoomRealtime";
-import type { RoomMemberRole, RoomMemberStatus } from "../services/roomAuthority";
 import {
   buildRoomMemberPanelItems,
-  fetchRoomMembers,
-} from "../services/roomMembers";
-import type { RoomMemberPanelItem } from "../services/roomMembers";
+  type RoomMemberRole,
+  type RoomMemberStatus,
+  type RoomMemberPanelItem,
+} from "../services/roomAuthority";
 import { useRoomVoiceSession } from "./useRoomVoiceSession";
 import {
   buildAppliedRoomSnapshotState,
@@ -103,6 +80,7 @@ export function useRoomSessionState({
     () => createRoomSessionStateDispatchers(dispatch),
     []
   );
+  const remoteAdapters = useMemo(() => createRoomSessionRemoteAdapters(), []);
   const {
     currentRoomId,
     roomType,
@@ -169,17 +147,7 @@ export function useRoomSessionState({
       const result = await joinRoomSessionAction({
         input: { roomId, charId, password, isRestoring },
         isCurrent: () => joinSequenceRef.current.isCurrent(joinSequence),
-        adapters: {
-          fetchRoomById,
-          getCurrentUser,
-          fetchCurrentRoomMembership,
-          joinRoom: joinRoomRpc,
-          fetchRoomCharacters,
-          fetchRoomMembers,
-          mapCharacterRow,
-          fetchProfileNickname,
-          addRoomSystemMessage,
-        },
+        adapters: remoteAdapters.join,
       });
 
       if (!result.ok) return result;
@@ -206,7 +174,7 @@ export function useRoomSessionState({
 
       return { ok: true };
     },
-    [applyRoomSnapshot, stateDispatchers]
+    [applyRoomSnapshot, remoteAdapters, stateDispatchers]
   );
 
   const restoreRoomFromUrl = useCallback(async () => {
@@ -216,8 +184,7 @@ export function useRoomSessionState({
     const result = await restoreRoomSessionFromUrl({
       roomId,
       adapters: {
-        getCurrentUser,
-        fetchCurrentRoomMembership,
+        ...remoteAdapters.restore,
         joinRoomSession,
       },
     });
@@ -225,7 +192,7 @@ export function useRoomSessionState({
     if (result.action === "clear-url" || result.action === "restored") {
       window.history.replaceState(null, "", window.location.pathname);
     }
-  }, [joinRoomSession]);
+  }, [joinRoomSession, remoteAdapters]);
 
   const clearRoomSession = useCallback(() => {
     joinSequenceRef.current.invalidate();
@@ -250,10 +217,7 @@ export function useRoomSessionState({
           userNickname,
           characters: charactersRef.current,
         },
-        adapters: {
-          getCurrentUser,
-          addMessage,
-        },
+        adapters: remoteAdapters.leaveMessage,
       });
 
       clearRoomSession();
@@ -265,6 +229,7 @@ export function useRoomSessionState({
       isKP,
       userId,
       userNickname,
+      remoteAdapters,
     ]);
 
   const addLog = useCallback(
@@ -286,43 +251,43 @@ export function useRoomSessionState({
         customCharId,
         recipientId,
         meta,
-        addMessage,
+        addMessage: remoteAdapters.addLog.addMessage,
       });
     },
-    [activeCharId, currentRoomId, userId]
+    [activeCharId, currentRoomId, remoteAdapters, userId]
   );
 
   const deleteCurrentRoom =
     useCallback(async (): Promise<RoomSessionActionResult> => {
       const result = await deleteRoomSession({
         roomId: currentRoomId,
-        deleteRoom,
+        deleteRoom: remoteAdapters.deleteRoom.deleteRoom,
       });
 
       if (!result.ok) return result;
       clearRoomSession();
       return { ok: true };
-    }, [clearRoomSession, currentRoomId]);
+    }, [clearRoomSession, currentRoomId, remoteAdapters]);
 
   const clearCurrentRoomChat =
     useCallback(async (): Promise<RoomSessionActionResult> => {
       const result = await clearRoomSessionChat({
         roomId: currentRoomId,
-        deleteRoomMessages,
+        deleteRoomMessages: remoteAdapters.clearChat.deleteRoomMessages,
       });
 
       if (!result.ok) return result;
       stateDispatchers.replaceLogs([]);
       await addLog("system", buildRoomChatClearedMessage());
       return { ok: true };
-    }, [addLog, currentRoomId, stateDispatchers]);
+    }, [addLog, currentRoomId, remoteAdapters, stateDispatchers]);
 
   const deleteCurrentRoomMessage =
     useCallback(
       async (messageId: string): Promise<RoomSessionActionResult> => {
         const result = await deleteRoomSessionMessage({
           messageId,
-          deleteMessage,
+          deleteMessage: remoteAdapters.deleteMessage.deleteMessage,
         });
 
         if (!result.ok) return result;
@@ -331,7 +296,7 @@ export function useRoomSessionState({
         );
         return { ok: true };
       },
-      [stateDispatchers]
+      [remoteAdapters, stateDispatchers]
     );
 
   const buildCurrentRoomStory =
@@ -339,11 +304,9 @@ export function useRoomSessionState({
       return buildRoomStory({
         roomId: currentRoomId,
         currentUserId: userId,
-        fetchMessagesPage,
-        mapMessagesToLogs,
-        buildStoryReport,
+        ...remoteAdapters.story,
       });
-    }, [currentRoomId, userId]);
+    }, [currentRoomId, remoteAdapters, userId]);
 
   const removeRoomCharacter = useCallback(
     async (characterId: string): Promise<RoomSessionActionResult> => {
@@ -357,11 +320,7 @@ export function useRoomSessionState({
           characters: currentCharacters,
           roomMembers,
         },
-        adapters: {
-          kickRoomMember,
-          removeCharacterFromRoom,
-          addMessage,
-        },
+        adapters: remoteAdapters.removeCharacter,
       });
 
       if (result.nextState) {
@@ -373,7 +332,7 @@ export function useRoomSessionState({
       }
       return { ok: result.ok, message: result.message };
     },
-    [activeCharId, currentRoomId, roomMembers, stateDispatchers, userId]
+    [activeCharId, currentRoomId, remoteAdapters, roomMembers, stateDispatchers, userId]
   );
 
   const kickRoomMemberByUserId = useCallback(
@@ -388,10 +347,7 @@ export function useRoomSessionState({
           characters: currentCharacters,
           roomMembers,
         },
-        adapters: {
-          kickRoomMember,
-          addMessage,
-        },
+        adapters: remoteAdapters.kickMember,
       });
 
       if (result.nextState) {
@@ -403,7 +359,7 @@ export function useRoomSessionState({
       }
       return { ok: result.ok, message: result.message };
     },
-    [activeCharId, currentRoomId, roomMembers, stateDispatchers, userId]
+    [activeCharId, currentRoomId, remoteAdapters, roomMembers, stateDispatchers, userId]
   );
 
   const concludeCurrentRoom = useCallback(
@@ -414,14 +370,37 @@ export function useRoomSessionState({
         roomId: currentRoomId,
         isKeeper: isKP,
         outcomes,
-        concludeRoom,
+        concludeRoom: remoteAdapters.conclude.concludeRoom,
       });
 
       if (!result.ok) return result;
       clearRoomSession();
       return { ok: true };
     },
-    [clearRoomSession, currentRoomId, isKP]
+    [clearRoomSession, currentRoomId, isKP, remoteAdapters]
+  );
+
+  const updateModuleSettings = useCallback(
+    async (
+      info: Parameters<RoomSessionActions["updateModuleSettings"]>[0],
+      password?: string
+    ): Promise<RoomSessionActionResult> => {
+      const result = await updateRoomSessionModuleSettings({
+        roomId: currentRoomId,
+        isKeeper: isKP,
+        info: {
+          title: info.title,
+          description: info.description,
+        },
+        password,
+        ...remoteAdapters.moduleSettings,
+      });
+
+      if (!result.ok) return result;
+      stateDispatchers.applyModuleSettings(info, password);
+      return { ok: true };
+    },
+    [currentRoomId, isKP, remoteAdapters, stateDispatchers]
   );
 
   const updateMusicUrl = useCallback(
@@ -430,13 +409,13 @@ export function useRoomSessionState({
         roomId: currentRoomId,
         isKeeper: isKP,
         url,
-        updateRoomMusicUrl,
+        updateRoomMusicUrl: remoteAdapters.musicUrl.updateRoomMusicUrl,
       });
       if (!result.ok && result.message) {
         alert(result.message);
       }
     },
-    [currentRoomId, isKP]
+    [currentRoomId, isKP, remoteAdapters]
   );
 
   const updateMusicState = useCallback(
@@ -446,7 +425,7 @@ export function useRoomSessionState({
         isKeeper: isKP,
         isPlaying,
         trackIndex,
-        updateRoomMusicState,
+        updateRoomMusicState: remoteAdapters.musicState.updateRoomMusicState,
       });
 
       if (result.missingMusicSyncSchema && !hasWarnedMusicSchemaRef.current) {
@@ -461,7 +440,7 @@ export function useRoomSessionState({
         console.error(result.message);
       }
     },
-    [currentRoomId, isKP]
+    [currentRoomId, isKP, remoteAdapters]
   );
 
   const loadMoreLogs = useCallback(async () => {
@@ -480,8 +459,7 @@ export function useRoomSessionState({
       const result = await fetchOlderRoomSessionLogs({
         request,
         currentUserId: userId,
-        fetchMessagesBefore,
-        mapMessagesToLogs,
+        ...remoteAdapters.olderLogs,
       });
 
       if (!result.ok) return;
@@ -500,6 +478,7 @@ export function useRoomSessionState({
     isLoadingMore,
     logs,
     pageSize,
+    remoteAdapters,
     stateDispatchers,
     userId,
   ]);
@@ -600,6 +579,7 @@ export function useRoomSessionState({
     removeRoomCharacter,
     kickRoomMemberByUserId,
     concludeCurrentRoom,
+    updateModuleSettings,
     updateMusicUrl,
     updateMusicState,
     loadMoreLogs,
@@ -609,7 +589,6 @@ export function useRoomSessionState({
   const localUpdates: RoomSessionLocalUpdates = {
     replaceCharacters: stateDispatchers.replaceCharacters,
     selectActiveCharacter: stateDispatchers.selectActiveCharacter,
-    applyModuleSettings: stateDispatchers.applyModuleSettings,
     markVoiceConnected: voiceSession.actions.markConnected,
     markVoiceReconnecting: voiceSession.actions.markReconnecting,
     markVoiceDisconnected: voiceSession.actions.markDisconnected,

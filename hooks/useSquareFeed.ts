@@ -16,7 +16,7 @@ import {
   likePost,
   unlikePost,
   uploadPostImage,
-} from "../services/square";
+} from "../services/squareFeedRepository";
 import { createSquareFeedExecutor } from "../services/squareFeedModel";
 
 const DEFAULT_CHANNEL_NAME = "闲聊大厅";

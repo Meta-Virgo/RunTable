@@ -5,11 +5,8 @@ import type {
   RoomMembership,
   RoomMemberRole,
   RoomMemberStatus,
+  RoomMemberPanelItem,
 } from "../services/roomAuthority";
-import {
-  removeRoomMemberByUserId,
-  type RoomMemberPanelItem,
-} from "../services/roomMembers";
 
 export type VoiceConnectionStatus =
   | "idle"
@@ -107,6 +104,10 @@ export interface RoomSessionActions {
   concludeCurrentRoom: (
     outcomes: Record<string, string>
   ) => Promise<RoomSessionActionResult>;
+  updateModuleSettings: (
+    info: ModuleInfo,
+    password?: string
+  ) => Promise<RoomSessionActionResult>;
   updateMusicUrl: (url: string) => Promise<void>;
   updateMusicState: (isPlaying: boolean, trackIndex: number) => Promise<void>;
   loadMoreLogs: () => Promise<void>;
@@ -116,7 +117,6 @@ export interface RoomSessionActions {
 export interface RoomSessionLocalUpdates {
   replaceCharacters: (update: SetStateAction<Character[]>) => void;
   selectActiveCharacter: Dispatch<SetStateAction<string>>;
-  applyModuleSettings: (info: ModuleInfo, password?: string) => void;
   markVoiceConnected: () => void;
   markVoiceReconnecting: () => void;
   markVoiceDisconnected: (message: string) => void;
@@ -389,33 +389,6 @@ export function buildRoomActionFailureMessage(
 
 export function removeRoomLogById(logs: Log[], messageId: string) {
   return logs.filter((log) => log.id !== messageId);
-}
-
-export function applyRoomMemberRemovedLocally(input: {
-  characters: Character[];
-  roomMembers: RoomMembership[];
-  activeCharId: string;
-  removedCharacterId?: string | null;
-  removedUserId?: string | null;
-}) {
-  const nextCharacters = input.removedCharacterId
-    ? input.characters.filter(
-        (character) => character.id !== input.removedCharacterId
-      )
-    : input.characters;
-  const nextRoomMembers = input.removedUserId
-    ? removeRoomMemberByUserId(input.roomMembers, input.removedUserId)
-    : input.roomMembers;
-  const nextActiveCharId =
-    input.removedCharacterId && input.activeCharId === input.removedCharacterId
-      ? "pc"
-      : input.activeCharId;
-
-  return {
-    characters: nextCharacters,
-    roomMembers: nextRoomMembers,
-    activeCharId: nextActiveCharId,
-  };
 }
 
 export function shouldWarnMissingMusicSyncSchema(error: {

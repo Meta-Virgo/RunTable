@@ -3,6 +3,7 @@ import {
   clearRoomSessionChat,
   concludeRoomSession,
   deleteRoomSession,
+  updateRoomSessionModuleSettings,
   updateRoomSessionMusicState,
   updateRoomSessionMusicUrl,
 } from "./roomSessionActions";
@@ -88,6 +89,62 @@ describe("room session actions", () => {
       })
     ).resolves.toEqual({ ok: true });
     expect(updateRoomMusicUrl).toHaveBeenCalledWith("room-1", "song:1");
+  });
+
+  it("updates room module settings and optional password only for keeper sessions", async () => {
+    const updateRoomModule = vi.fn().mockResolvedValue({ error: null });
+    const setRoomPassword = vi.fn().mockResolvedValue(undefined);
+
+    await expect(
+      updateRoomSessionModuleSettings({
+        roomId: "room-1",
+        isKeeper: false,
+        info: { title: "Room", description: "desc" },
+        password: "pw",
+        updateRoomModule,
+        setRoomPassword,
+      })
+    ).resolves.toEqual({ ok: false });
+    expect(updateRoomModule).not.toHaveBeenCalled();
+    expect(setRoomPassword).not.toHaveBeenCalled();
+
+    await expect(
+      updateRoomSessionModuleSettings({
+        roomId: "room-1",
+        isKeeper: true,
+        info: { title: "Room", description: "desc" },
+        password: "pw",
+        updateRoomModule,
+        setRoomPassword,
+      })
+    ).resolves.toEqual({ ok: true });
+    expect(updateRoomModule).toHaveBeenCalledWith("room-1", {
+      title: "Room",
+      description: "desc",
+    });
+    expect(setRoomPassword).toHaveBeenCalledWith("room-1", "pw");
+  });
+
+  it("does not update the room password when module settings fail", async () => {
+    const consoleError = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => undefined);
+    const setRoomPassword = vi.fn().mockResolvedValue(undefined);
+
+    await expect(
+      updateRoomSessionModuleSettings({
+        roomId: "room-1",
+        isKeeper: true,
+        info: { title: "Room", description: "desc" },
+        password: "pw",
+        updateRoomModule: vi.fn().mockResolvedValue({
+          error: { message: "denied" },
+        }),
+        setRoomPassword,
+      })
+    ).resolves.toEqual({ ok: false, message: "淇濆瓨澶辫触: denied" });
+    expect(setRoomPassword).not.toHaveBeenCalled();
+    consoleError.mockRestore();
   });
 
   it("marks missing music sync schema warnings separately from other failures", async () => {

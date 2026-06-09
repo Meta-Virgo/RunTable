@@ -1,50 +1,27 @@
 import { useCallback, useEffect, useState } from "react";
 import { supabase } from "../supabase";
-import { Character, GameHistory, GameHistoryParticipant } from "../types";
+import { GameHistory } from "../types";
 import { getCurrentUser, updatePassword } from "../services/auth";
 import {
   createProfileForUser,
   fetchProfileDetails,
   updateProfile,
 } from "../services/profiles";
+import {
+  fetchCharactersByIds,
+  fetchFriendRequestCount,
+  fetchKpHistory,
+  fetchPlayerHistory,
+} from "../services/homeProfileRepository";
+import {
+  fetchHomeProfileHistory,
+  type HomePlayerHistoryItem,
+} from "../services/homeProfileModel";
 
 interface ActionResult {
   ok: boolean;
   message?: string;
 }
-
-const applyLatestCharacterSnapshots = async (
-  participants: any[]
-): Promise<(GameHistoryParticipant & { game_history: GameHistory })[]> => {
-  const characterIds = participants
-    .map((participant) => participant.character_snapshot?.id)
-    .filter(Boolean);
-  let characterMap = new Map<string, Character>();
-
-  if (characterIds.length > 0) {
-    const { data: latestCharacters } = await supabase
-      .from("characters")
-      .select("*")
-      .in("id", characterIds);
-
-    if (latestCharacters) {
-      characterMap = new Map(
-        latestCharacters.map((character) => [character.id, character])
-      );
-    }
-  }
-
-  return participants
-    .map((participant) => ({
-      ...participant,
-      latest_character: characterMap.get(participant.character_snapshot?.id),
-    }))
-    .sort(
-      (a, b) =>
-        new Date(b.game_history.created_at).getTime() -
-        new Date(a.game_history.created_at).getTime()
-    );
-};
 
 export function useHomeProfileData() {
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
@@ -56,9 +33,7 @@ export function useHomeProfileData() {
   const [userCreatedAt, setUserCreatedAt] = useState<string | null>(null);
   const [isVip, setIsVip] = useState(false);
   const [kpHistory, setKpHistory] = useState<GameHistory[]>([]);
-  const [playerHistory, setPlayerHistory] = useState<
-    (GameHistoryParticipant & { game_history: GameHistory })[]
-  >([]);
+  const [playerHistory, setPlayerHistory] = useState<HomePlayerHistoryItem[]>([]);
   const [friendRequestCount, setFriendRequestCount] = useState(0);
 
   const applyProfile = useCallback((profile: any) => {
@@ -71,11 +46,7 @@ export function useHomeProfileData() {
   }, []);
 
   const refreshFriendRequestCount = useCallback(async (userId: string) => {
-    const { count, error } = await supabase
-      .from("friendships")
-      .select("id", { count: "exact" })
-      .eq("friend_id", userId)
-      .eq("status", "pending");
+    const { count, error } = await fetchFriendRequestCount(userId);
 
     if (!error && count !== null) {
       setFriendRequestCount(count);
@@ -83,23 +54,17 @@ export function useHomeProfileData() {
   }, []);
 
   const refreshGameHistory = useCallback(async (userId: string) => {
-    const { data: kpData } = await supabase
-      .from("game_histories")
-      .select("*")
-      .eq("kp_id", userId)
-      .order("created_at", { ascending: false });
+    const result = await fetchHomeProfileHistory({
+      userId,
+      repository: {
+        fetchKpHistory,
+        fetchPlayerHistory,
+        fetchCharactersByIds,
+      },
+    });
 
-    if (kpData) setKpHistory(kpData);
-
-    const { data: playerData } = await supabase
-      .from("game_history_participants")
-      .select(`*, game_history:game_histories (*)`)
-      .eq("user_id", userId)
-      .order("id", { ascending: false });
-
-    if (playerData) {
-      setPlayerHistory(await applyLatestCharacterSnapshots(playerData as any[]));
-    }
+    setKpHistory(result.kpHistory);
+    setPlayerHistory(result.playerHistory);
   }, []);
 
   useEffect(() => {

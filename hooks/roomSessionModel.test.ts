@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 import {
   buildAppliedRoomSnapshotState,
   buildClearedRoomSessionState,
-  applyRoomMemberRemovedLocally,
   buildRoomActionFailureMessage,
   buildRoomActionFailureResult,
   buildVoiceConnectedState,
@@ -28,6 +27,7 @@ import {
   shouldLoadMoreRoomLogs,
   shouldWarnMissingMusicSyncSchema,
 } from "./roomSessionModel";
+import { applyRoomMemberRemovedLocally } from "../services/roomAuthority";
 
 describe("room session model", () => {
   const character = (id: string, userId?: string) =>

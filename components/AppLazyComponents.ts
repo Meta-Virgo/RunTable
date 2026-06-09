@@ -25,23 +25,31 @@ export const RoomTools = lazy(() =>
 );
 
 export const ModuleModal = lazy(() =>
-  import("./Modals").then((module) => ({ default: module.ModuleModal }))
+  import("./modals/ModuleModal").then((module) => ({
+    default: module.ModuleModal,
+  }))
 );
 
 export const CharacterModal = lazy(() =>
-  import("./Modals").then((module) => ({ default: module.CharacterModal }))
+  import("./modals/CharacterModal").then((module) => ({
+    default: module.CharacterModal,
+  }))
 );
 
 export const StatusModal = lazy(() =>
-  import("./Modals").then((module) => ({ default: module.StatusModal }))
+  import("./modals/StatusModal").then((module) => ({
+    default: module.StatusModal,
+  }))
 );
 
 export const StoryModal = lazy(() =>
-  import("./Modals").then((module) => ({ default: module.StoryModal }))
+  import("./modals/StoryModal").then((module) => ({ default: module.StoryModal }))
 );
 
 export const ConclusionModal = lazy(() =>
-  import("./Modals").then((module) => ({ default: module.ConclusionModal }))
+  import("./modals/ConclusionModal").then((module) => ({
+    default: module.ConclusionModal,
+  }))
 );
 
 export const LiveKitRoom = lazy(() =>
