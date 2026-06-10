@@ -43,20 +43,21 @@ export const Button: React.FC<ButtonProps> = ({
   };
   const variants = {
     primary:
-      "bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-500/20 border border-indigo-500/50",
+      "bg-dicecho-primary-strong hover:bg-dicecho-primary text-white shadow-sm hover:shadow-md border border-dicecho-primary/70",
     secondary:
-      "bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 hover:border-slate-500",
+      "bg-dicecho-raised/80 hover:bg-dicecho-raised text-slate-100 border border-dicecho-border/60 hover:border-dicecho-primary/50",
     ghost:
-      "text-slate-400 hover:text-indigo-300 hover:bg-white/5 bg-transparent border border-transparent",
+      "text-dicecho-muted hover:text-white hover:bg-white/10 bg-transparent border border-transparent",
     danger:
       "bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 hover:border-red-500/50",
     dangerActive:
       "bg-red-600 text-white border border-red-500 shadow-lg shadow-red-500/20",
     success:
       "bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg border border-emerald-500/50",
-    active: "bg-indigo-500/20 text-indigo-300 border border-indigo-500/30",
+    active:
+      "bg-dicecho-primary/20 text-white border border-dicecho-primary/40",
     primarySoft:
-      "bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 border border-indigo-500/20 hover:border-indigo-500/50",
+      "bg-dicecho-primary/10 hover:bg-dicecho-primary/20 text-dicecho-primary border border-dicecho-primary/30 hover:border-dicecho-primary/60",
   };
   return (
     <button
@@ -64,7 +65,7 @@ export const Button: React.FC<ButtonProps> = ({
       onClick={onClick}
       disabled={disabled}
       className={cn(
-        "flex items-center justify-center rounded-xl font-semibold transition-all duration-200 active:scale-95 disabled:opacity-50 disabled:active:scale-100",
+        "flex items-center justify-center rounded-lg font-semibold transition-all duration-200 active:scale-[0.98] disabled:opacity-50 disabled:active:scale-100",
         sizeClasses[size],
         active ? variants.active : variants[variant],
         className
@@ -88,14 +89,14 @@ interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
 }
 
 export const Input: React.FC<InputProps> = ({ label, className, ...props }) => (
-  <div className={cn("flex flex-col group", className)}>
+  <div className={cn("flex flex-col", className)}>
     {label && (
-      <label className="text-xs text-slate-400 mb-1.5 font-medium ml-1 group-focus-within:text-indigo-400 transition-colors">
+      <label className="text-xs text-dicecho-muted mb-1.5 font-medium ml-1">
         {label}
       </label>
     )}
     <input
-      className="bg-slate-900/50 border border-slate-700/50 text-slate-100 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 transition-all placeholder-slate-600 text-sm disabled:opacity-30 shadow-inner"
+      className="bg-dicecho-panel/70 border border-dicecho-border/50 text-slate-100 rounded-lg px-4 py-2.5 focus:outline-none focus:border-dicecho-primary/70 transition-colors duration-150 placeholder-slate-400/60 text-sm disabled:opacity-30 shadow-sm"
       {...props}
     />
   </div>
@@ -113,15 +114,15 @@ export const Textarea: React.FC<TextareaProps> = ({
   rows = 3,
   ...props
 }) => (
-  <div className={cn("flex flex-col w-full group", className)}>
+  <div className={cn("flex flex-col w-full", className)}>
     {label && (
-      <label className="text-xs text-slate-400 mb-1.5 font-medium ml-1 group-focus-within:text-indigo-400 transition-colors">
+      <label className="text-xs text-dicecho-muted mb-1.5 font-medium ml-1">
         {label}
       </label>
     )}
     <textarea
       rows={rows}
-      className="bg-slate-900/50 border border-slate-700/50 text-slate-100 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 transition-all placeholder-slate-600 text-sm resize-none custom-scrollbar shadow-inner"
+      className="bg-dicecho-panel/70 border border-dicecho-border/50 text-slate-100 rounded-lg px-4 py-3 focus:outline-none focus:border-dicecho-primary/70 transition-colors duration-150 placeholder-slate-400/60 text-sm resize-none custom-scrollbar shadow-sm"
       {...props}
     />
   </div>
@@ -210,7 +211,7 @@ export const NumberStepper: React.FC<NumberStepperProps> = ({
   return (
     <div
       className={cn(
-        "flex items-center bg-[#020617] rounded-xl border border-slate-700 shadow-sm group hover:border-slate-500 transition-all",
+        "flex items-center bg-dicecho-panel/70 rounded-lg border border-dicecho-border/50 shadow-sm group hover:border-dicecho-primary/50 transition-all",
         heightClass,
         disabled && "opacity-50 cursor-not-allowed",
         className
@@ -222,12 +223,12 @@ export const NumberStepper: React.FC<NumberStepperProps> = ({
         disabled={disabled || (min !== undefined && value <= min)}
         className={cn(
           buttonWidthClass,
-          "h-full flex items-center justify-center text-slate-400 hover:text-white active:bg-slate-800 rounded-l-xl transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+          "h-full flex items-center justify-center text-dicecho-muted hover:text-white active:bg-dicecho-raised rounded-l-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
         )}
       >
         <Minus size={14} strokeWidth={3} />
       </button>
-      <div className="flex-1 h-full border-x border-slate-800 flex items-center justify-center bg-slate-900/50 min-w-[3rem]">
+      <div className="flex-1 h-full border-x border-dicecho-border/30 flex items-center justify-center bg-dicecho-card/70 min-w-[3rem]">
         <input
           type="text"
           inputMode="numeric"
@@ -248,7 +249,7 @@ export const NumberStepper: React.FC<NumberStepperProps> = ({
         disabled={disabled || (max !== undefined && value >= max)}
         className={cn(
           buttonWidthClass,
-          "h-full flex items-center justify-center text-slate-400 hover:text-white active:bg-slate-800 rounded-r-xl transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+          "h-full flex items-center justify-center text-dicecho-muted hover:text-white active:bg-dicecho-raised rounded-r-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
         )}
       >
         <Plus size={14} strokeWidth={3} />
@@ -285,25 +286,24 @@ export const Modal: React.FC<ModalProps> = ({
       )}
     >
       <div
-        className="absolute inset-0 bg-black/80 backdrop-blur-sm"
+        className="absolute inset-0 bg-[#202636]/80 backdrop-blur-sm"
         onClick={onClose}
       ></div>
       <div
         className={cn(
-          "glass-panel bg-[#0f172a] rounded-3xl w-full relative z-10 overflow-hidden shadow-2xl flex flex-col max-h-[90vh]",
-          !instant && "animate-slide-up",
+          "glass-panel bg-dicecho-panel rounded-lg w-full relative z-10 overflow-hidden shadow-xl flex flex-col max-h-[90vh]",
           className
         )}
       >
         {title && (
           <div
             className={cn(
-              "px-6 md:px-8 py-4 md:py-6 border-b border-white/10 flex justify-between items-center bg-white/5 shrink-0",
+              "px-6 md:px-8 py-4 md:py-6 border-b border-dicecho-border/40 flex justify-between items-center bg-dicecho-card/60 shrink-0",
               headerClassName
             )}
           >
             <h3 className="text-lg md:text-xl font-bold text-white flex items-center gap-3">
-              {Icon && <Icon size={24} className="text-indigo-400" />}
+              {Icon && <Icon size={24} className="text-dicecho-primary" />}
               {title}
             </h3>
             <button
@@ -378,7 +378,7 @@ export const StatBadge: React.FC<{
     slate: {
       text: "text-slate-400",
       bg: "bg-slate-500",
-      track: "bg-slate-800/40",
+      track: "bg-dicecho-raised/45",
     },
   };
   const c = colorMap[color];

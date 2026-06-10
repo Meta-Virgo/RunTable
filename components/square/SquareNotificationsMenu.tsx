@@ -32,8 +32,8 @@ export const SquareNotificationsMenu: React.FC<
   return (
     <>
       <div className="fixed inset-0 z-40" onClick={onClose} />
-      <div className="absolute left-4 right-4 top-16 mt-2 md:left-auto md:right-0 md:top-full md:mt-2 w-auto md:w-80 bg-slate-800 border border-slate-700 rounded-xl shadow-xl z-50 overflow-hidden flex flex-col max-h-96 origin-top md:origin-top-right animate-scale-in">
-        <div className="p-3 border-b border-slate-700 font-bold text-sm text-slate-300 flex justify-between items-center">
+      <div className="absolute left-4 right-4 top-16 mt-2 md:left-auto md:right-0 md:top-full md:mt-2 w-auto md:w-80 bg-dicecho-panel border border-dicecho-border/50 rounded-lg shadow-lg shadow-black/25 z-50 overflow-hidden flex flex-col max-h-96 origin-top md:origin-top-right">
+        <div className="p-3 border-b border-dicecho-border/40 font-bold text-sm text-slate-200 flex justify-between items-center">
           <span>通知中心</span>
           {unreadCount > 0 && (
             <button
@@ -42,7 +42,7 @@ export const SquareNotificationsMenu: React.FC<
                   onMarkAsRead(notification.id)
                 )
               }
-              className="text-xs text-indigo-400 hover:text-indigo-300"
+              className="text-xs text-dicecho-primary hover:text-white"
             >
               全部已读
             </button>
@@ -50,7 +50,7 @@ export const SquareNotificationsMenu: React.FC<
         </div>
         <div className="overflow-y-auto flex-1 custom-scrollbar">
           {notifications.length === 0 ? (
-            <div className="p-8 text-center text-slate-500 text-xs">
+            <div className="p-8 text-center text-dicecho-muted text-xs">
               暂无通知
             </div>
           ) : (
@@ -58,22 +58,23 @@ export const SquareNotificationsMenu: React.FC<
               <div
                 key={notification.id}
                 className={cn(
-                  "p-3 border-b border-slate-700/50 hover:bg-slate-700/30 transition-colors cursor-pointer group",
-                  !notification.is_read && "bg-slate-700/20"
+                  "p-3 border-b transition-colors cursor-pointer group",
+                  "border-dicecho-border/30 hover:bg-white/10",
+                  !notification.is_read && "bg-dicecho-primary/10"
                 )}
                 onClick={() => {
                   onMarkAsRead(notification.id);
                 }}
               >
                 <div className="flex gap-3">
-                  <div className="w-8 h-8 rounded-full bg-slate-600 shrink-0 overflow-hidden">
+                  <div className="w-8 h-8 rounded-full bg-dicecho-card shrink-0 overflow-hidden border border-dicecho-border/40">
                     {notification.actor?.avatar_url ? (
                       <img
                         src={notification.actor.avatar_url}
                         className="w-full h-full object-cover"
                       />
                     ) : (
-                      <span className="flex items-center justify-center h-full text-xs font-bold text-slate-400">
+                      <span className="flex items-center justify-center h-full text-xs font-bold text-dicecho-muted">
                         {notification.actor?.nickname?.[0]}
                       </span>
                     )}
@@ -88,20 +89,20 @@ export const SquareNotificationsMenu: React.FC<
                         : " 评论了你的帖子"}
                     </p>
                     {notification.post?.content && (
-                      <p className="text-xs text-slate-500 truncate mt-1">
+                      <p className="text-xs text-dicecho-muted truncate mt-1">
                         "{summarizeMarkdown(notification.post.content)}"
                       </p>
                     )}
-                    <p className="text-[10px] text-slate-600 mt-1">
+                    <p className="text-[10px] text-dicecho-muted mt-1">
                       {new Date(notification.created_at).toLocaleString()}
                     </p>
                   </div>
                   <div className="flex flex-col items-end gap-2 shrink-0">
                     {!notification.is_read && (
-                      <div className="w-2 h-2 rounded-full bg-indigo-500 mt-1.5" />
+                      <div className="w-2 h-2 rounded-full bg-dicecho-primary mt-1.5" />
                     )}
                     <button
-                      className="text-slate-500 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity p-1"
+                      className="text-dicecho-muted hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity p-1"
                       onClick={(event) =>
                         onDeleteNotification(event, notification.id)
                       }
@@ -118,4 +119,3 @@ export const SquareNotificationsMenu: React.FC<
     </>
   );
 };
-

@@ -391,16 +391,22 @@ export function useRoomSessionState({
         info: {
           title: info.title,
           description: info.description,
+          coverImageUrl: info.coverImageUrl,
         },
         password,
         ...remoteAdapters.moduleSettings,
       });
 
       if (!result.ok) return result;
-      stateDispatchers.applyModuleSettings(info, password);
-      return { ok: true };
+      stateDispatchers.applyModuleSettings(
+        result.message
+          ? { ...info, coverImageUrl: moduleInfo.coverImageUrl }
+          : info,
+        password
+      );
+      return { ok: true, message: result.message };
     },
-    [currentRoomId, isKP, remoteAdapters, stateDispatchers]
+    [currentRoomId, isKP, moduleInfo.coverImageUrl, remoteAdapters, stateDispatchers]
   );
 
   const updateMusicUrl = useCallback(

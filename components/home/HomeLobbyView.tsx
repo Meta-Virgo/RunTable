@@ -1,16 +1,27 @@
 import React from "react";
-import { Loader2, MessageSquare, Mic, Plus, Search, Users } from "lucide-react";
+import {
+  Clock3,
+  Filter,
+  Hash,
+  Loader2,
+  MessageSquare,
+  Mic,
+  Plus,
+  Search,
+  Users,
+} from "lucide-react";
 import type { Character, Room } from "../../types";
-import { Button, Input, Textarea } from "../UI";
+import { Button, Input, Textarea, cn } from "../UI";
 import { RoomCard } from "../RoomCard";
+import type { LobbySortMode } from "../../hooks/useLobbyCatalog";
 
 type RoomFilter = "all" | "mine" | "created" | "kp_online";
 
-const ROOM_FILTERS: { id: RoomFilter; label: string }[] = [
-  { id: "all", label: "全部" },
-  { id: "mine", label: "我的角色" },
-  { id: "created", label: "我的房间" },
-  { id: "kp_online", label: "KP在线" },
+const ROOM_FILTERS: { id: RoomFilter; label: string; description: string }[] = [
+  { id: "all", label: "全部房间", description: "开放中的跑团" },
+  { id: "mine", label: "我的角色", description: "已加入的房间" },
+  { id: "created", label: "我的房间", description: "由我主持" },
+  { id: "kp_online", label: "KP 在线", description: "可立即沟通" },
 ];
 
 interface HomeLobbyViewProps {
@@ -21,7 +32,10 @@ interface HomeLobbyViewProps {
   setSearchQuery: (query: string) => void;
   roomFilter: string;
   setRoomFilter: (filter: RoomFilter) => void;
+  sortMode: LobbySortMode;
+  setSortMode: (sortMode: LobbySortMode) => void;
   myCharacters: Character[];
+  onlineUsers: Set<string>;
   onJoinRoom: (
     roomId: string,
     charId: string | "pc",
@@ -33,6 +47,8 @@ interface HomeLobbyViewProps {
   setNewRoomTitle: (title: string) => void;
   newRoomDesc: string;
   setNewRoomDesc: (description: string) => void;
+  newRoomCoverImageUrl: string;
+  setNewRoomCoverImageUrl: (url: string) => void;
   newRoomPassword: string;
   setNewRoomPassword: (password: string) => void;
   newRoomType: "text" | "voice";
@@ -49,7 +65,10 @@ export const HomeLobbyView: React.FC<HomeLobbyViewProps> = ({
   setSearchQuery,
   roomFilter,
   setRoomFilter,
+  sortMode,
+  setSortMode,
   myCharacters,
+  onlineUsers,
   onJoinRoom,
   showCreateRoom,
   setShowCreateRoom,
@@ -57,93 +76,159 @@ export const HomeLobbyView: React.FC<HomeLobbyViewProps> = ({
   setNewRoomTitle,
   newRoomDesc,
   setNewRoomDesc,
+  newRoomCoverImageUrl,
+  setNewRoomCoverImageUrl,
   newRoomPassword,
   setNewRoomPassword,
   newRoomType,
   setNewRoomType,
   loading,
   onCreateRoom,
-}) => (
-  <div className="space-y-6">
-    <div className="flex flex-col gap-4">
-      <div className="flex flex-col md:flex-row gap-4 justify-between items-center">
-        <div className="relative w-full md:w-96 group">
-          <Search
-            className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-indigo-400 transition-colors"
-            size={18}
-          />
-          <input
-            type="text"
-            placeholder="搜索房间..."
-            className="w-full bg-slate-900/50 border border-slate-700/50 rounded-xl pl-10 pr-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 transition-all text-sm"
-            value={searchQuery}
-            onChange={(event) => setSearchQuery(event.target.value)}
-          />
-        </div>
-        <Button icon={Plus} onClick={() => setShowCreateRoom(true)}>
-          创建房间
-        </Button>
-      </div>
+}) => {
+  const nextSortMode: LobbySortMode =
+    sortMode === "activity" ? "room_number" : "activity";
+  const SortIcon = sortMode === "activity" ? Clock3 : Hash;
 
-      <div className="flex gap-2 overflow-x-auto pb-2">
-        {ROOM_FILTERS.map((filter) => (
-          <button
-            key={filter.id}
-            onClick={() => setRoomFilter(filter.id)}
-            className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all whitespace-nowrap ${
-              roomFilter === filter.id
-                ? "bg-indigo-500/20 text-indigo-400 border border-indigo-500/30"
-                : "bg-slate-800/50 text-slate-400 border border-transparent hover:bg-slate-800 hover:text-slate-300"
-            }`}
-          >
-            {filter.label}
-          </button>
-        ))}
+  return (
+    <div className="space-y-6">
+      <section className="rounded-lg border border-dicecho-border/40 bg-dicecho-panel/75 p-4 shadow-sm md:p-5">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <h2 className="text-2xl font-bold tracking-normal text-white">
+              跑团大厅
+            </h2>
+            <p className="mt-1 max-w-2xl text-sm text-dicecho-muted">
+              欢迎来到我的酒馆~
+            </p>
+          </div>
+          <Button icon={Plus} onClick={() => setShowCreateRoom(!showCreateRoom)}>
+            {showCreateRoom ? "收起创建" : "创建房间"}
+          </Button>
+        </div>
+      </section>
+
+      <div className="grid gap-6 md:grid-cols-[16rem_minmax(0,1fr)]">
+        <aside className="space-y-4">
+          <div className="rounded-lg border border-dicecho-border/40 bg-dicecho-panel/75 p-4 shadow-sm">
+            <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-white">
+              <Filter size={16} className="text-dicecho-primary" />
+              筛选
+            </div>
+            <div className="space-y-2">
+              {ROOM_FILTERS.map((filter) => (
+                <button
+                  key={filter.id}
+                  onClick={() => setRoomFilter(filter.id)}
+                  className={cn(
+                    "w-full rounded-lg border px-3 py-2 text-left transition-all",
+                    roomFilter === filter.id
+                      ? "border-dicecho-primary/50 bg-dicecho-primary/20 text-white"
+                      : "border-transparent text-dicecho-muted hover:border-dicecho-border/50 hover:bg-white/10 hover:text-white"
+                  )}
+                >
+                  <span className="block text-sm font-semibold">
+                    {filter.label}
+                  </span>
+                  <span className="mt-0.5 block text-xs text-dicecho-muted">
+                    {filter.description}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="rounded-lg border border-dicecho-border/40 bg-dicecho-panel/75 p-4 text-sm shadow-sm">
+            <div className="flex items-center gap-2 font-semibold text-white">
+              <Users size={16} className="text-dicecho-accent" />
+              我的角色
+            </div>
+            <div className="mt-3 text-2xl font-bold text-white">
+              {myCharacters.length}
+            </div>
+            <p className="mt-1 text-xs text-dicecho-muted">
+              快找张桌子坐下
+            </p>
+          </div>
+        </aside>
+
+        <section className="min-w-0 space-y-4">
+          <div className="rounded-lg border border-dicecho-border/40 bg-dicecho-bg/90 p-3 shadow-sm backdrop-blur">
+            <div className="flex flex-col gap-3 md:flex-row md:items-center">
+              <div className="relative flex-1 group">
+                <Search
+                  className="absolute left-3 top-1/2 -translate-y-1/2 text-dicecho-muted"
+                  size={18}
+                />
+                <input
+                  type="text"
+                  placeholder="输入房间名、简介或房间号搜索"
+                  className="w-full rounded-lg border border-dicecho-border/50 bg-dicecho-panel/70 py-2.5 pl-10 pr-4 text-sm text-slate-100 shadow-sm transition-colors duration-150 placeholder:text-slate-400/60 focus:border-dicecho-primary/70 focus:outline-none"
+                  value={searchQuery}
+                  onChange={(event) => setSearchQuery(event.target.value)}
+                />
+              </div>
+              <div className="hidden items-center justify-end gap-3 text-sm text-dicecho-muted md:flex">
+                <button
+                  type="button"
+                  onClick={() => setSortMode(nextSortMode)}
+                  className="inline-flex items-center gap-1 rounded-lg border border-dicecho-border/40 px-2.5 py-1.5 text-xs transition-colors hover:border-dicecho-primary/50 hover:text-white"
+                >
+                  <SortIcon size={13} />
+                  {sortMode === "activity" ? "默认排序" : "按房间号排序"}
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {showCreateRoom && (
+            <CreateRoomPanel
+              loading={loading}
+              newRoomDesc={newRoomDesc}
+              newRoomCoverImageUrl={newRoomCoverImageUrl}
+              newRoomPassword={newRoomPassword}
+              newRoomTitle={newRoomTitle}
+              newRoomType={newRoomType}
+              setNewRoomDesc={setNewRoomDesc}
+              setNewRoomCoverImageUrl={setNewRoomCoverImageUrl}
+              setNewRoomPassword={setNewRoomPassword}
+              setNewRoomTitle={setNewRoomTitle}
+              setNewRoomType={setNewRoomType}
+              onCancel={() => setShowCreateRoom(false)}
+              onCreateRoom={onCreateRoom}
+            />
+          )}
+
+          {isLoadingRooms ? (
+            <div className="flex flex-col items-center justify-center rounded-lg border border-dicecho-border/30 bg-dicecho-panel/50 py-24 text-dicecho-muted animate-fade-in">
+              <Loader2 className="mb-4 h-10 w-10 animate-spin text-dicecho-primary" />
+              <p className="text-sm font-medium">正在加载房间...</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 gap-5 animate-fade-in md:grid-cols-2 xl:grid-cols-3">
+              {filteredRooms.map((room) => (
+                <RoomCard
+                  key={room.id}
+                  room={room}
+                  currentUserId={currentUserId}
+                  myCharacters={myCharacters}
+                  onlineUsers={onlineUsers}
+                  onJoinRoom={onJoinRoom}
+                />
+              ))}
+              {filteredRooms.length === 0 && (
+                <div className="col-span-full rounded-lg border border-dashed border-dicecho-border/40 bg-dicecho-panel/40 py-16 text-center text-dicecho-muted">
+                  <Users size={42} className="mx-auto mb-3 opacity-45" />
+                  <p className="font-medium text-slate-200">暂无匹配房间</p>
+                  <p className="mt-1 text-sm">换个关键词或筛选条件试试。</p>
+                </div>
+              )}
+            </div>
+          )}
+        </section>
       </div>
     </div>
-
-    {showCreateRoom && (
-      <CreateRoomPanel
-        loading={loading}
-        newRoomDesc={newRoomDesc}
-        newRoomPassword={newRoomPassword}
-        newRoomTitle={newRoomTitle}
-        newRoomType={newRoomType}
-        setNewRoomDesc={setNewRoomDesc}
-        setNewRoomPassword={setNewRoomPassword}
-        setNewRoomTitle={setNewRoomTitle}
-        setNewRoomType={setNewRoomType}
-        onCancel={() => setShowCreateRoom(false)}
-        onCreateRoom={onCreateRoom}
-      />
-    )}
-
-    {isLoadingRooms ? (
-      <div className="flex flex-col items-center justify-center py-24 text-slate-500 animate-fade-in">
-        <Loader2 className="w-12 h-12 animate-spin mb-4 text-indigo-500" />
-        <p className="text-slate-400 font-medium">正在加载房间...</p>
-      </div>
-    ) : (
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 animate-fade-in">
-        {filteredRooms.map((room) => (
-          <RoomCard
-            key={room.id}
-            room={room}
-            currentUserId={currentUserId}
-            myCharacters={myCharacters}
-            onJoinRoom={onJoinRoom}
-          />
-        ))}
-        {filteredRooms.length === 0 && (
-          <div className="col-span-full py-12 text-center text-slate-500">
-            <Users size={48} className="mx-auto mb-3 opacity-20" />
-            <p>暂无房间</p>
-          </div>
-        )}
-      </div>
-    )}
-  </div>
-);
+  );
+};
 
 const CreateRoomPanel: React.FC<{
   loading: boolean;
@@ -151,6 +236,8 @@ const CreateRoomPanel: React.FC<{
   setNewRoomTitle: (title: string) => void;
   newRoomDesc: string;
   setNewRoomDesc: (description: string) => void;
+  newRoomCoverImageUrl: string;
+  setNewRoomCoverImageUrl: (url: string) => void;
   newRoomPassword: string;
   setNewRoomPassword: (password: string) => void;
   newRoomType: "text" | "voice";
@@ -160,32 +247,37 @@ const CreateRoomPanel: React.FC<{
 }> = ({
   loading,
   newRoomDesc,
+  newRoomCoverImageUrl,
   newRoomPassword,
   newRoomTitle,
   newRoomType,
   setNewRoomDesc,
+  setNewRoomCoverImageUrl,
   setNewRoomPassword,
   setNewRoomTitle,
   setNewRoomType,
   onCancel,
   onCreateRoom,
 }) => (
-  <div className="bg-slate-800/30 border border-indigo-500/30 rounded-2xl p-6 animate-scale-in">
-    <h3 className="text-lg font-bold text-white mb-4">新建跑团房间</h3>
-    <div className="space-y-4">
-      <div className="flex gap-4">
+  <div className="rounded-lg border border-dicecho-primary/30 bg-dicecho-panel/80 p-5 shadow-sm animate-scale-in">
+    <h3 className="text-lg font-bold text-white">新建跑团房间</h3>
+    <p className="mt-1 text-sm text-dicecho-muted">
+      填写标题、简介、封面和加入方式，创建后会自动以 KP 身份进入。
+    </p>
+    <div className="mt-4 space-y-4">
+      <div className="grid grid-cols-2 gap-3">
         <RoomTypeButton
           active={newRoomType === "text"}
           icon={MessageSquare}
           label="文字团"
-          tone="indigo"
+          tone="primary"
           onClick={() => setNewRoomType("text")}
         />
         <RoomTypeButton
           active={newRoomType === "voice"}
           icon={Mic}
           label="语音团"
-          tone="pink"
+          tone="accent"
           onClick={() => setNewRoomType("voice")}
         />
       </div>
@@ -196,19 +288,25 @@ const CreateRoomPanel: React.FC<{
         placeholder="例如：印斯茅斯之影"
       />
       <Input
-        label="房间密码 (可选)"
+        label="封面 URL（可选）"
+        value={newRoomCoverImageUrl}
+        onChange={(event) => setNewRoomCoverImageUrl(event.target.value)}
+        placeholder="https://example.com/cover.jpg"
+      />
+      <Input
+        label="房间密码（可选）"
         value={newRoomPassword}
         onChange={(event) => setNewRoomPassword(event.target.value)}
         placeholder="留空则为公开房间"
         type="password"
       />
       <Textarea
-        label="简介 (可选)"
+        label="简介（可选）"
         value={newRoomDesc}
         onChange={(event) => setNewRoomDesc(event.target.value)}
-        placeholder="简单的模组介绍或招募要求..."
+        placeholder="简单介绍模组氛围、招募要求或开团时间..."
       />
-      <div className="flex justify-end gap-3 pt-4 border-t border-white/10">
+      <div className="flex justify-end gap-3 border-t border-dicecho-border/40 pt-4">
         <Button variant="ghost" onClick={onCancel}>
           取消
         </Button>
@@ -228,26 +326,26 @@ const RoomTypeButton: React.FC<{
   active: boolean;
   icon: React.ElementType;
   label: string;
-  tone: "indigo" | "pink";
+  tone: "primary" | "accent";
   onClick: () => void;
 }> = ({ active, icon: Icon, label, tone, onClick }) => {
   const activeClass =
-    tone === "indigo"
-      ? "bg-indigo-500/20 border-indigo-500 text-indigo-400"
-      : "bg-pink-500/20 border-pink-500 text-pink-400";
+    tone === "primary"
+      ? "border-dicecho-primary/60 bg-dicecho-primary/20 text-white"
+      : "border-dicecho-accent/60 bg-dicecho-accent/20 text-white";
 
   return (
     <button
       onClick={onClick}
-      className={`flex-1 py-3 rounded-xl border flex flex-col items-center gap-2 transition-all ${
+      className={cn(
+        "flex items-center justify-center gap-2 rounded-lg border py-3 text-sm font-semibold transition-all",
         active
           ? activeClass
-          : "bg-slate-900/50 border-slate-700/50 text-slate-500 hover:border-slate-600"
-      }`}
+          : "border-dicecho-border/40 bg-dicecho-card/70 text-dicecho-muted hover:border-dicecho-border hover:text-white"
+      )}
     >
-      <Icon size={24} />
-      <span className="text-sm font-bold">{label}</span>
+      <Icon size={18} />
+      <span>{label}</span>
     </button>
   );
 };
-

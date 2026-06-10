@@ -116,6 +116,7 @@ describe("room session reducer", () => {
         moduleInfo: {
           title: "New",
           description: "Desc",
+          coverImageUrl: "https://img.test/cover.jpg",
           notes: "",
         },
       })
@@ -123,6 +124,7 @@ describe("room session reducer", () => {
       moduleInfo: {
         title: "New",
         description: "Desc",
+        coverImageUrl: "https://img.test/cover.jpg",
         notes: "",
       },
       roomPassword: "secret",

@@ -36,7 +36,7 @@ export const SquareComposer: React.FC<SquareComposerProps> = ({
 
   return (
     <div
-      className="bg-slate-800/30 border border-slate-700/50 rounded-xl p-3 md:p-4 mb-8 focus-within:border-indigo-500 focus-within:bg-slate-800/50 transition-colors"
+      className="bg-dicecho-card/80 border border-dicecho-border/40 rounded-lg p-3 md:p-4 mb-8 focus-within:border-dicecho-primary/60 transition-colors duration-150 dicecho-card-shadow"
       onDragOver={(event) => event.preventDefault()}
       onDrop={handleDrop}
     >
@@ -46,11 +46,11 @@ export const SquareComposer: React.FC<SquareComposerProps> = ({
             <img
               src={pendingImage.dataUrl}
               alt="Preview"
-              className="max-h-48 rounded-lg border border-white/10"
+              className="max-h-48 rounded-lg border border-dicecho-border/40"
             />
             <button
               onClick={clearPendingImage}
-              className="absolute -top-2 -right-2 bg-slate-900 rounded-full p-1 text-slate-400 hover:text-white border border-white/10 opacity-0 group-hover:opacity-100 transition-opacity"
+              className="absolute -top-2 -right-2 bg-dicecho-panel rounded-full p-1 text-dicecho-muted hover:text-white border border-dicecho-border/40 opacity-0 group-hover:opacity-100 transition-opacity"
             >
               <X size={12} />
             </button>
@@ -66,7 +66,7 @@ export const SquareComposer: React.FC<SquareComposerProps> = ({
           textareaClassName="min-h-[80px]"
           previewVariant="preview"
         />
-        <div className="flex justify-between items-center mt-2 pt-2 border-t border-white/5 relative z-20">
+        <div className="flex justify-between items-center mt-2 pt-2 border-t border-dicecho-border/30 relative z-20">
           <div className="flex gap-2">
             <input
               type="file"
@@ -93,4 +93,3 @@ export const SquareComposer: React.FC<SquareComposerProps> = ({
     </div>
   );
 };
-

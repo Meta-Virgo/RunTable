@@ -84,7 +84,7 @@ export function useMusicPlaybackController({
     "music_player_pos"
   );
 
-  useElasticScroll(playlistScrollRef, playlistContentRef);
+  useElasticScroll(playlistScrollRef, playlistContentRef, { enabled: false });
 
   useEffect(() => {
     if (!isKP) {

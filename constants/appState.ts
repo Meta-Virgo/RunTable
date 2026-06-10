@@ -31,6 +31,7 @@ export const INITIAL_CHAR_STATE: Character = {
 export const EMPTY_MODULE_INFO: ModuleInfo = {
   title: "",
   description: "",
+  coverImageUrl: null,
   notes: "",
 };
 

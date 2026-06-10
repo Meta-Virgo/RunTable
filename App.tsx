@@ -418,19 +418,7 @@ const App: React.FC = () => {
 
   const appContent = (
     <Suspense fallback={<LoadingScreen />}>
-      <div className="flex h-screen text-slate-200 font-sans selection:bg-indigo-500/30 overflow-hidden bg-[#020617]">
-      {/* Background Effects */}
-      <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none z-0">
-        <div className="absolute top-[-10%] left-[-10%] w-96 h-96 bg-purple-900/20 rounded-full blur-[100px] animate-blob"></div>
-        <div
-          className="absolute bottom-[10%] right-[-5%] w-[30rem] h-[30rem] bg-indigo-900/10 rounded-full blur-[120px] animate-blob"
-          style={{ animationDelay: "2s" }}
-        ></div>
-        <div
-          className="absolute top-[40%] left-[30%] w-72 h-72 bg-slate-800/20 rounded-full blur-[80px] animate-blob"
-          style={{ animationDelay: "4s" }}
-        ></div>
-      </div>
+      <div className="flex h-[100dvh] overflow-hidden dicecho-page-bg text-slate-200 font-sans selection:bg-dicecho-primary/30">
 
       <Sidebar
         isOpen={sidebarOpen}
@@ -454,8 +442,8 @@ const App: React.FC = () => {
         isVoiceConnected={voiceConnectionStatus === "connected"}
       />
 
-      <main className="flex-1 flex flex-col relative min-w-0 z-10">
-        <header className="h-16 shrink-0 pt-safe flex items-center justify-between px-4 md:px-8 border-b border-white/5 backdrop-blur-sm sticky top-0 z-20 bg-slate-900/80 md:bg-transparent">
+      <main className="flex-1 flex flex-col relative min-w-0">
+        <header className="h-16 shrink-0 pt-safe flex items-center justify-between px-4 md:px-8 border-b border-dicecho-border/40 bg-dicecho-panel/85 backdrop-blur-sm sticky top-0 z-20 shadow-sm">
           <div className="flex items-center gap-3">
             <button
               onClick={() => setSidebarOpen(true)}
@@ -467,7 +455,7 @@ const App: React.FC = () => {
               <h1 className="text-white font-bold text-lg md:text-xl tracking-tight">
                 {moduleInfo.title || "未命名模组"}
               </h1>
-              <p className="text-xs text-slate-500 truncate max-w-[150px] md:max-w-md mt-1">
+              <p className="text-xs text-dicecho-muted truncate max-w-[150px] md:max-w-md mt-1">
                 {moduleInfo.description || "暂无描述"}
               </p>
             </div>
@@ -497,7 +485,7 @@ const App: React.FC = () => {
         </header>
 
         {roomType === "voice" && voiceConnectionStatus !== "idle" && (
-          <div className="shrink-0 px-4 md:px-8 py-2 border-b border-white/5 bg-slate-950/60">
+          <div className="shrink-0 px-4 md:px-8 py-2 border-b border-dicecho-border/40 bg-dicecho-card/70">
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
               <span className="inline-flex items-center gap-2 font-medium text-slate-200">
                 <span
@@ -586,10 +574,10 @@ const App: React.FC = () => {
           onUpdateUrl={updateMusicUrl}
           mode={view === "music" ? "sidebar" : "fixed"}
           className={
-            view === "music" ? "absolute inset-0 z-10 bg-slate-900 pt-16" : ""
+            view === "music" ? "absolute inset-0 z-10 bg-dicecho-panel pt-16" : ""
           }
           isMobile={isMobile}
-          isHidden={view === "setup" || view === "tools" || roomType === "voice"}
+          isHidden={view !== "music" || roomType === "voice"}
           globalMute={globalMute}
           syncedIsPlaying={isMusicPlaying}
           syncedTrackIndex={musicTrackIndex}
@@ -614,7 +602,7 @@ const App: React.FC = () => {
           password={roomPassword}
           onSave={async (info, password) => {
             const result = await updateModuleSettings(info, password);
-            if (!result.ok && result.message) {
+            if (result.message) {
               alert(result.message);
             }
           }}

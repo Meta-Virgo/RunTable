@@ -19,12 +19,12 @@ export const StatusModal: React.FC<{
         className="absolute inset-0 bg-black/80 backdrop-blur-sm"
         onClick={onClose}
       ></div>
-      <div className="glass-panel rounded-3xl w-full max-w-md relative z-10 overflow-hidden animate-slide-up bg-[#0f172a]">
-        <div className="p-6 border-b border-white/10 bg-slate-900/50 text-center">
+      <div className="glass-panel rounded-lg w-full max-w-md relative z-10 overflow-hidden bg-dicecho-panel border border-dicecho-border/55 shadow-xl shadow-black/25">
+        <div className="p-6 border-b border-dicecho-border/45 bg-dicecho-card/55 text-center">
           <h3 className="font-bold text-white text-lg">
             快速状态调整: {char.name}
           </h3>
-          <p className="text-xs text-slate-500 mt-1">
+          <p className="text-xs text-dicecho-muted mt-1">
             直接修改数值，系统会自动记录变动
           </p>
         </div>
@@ -54,7 +54,7 @@ export const StatusModal: React.FC<{
             </div>
           ))}
         </div>
-        <div className="p-6 bg-slate-900/50 flex justify-center border-t border-white/10">
+        <div className="p-6 bg-dicecho-card/55 flex justify-center border-t border-dicecho-border/45">
           <Button
             onClick={() => onSave(status.hp, status.san, status.mp)}
             variant="primary"

@@ -39,10 +39,10 @@ export const SquareProfileModal: React.FC<SquareProfileModalProps> = ({
       headerClassName="hidden"
       className="max-w-md overflow-visible !bg-transparent !border-none !shadow-none !p-0"
     >
-      <div className="bg-slate-900/90 border border-slate-700/50 rounded-3xl relative overflow-hidden shadow-2xl backdrop-blur-xl">
+      <div className="bg-dicecho-card/95 border border-dicecho-border/50 rounded-lg relative overflow-hidden shadow-lg shadow-black/25 backdrop-blur-xl">
         {profile.is_vip && (
           <div className="absolute top-4 left-4 z-10">
-            <span className="bg-gradient-to-r from-purple-600 to-indigo-600 text-white text-xs font-bold px-2 py-1 rounded-full shadow-lg border border-purple-400/30">
+            <span className="bg-dicecho-primary-strong text-white text-xs font-bold px-2 py-1 rounded-full shadow-sm border border-dicecho-primary/40">
               VIP
             </span>
           </div>
@@ -59,7 +59,7 @@ export const SquareProfileModal: React.FC<SquareProfileModalProps> = ({
                   cy="50"
                   r="48"
                   fill="none"
-                  stroke="#1e293b"
+                  stroke="#31394c"
                   strokeWidth="3"
                 />
                 <circle
@@ -67,19 +67,19 @@ export const SquareProfileModal: React.FC<SquareProfileModalProps> = ({
                   cy="50"
                   r="48"
                   fill="none"
-                  stroke="#6366f1"
+                  stroke="#9b86f6"
                   strokeWidth="3"
                   strokeDasharray="301.59"
                   strokeDashoffset="52.77825"
                   strokeLinecap="round"
-                  className="transition-all duration-1000 ease-out"
+                  className="transition-[stroke-dashoffset] duration-300 ease-out"
                 />
               </svg>
               <div
                 className="relative group block"
                 style={{ width: "96px", height: "96px" }}
               >
-                <div className="rounded-full overflow-hidden bg-slate-800 border-2 border-slate-700 flex items-center justify-center relative w-full h-full">
+                <div className="rounded-full overflow-hidden bg-dicecho-panel border-2 border-dicecho-primary/50 flex items-center justify-center relative w-full h-full">
                   <AvatarUpload
                     url={profile.avatar_url}
                     onUpload={() => {}}
@@ -91,15 +91,15 @@ export const SquareProfileModal: React.FC<SquareProfileModalProps> = ({
             </div>
           </div>
           <div className="relative inline-flex items-center gap-2">
-            <h2 className="text-2xl font-bold mb-1 transition-colors text-purple-400 drop-shadow-[0_0_10px_rgba(168,85,247,0.5)]">
+            <h2 className="text-2xl font-bold mb-1 transition-colors text-dicecho-primary">
               {profile.nickname}
             </h2>
-            <span className="bg-indigo-500/20 text-indigo-300 text-[10px] font-bold px-1.5 py-0.5 rounded border border-indigo-500/30">
+            <span className="bg-dicecho-primary/20 text-dicecho-primary text-[10px] font-bold px-1.5 py-0.5 rounded border border-dicecho-primary/30">
               LV.{profile.level || 1}
             </span>
           </div>
           <div className="flex justify-center items-center gap-2 mb-4 mt-2">
-            <span className="text-sm text-slate-400 font-mono bg-slate-900/50 px-2 py-1 rounded">
+            <span className="text-sm text-dicecho-muted font-mono bg-dicecho-panel/70 px-2 py-1 rounded">
               UID: {profile.user_code}
             </span>
           </div>
@@ -121,10 +121,10 @@ export const SquareProfileModal: React.FC<SquareProfileModalProps> = ({
             />
           </div>
         </div>
-        <div className="bg-slate-950/30 border-t border-white/5 p-4 max-h-[40vh] overflow-y-auto custom-scrollbar">
+        <div className="bg-dicecho-panel/70 border-t border-dicecho-border/40 p-4 max-h-[40vh] overflow-y-auto custom-scrollbar">
           {historyLoading ? (
             <div className="flex justify-center py-8">
-              <Loader2 className="animate-spin text-indigo-500" />
+              <Loader2 className="animate-spin text-dicecho-primary" />
             </div>
           ) : historyTab === "player" ? (
             <PlayerHistoryList playerHistory={playerHistory} />
@@ -145,20 +145,20 @@ const HistoryTabCard: React.FC<{
 }> = ({ active, count, label, onClick }) => (
   <div
     onClick={onClick}
-    className={`p-4 rounded-xl border cursor-pointer transition-all group ${
+    className={`p-4 rounded-lg border cursor-pointer transition-colors duration-150 group ${
       active
-        ? "bg-slate-800 border-indigo-500/50 shadow-lg shadow-indigo-500/10"
-        : "bg-slate-900/50 border-slate-700/30 hover:bg-slate-800"
+        ? "bg-dicecho-primary/15 border-dicecho-primary/50"
+        : "bg-dicecho-card/70 border-dicecho-border/30 hover:bg-white/10"
     }`}
   >
     <div
       className={`text-xs uppercase font-bold mb-1 transition-colors ${
-        active ? "text-indigo-400" : "text-slate-500 group-hover:text-indigo-400"
+        active ? "text-dicecho-primary" : "text-dicecho-muted group-hover:text-slate-200"
       }`}
     >
       {label}
     </div>
-    <div className="text-2xl font-mono font-bold text-indigo-400">{count}</div>
+    <div className="text-2xl font-mono font-bold text-dicecho-primary">{count}</div>
   </div>
 );
 
@@ -167,17 +167,17 @@ const PlayerHistoryList: React.FC<{
 }> = ({ playerHistory }) => (
   <div className="space-y-3">
     {playerHistory.length === 0 && (
-      <div className="text-center py-8 text-slate-500 text-sm">暂无记录</div>
+      <div className="text-center py-8 text-dicecho-muted text-sm">暂无记录</div>
     )}
     {playerHistory.map((item) => {
       const characterDisplay = getSquareHistoryCharacterDisplay(item);
       return (
         <div
           key={item.id}
-          className={`relative p-3 rounded-xl border transition-all ${
+          className={`relative p-3 rounded-lg border transition-colors duration-150 ${
             characterDisplay.isDead
-              ? "bg-slate-950 border-slate-800 grayscale"
-              : "bg-slate-800/50 border-slate-700/50 hover:border-indigo-500/30"
+              ? "bg-dicecho-panel/50 border-dicecho-border/30 grayscale"
+              : "bg-dicecho-card/70 border-dicecho-border/40 hover:border-dicecho-primary/40"
           }`}
         >
           <div className="flex justify-between items-start mb-2">
@@ -185,10 +185,10 @@ const PlayerHistoryList: React.FC<{
               <h4 className="font-bold text-white text-sm line-clamp-1">
                 {item.game_history.room_title}
               </h4>
-              <div className="text-[10px] text-slate-500 flex items-center gap-1 mt-0.5">
+              <div className="text-[10px] text-dicecho-muted flex items-center gap-1 mt-0.5">
                 <Crown size={10} className="text-yellow-500" />
                 {new Date(item.game_history.created_at).toLocaleDateString()}
-                <span className="w-0.5 h-0.5 rounded-full bg-slate-600" />
+                <span className="w-0.5 h-0.5 rounded-full bg-dicecho-muted" />
                 KP: {item.game_history.kp_nickname}
               </div>
             </div>
@@ -199,14 +199,14 @@ const PlayerHistoryList: React.FC<{
                   : characterDisplay.isLost
                   ? "bg-yellow-950 text-yellow-500 border border-yellow-900"
                   : characterDisplay.isCrazy
-                  ? "bg-purple-950 text-purple-500 border border-purple-900"
+                  ? "bg-dicecho-primary/15 text-dicecho-primary border border-dicecho-primary/30"
                   : "bg-emerald-950 text-emerald-500 border border-emerald-900"
               }`}
             >
               {item.outcome}
             </div>
           </div>
-          <div className="flex items-center gap-2 bg-slate-900/50 p-1.5 rounded-lg">
+          <div className="flex items-center gap-2 bg-dicecho-panel/70 p-1.5 rounded-lg border border-dicecho-border/30">
             <div className="w-6 h-6 flex items-center justify-center">
               <AvatarUpload
                 url={characterDisplay.avatarUrl}
@@ -219,7 +219,7 @@ const PlayerHistoryList: React.FC<{
               <div className="text-xs font-medium text-slate-300 truncate">
                 {characterDisplay.name}
               </div>
-              <div className="text-[10px] text-slate-500">
+              <div className="text-[10px] text-dicecho-muted">
                 {characterDisplay.job} · {characterDisplay.sex}
               </div>
             </div>
@@ -235,20 +235,20 @@ const KpHistoryList: React.FC<{ kpHistory: GameHistory[] }> = ({
 }) => (
   <div className="space-y-3">
     {kpHistory.length === 0 && (
-      <div className="text-center py-8 text-slate-500 text-sm">暂无记录</div>
+      <div className="text-center py-8 text-dicecho-muted text-sm">暂无记录</div>
     )}
     {kpHistory.map((history) => (
       <div
         key={history.id}
-        className="bg-slate-800/50 border border-slate-700/50 p-3 rounded-xl hover:border-indigo-500/30 transition-all"
+        className="bg-dicecho-card/70 border border-dicecho-border/40 p-3 rounded-lg hover:border-dicecho-primary/40 transition-colors duration-150"
       >
         <div className="flex justify-between items-start mb-1">
           <h4 className="font-bold text-white text-sm">{history.room_title}</h4>
-          <span className="text-[10px] text-slate-500 bg-slate-900 px-1.5 py-0.5 rounded">
+          <span className="text-[10px] text-dicecho-muted bg-dicecho-panel/70 px-1.5 py-0.5 rounded">
             {new Date(history.created_at).toLocaleDateString()}
           </span>
         </div>
-        <div className="flex items-center gap-1 text-[10px] text-slate-400">
+        <div className="flex items-center gap-1 text-[10px] text-dicecho-muted">
           <Crown size={10} className="text-yellow-500" />
           <span>主持人 (KP)</span>
         </div>
@@ -256,4 +256,3 @@ const KpHistoryList: React.FC<{ kpHistory: GameHistory[] }> = ({
     ))}
   </div>
 );
-

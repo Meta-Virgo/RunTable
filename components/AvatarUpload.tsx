@@ -113,8 +113,8 @@ export const AvatarUpload: React.FC<AvatarUploadProps> = ({
       >
         <div
           className={cn(
-            "rounded-full overflow-hidden bg-slate-800 border-2 border-slate-700 flex items-center justify-center relative w-full h-full",
-            editable && "hover:border-indigo-500 transition-colors"
+            "rounded-full overflow-hidden bg-dicecho-card border-2 border-dicecho-border/55 flex items-center justify-center relative w-full h-full",
+            editable && "hover:border-dicecho-primary/70 transition-colors"
           )}
         >
           {url ? (
@@ -124,7 +124,7 @@ export const AvatarUpload: React.FC<AvatarUploadProps> = ({
               className="w-full h-full object-cover"
             />
           ) : (
-            <User size={size * 0.5} className="text-slate-500" />
+            <User size={size * 0.5} className="text-dicecho-muted" />
           )}
 
           {uploading && (
@@ -154,8 +154,8 @@ export const AvatarUpload: React.FC<AvatarUploadProps> = ({
       {imageSrc &&
         createPortal(
           <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-            <div className="bg-slate-900 rounded-xl w-full max-w-md overflow-hidden shadow-2xl border border-slate-800 flex flex-col h-[500px]">
-              <div className="p-4 border-b border-slate-800">
+            <div className="bg-dicecho-panel rounded-lg w-full max-w-md overflow-hidden shadow-lg shadow-black/25 border border-dicecho-border/55 flex flex-col h-[500px]">
+              <div className="p-4 border-b border-dicecho-border/45 bg-dicecho-card/55">
                 <h3 className="text-lg font-semibold text-white">裁切头像</h3>
               </div>
 
@@ -171,7 +171,7 @@ export const AvatarUpload: React.FC<AvatarUploadProps> = ({
                 />
               </div>
 
-              <div className="p-4 bg-slate-900 border-t border-slate-800 flex justify-between items-center gap-4">
+              <div className="p-4 bg-dicecho-card/55 border-t border-dicecho-border/45 flex justify-between items-center gap-4">
                 <div className="flex-1">
                   <input
                     type="range"
@@ -181,20 +181,20 @@ export const AvatarUpload: React.FC<AvatarUploadProps> = ({
                     step={0.1}
                     aria-labelledby="Zoom"
                     onChange={(e) => setZoom(Number(e.target.value))}
-                    className="w-full h-1 bg-slate-700 rounded-lg appearance-none cursor-pointer"
+                    className="w-full h-1 bg-dicecho-raised rounded-lg appearance-none cursor-pointer accent-dicecho-primary"
                   />
                 </div>
                 <div className="flex gap-2">
                   <button
                     onClick={handleCancel}
-                    className="px-4 py-2 text-sm font-medium text-slate-300 hover:text-white hover:bg-slate-800 rounded-lg transition-colors"
+                    className="px-4 py-2 text-sm font-medium text-dicecho-muted hover:text-white hover:bg-white/10 rounded-lg transition-colors"
                   >
                     取消
                   </button>
                   <button
                     onClick={handleUpload}
                     disabled={uploading}
-                    className="px-4 py-2 text-sm font-medium bg-indigo-600 text-white rounded-lg hover:bg-indigo-500 transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="px-4 py-2 text-sm font-medium bg-dicecho-primary-strong text-white rounded-lg hover:bg-dicecho-primary transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {uploading ? (
                       <Loader2 className="animate-spin w-4 h-4" />

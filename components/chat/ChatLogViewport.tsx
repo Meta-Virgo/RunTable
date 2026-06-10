@@ -71,13 +71,13 @@ export const ChatLogViewport: React.FC<ChatLogViewportProps> = ({
   <div
     ref={logsContainerRef}
     onScroll={onScroll}
-    className="flex-1 overflow-y-auto px-3 md:px-8 py-4 pt-4 pb-48 custom-scrollbar overscroll-y-none"
+    className="flex-1 overflow-y-auto px-3 md:px-8 py-4 pt-4 pb-48 custom-scrollbar overscroll-y-none bg-dicecho-bg/35"
   >
     <div ref={contentRef} className="space-y-6 min-h-full">
       {hasMore && (
         <div className="flex justify-center py-2 shrink-0">
           {isLoading ? (
-            <span className="text-xs text-indigo-400 flex items-center gap-2">
+            <span className="text-xs text-dicecho-primary flex items-center gap-2">
               <RefreshCw size={12} className="animate-spin" /> 加载中...
             </span>
           ) : (
@@ -88,11 +88,11 @@ export const ChatLogViewport: React.FC<ChatLogViewportProps> = ({
         </div>
       )}
       {logs.length === 0 && (
-        <div className="flex flex-col items-center justify-center h-[60vh] text-slate-600 animate-slide-up">
-          <div className="w-24 h-24 bg-gradient-to-tr from-slate-800 to-slate-900 rounded-full flex items-center justify-center mb-6 ring-1 ring-slate-700/50 shadow-2xl">
-            <BookOpen size={40} className="text-slate-500 opacity-50" />
+        <div className="flex flex-col items-center justify-center h-[60vh] text-slate-600">
+          <div className="w-24 h-24 bg-dicecho-panel rounded-lg flex items-center justify-center mb-6 ring-1 ring-dicecho-border/40 shadow-sm">
+            <BookOpen size={40} className="text-dicecho-muted opacity-55" />
           </div>
-          <p className="text-lg font-medium text-slate-500">
+          <p className="text-lg font-medium text-dicecho-muted">
             传奇故事，由此开始
           </p>
         </div>
@@ -173,14 +173,14 @@ const ChatLogItem: React.FC<{
   }
 
   const bubbleColor = isPrivate
-    ? "bg-slate-900 text-slate-300 border-indigo-500/50 shadow-indigo-500/10"
+    ? "bg-dicecho-panel text-slate-300 border-dicecho-primary/50 shadow-black/10"
     : log.charRole === "Keeper"
-    ? "bg-indigo-600 text-white border-indigo-500 shadow-indigo-500/10"
+    ? "bg-dicecho-primary-strong text-white border-dicecho-primary shadow-black/10"
     : log.charRole === "怪物"
     ? "bg-rose-900/80 text-rose-100 border-rose-800 shadow-rose-900/10"
     : log.charRole === "NPC"
-    ? "bg-slate-800 text-slate-200 border-slate-700 shadow-slate-900/10"
-    : "bg-slate-700/80 text-white border-slate-600";
+    ? "bg-dicecho-card text-slate-200 border-dicecho-border/60 shadow-black/10"
+    : "bg-dicecho-raised/80 text-white border-dicecho-border/60";
   const alignRight = log.isMine;
   const iconColor =
     log.charRole === "怪物"
@@ -188,8 +188,8 @@ const ChatLogItem: React.FC<{
       : log.charRole === "NPC"
       ? "text-cyan-400"
       : log.charRole === "Keeper"
-      ? "text-indigo-400"
-      : "text-purple-400";
+      ? "text-dicecho-primary"
+      : "text-dicecho-accent";
 
   const logCharacter = characters.find((character) => character.id === log.charId);
   const profileUserId = log.userId || logCharacter?.user_id || null;
@@ -207,7 +207,7 @@ const ChatLogItem: React.FC<{
           disabled={!profileUserId || profileLoadingUserId === profileUserId}
           onClick={() => onOpenUserProfile(profileUserId)}
           className={cn(
-            "rounded-lg bg-slate-800/80 border border-slate-700/50 shadow-lg relative overflow-hidden flex items-center justify-center",
+            "rounded-lg bg-dicecho-card border border-dicecho-border/50 shadow-sm relative overflow-hidden flex items-center justify-center",
             log.charAvatar ? "w-9 h-9 p-0" : "p-1.5 md:p-2",
             !log.charAvatar && iconColor,
             profileUserId ? "cursor-pointer" : "cursor-default"
@@ -235,7 +235,7 @@ const ChatLogItem: React.FC<{
             {displayName}
           </span>
           {isPrivate && (
-            <span className="text-[10px] bg-indigo-500/20 text-indigo-300 px-1.5 rounded border border-indigo-500/30">
+            <span className="text-[10px] bg-dicecho-primary/20 text-dicecho-primary px-1.5 rounded border border-dicecho-primary/30">
               私信
             </span>
           )}
@@ -275,7 +275,7 @@ const ChatLogItem: React.FC<{
                 });
                 onClearActiveMessage();
               }}
-              className="p-1.5 text-slate-500 hover:text-indigo-400 transition-all"
+              className="p-1.5 text-dicecho-muted hover:text-dicecho-primary transition-colors"
             >
               <Quote size={14} />
             </button>
@@ -304,10 +304,10 @@ const SystemLogItem: React.FC<{ log: Log; isStatus: boolean }> = ({
   <div className="flex justify-center py-2 animate-fade-in">
     <div
       className={cn(
-        "text-xs px-4 py-2 rounded-xl border flex items-start gap-2 shadow-sm backdrop-blur-sm max-w-[85%]",
+        "text-xs px-4 py-2 rounded-lg border flex items-start gap-2 shadow-sm backdrop-blur-sm max-w-[85%]",
         isStatus
           ? "bg-red-500/10 border-red-500/20 text-red-300"
-          : "bg-slate-800/60 border-slate-700/50 text-slate-400"
+          : "bg-dicecho-panel/70 border-dicecho-border/50 text-dicecho-muted"
       )}
     >
       <div className="mt-0.5 shrink-0">
@@ -338,7 +338,7 @@ const DiceLogItem: React.FC<{
   if (isHidden && !canSee) {
     return (
       <div className="flex flex-col items-center py-4 animate-slide-up">
-        <div className="relative overflow-hidden bg-slate-900 rounded-xl border-l-4 border-slate-600 shadow-2xl p-4 min-w-[260px] max-w-sm w-full opacity-70">
+        <div className="relative overflow-hidden bg-dicecho-panel rounded-lg border-l-4 border-dicecho-border shadow-sm p-4 min-w-[260px] max-w-sm w-full opacity-75">
           <EyeOff className="absolute -right-4 -bottom-4 text-slate-500/10 w-32 h-32 transform rotate-12" />
           <div className="flex justify-between items-center mb-2 relative z-10">
             <div className="flex flex-col">
@@ -369,10 +369,10 @@ const DiceLogItem: React.FC<{
     diceData.total = log.content as any;
   }
 
-  let borderColor = isHidden ? "border-purple-500" : "border-indigo-500";
-  let textColor = isHidden ? "text-purple-400" : "text-indigo-400";
+  let borderColor = isHidden ? "border-dicecho-primary" : "border-dicecho-primary";
+  let textColor = isHidden ? "text-dicecho-primary" : "text-dicecho-primary";
   let label = isHidden ? "Secret Roll" : "Dice Roll";
-  let iconColor = isHidden ? "text-purple-500/10" : "text-indigo-500/10";
+  let iconColor = isHidden ? "text-dicecho-primary/10" : "text-dicecho-primary/10";
 
   if (diceData.checkResult) {
     switch (diceData.checkResult) {
@@ -407,7 +407,7 @@ const DiceLogItem: React.FC<{
     <div className="flex flex-col items-center py-4 animate-slide-up">
       <div
         className={cn(
-          "relative overflow-hidden bg-slate-900 rounded-xl border-l-4 shadow-2xl p-4 min-w-[260px] max-w-sm w-full",
+          "relative overflow-hidden bg-dicecho-panel rounded-lg border-l-4 shadow-sm p-4 min-w-[260px] max-w-sm w-full",
           borderColor
         )}
       >
@@ -464,12 +464,12 @@ const DiceLogItem: React.FC<{
           )}
         </div>
         {diceData.details && diceData.details.length > 0 && (
-          <div className="mt-3 pt-2 border-t border-slate-800 relative z-10">
+          <div className="mt-3 pt-2 border-t border-dicecho-border/40 relative z-10">
             <div className="flex flex-wrap gap-1 text-xs font-mono text-slate-500">
               {diceData.details.map((detail: any, index: number) => (
                 <span
                   key={index}
-                  className="bg-slate-800 px-1.5 py-0.5 rounded text-slate-300"
+                  className="bg-dicecho-card px-1.5 py-0.5 rounded text-slate-300"
                 >
                   {detail}
                 </span>
@@ -507,7 +507,7 @@ const MessageBubble: React.FC<{
 }) => (
   <div
     className={cn(
-      "px-4 py-2 md:px-5 md:py-3 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap shadow-md border backdrop-blur-sm relative select-text",
+      "px-4 py-2 md:px-5 md:py-3 rounded-lg text-sm leading-relaxed whitespace-pre-wrap shadow-sm border backdrop-blur-sm relative select-text",
       bubbleColor,
       alignRight ? "rounded-tr-none" : "rounded-tl-none"
     )}
@@ -549,4 +549,3 @@ const MessageBubble: React.FC<{
     )}
   </div>
 );
-

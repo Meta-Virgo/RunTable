@@ -4,6 +4,7 @@ interface ElasticScrollOptions {
   resistance?: number;
   springStrength?: number;
   damping?: number;
+  enabled?: boolean;
   disabled?: boolean;
 }
 
@@ -16,6 +17,7 @@ export const useElasticScroll = (
     resistance = 0.4,
     springStrength = 0.15,
     damping = 0.85,
+    enabled = false,
     disabled = false,
   } = options;
 
@@ -31,7 +33,7 @@ export const useElasticScroll = (
   });
 
   useEffect(() => {
-    if (disabled) return;
+    if (!enabled || disabled) return;
 
     const scrollEl = scrollRef.current;
     const contentEl = contentRef.current;
@@ -234,5 +236,6 @@ export const useElasticScroll = (
     springStrength,
     damping,
     disabled,
+    enabled,
   ]);
 };

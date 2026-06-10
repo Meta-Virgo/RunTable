@@ -247,15 +247,15 @@ export const ChatComposer: React.FC<ChatComposerProps> = ({
 
   return (
     <>
-      <div className="absolute bottom-0 left-0 w-full z-50 p-2 md:p-6 pt-0 md:pt-2 bg-slate-950/50 md:bg-transparent backdrop-blur-md md:backdrop-blur-none pb-safe">
-        <div className="max-w-4xl mx-auto rounded-2xl relative z-20 transition-all focus-within:ring-2 focus-within:ring-indigo-500/30 focus-within:border-indigo-500/50 shadow-2xl">
-          <div className="absolute inset-0 glass-panel rounded-2xl z-0 pointer-events-none"></div>
+      <div className="absolute bottom-0 left-0 w-full z-50 p-2 md:p-6 pt-0 md:pt-2 bg-dicecho-bg/80 md:bg-transparent backdrop-blur-sm md:backdrop-blur-none pb-safe">
+        <div className="max-w-4xl mx-auto rounded-lg border border-dicecho-border/50 bg-dicecho-panel/95 relative z-20 transition-colors duration-150 focus-within:border-dicecho-primary/60 shadow-sm">
+          <div className="absolute inset-0 rounded-lg bg-dicecho-panel/95 z-0 pointer-events-none"></div>
           <div className="relative z-10 p-2 md:p-3">
-            <div className="absolute -top-3 left-4 bg-slate-900 text-slate-300 text-[10px] px-3 py-1 rounded-full border border-slate-700 shadow-lg flex items-center gap-2 font-medium tracking-wide z-10">
+            <div className="absolute -top-3 left-4 bg-dicecho-card text-slate-300 text-[10px] px-3 py-1 rounded-full border border-dicecho-border/50 shadow-sm flex items-center gap-2 font-medium tracking-wide z-10">
               <span
                 className={cn(
                   "w-2 h-2 rounded-full animate-pulse",
-                  activeCharId === "pc" ? "bg-indigo-500" : "bg-emerald-500"
+                  activeCharId === "pc" ? "bg-dicecho-primary" : "bg-dicecho-accent"
                 )}
               ></span>
               正在扮演:{" "}
@@ -264,9 +264,9 @@ export const ChatComposer: React.FC<ChatComposerProps> = ({
               </span>
             </div>
             {pendingImage && (
-              <div className="mx-4 mt-2 flex items-center gap-2 bg-slate-800/80 border border-slate-700 p-2 rounded-lg w-fit animate-fade-in relative z-20">
-                <div className="w-8 h-8 rounded bg-slate-900 flex items-center justify-center shrink-0 border border-slate-700">
-                  <ImageIcon size={14} className="text-indigo-400" />
+              <div className="mx-4 mt-2 flex items-center gap-2 bg-dicecho-card/80 border border-dicecho-border/50 p-2 rounded-lg w-fit animate-fade-in relative z-20">
+                <div className="w-8 h-8 rounded bg-dicecho-panel flex items-center justify-center shrink-0 border border-dicecho-border/50">
+                  <ImageIcon size={14} className="text-dicecho-primary" />
                 </div>
                 <span className="text-xs text-slate-300 truncate max-w-[150px] font-mono">
                   {pendingImage.name}
@@ -280,9 +280,9 @@ export const ChatComposer: React.FC<ChatComposerProps> = ({
               </div>
             )}
             {quoteMessage && (
-              <div className="mx-4 mt-2 flex items-center gap-2 bg-slate-800/80 border-l-4 border-indigo-500 p-2 rounded-r-lg w-fit animate-fade-in relative z-20 max-w-[80%]">
+              <div className="mx-4 mt-2 flex items-center gap-2 bg-dicecho-card/80 border-l-4 border-dicecho-primary p-2 rounded-r-lg w-fit animate-fade-in relative z-20 max-w-[80%]">
                 <div className="flex flex-col overflow-hidden">
-                  <span className="text-xs font-bold text-indigo-400">
+                  <span className="text-xs font-bold text-dicecho-primary">
                     回复 {quoteMessage.charName}:
                   </span>
                   <span className="text-xs text-slate-300 truncate font-mono opacity-80">
@@ -306,9 +306,9 @@ export const ChatComposer: React.FC<ChatComposerProps> = ({
               onDrop={handleDrop}
               placeholder={`以 ${activeChar.name} 的身份发言...`}
               rows={1}
-              className="w-full bg-transparent border-none text-slate-200 placeholder-slate-600 focus:outline-none focus:ring-0 resize-none px-4 py-3 min-h-[3rem] max-h-[200px] custom-scrollbar text-sm md:text-base"
+              className="w-full bg-transparent border-none text-slate-100 placeholder:text-dicecho-muted/60 focus:outline-none focus:ring-0 resize-none px-4 py-3 min-h-[3rem] max-h-[200px] custom-scrollbar text-sm md:text-base"
             />
-            <div className="flex flex-col md:flex-row justify-between items-center gap-3 md:gap-0 px-1 md:px-2 pt-2 border-t border-white/5 mt-1">
+            <div className="flex flex-col md:flex-row justify-between items-center gap-3 md:gap-0 px-1 md:px-2 pt-2 border-t border-dicecho-border/40 mt-1">
               <div className="flex items-center gap-2 md:gap-3 w-full md:w-auto overflow-x-auto md:overflow-visible custom-scrollbar justify-start md:justify-start pb-1 md:pb-0">
                 <div className="flex items-center gap-2 shrink-0">
                   {canRollCheck && (
@@ -329,7 +329,7 @@ export const ChatComposer: React.FC<ChatComposerProps> = ({
                               setShowAttrSelect(false);
                             }
                           }}
-                          className="flex items-center justify-center px-3 bg-[#020617] border border-slate-700 rounded-xl h-10 shadow-sm hover:border-slate-500 transition-all active:bg-slate-900 group min-w-[3.5rem]"
+                          className="flex items-center justify-center px-3 bg-dicecho-card/80 border border-dicecho-border/50 rounded-lg h-10 shadow-sm hover:border-dicecho-primary/50 transition-colors active:bg-dicecho-raised group min-w-[3.5rem]"
                         >
                           <span className="text-sm font-bold text-slate-300 font-mono group-hover:text-white">
                             属性
@@ -342,7 +342,7 @@ export const ChatComposer: React.FC<ChatComposerProps> = ({
                               onClick={() => setShowAttrSelect(false)}
                             ></div>
                             <div
-                              className="fixed bg-slate-900 border border-slate-700 p-2 rounded-xl grid grid-cols-3 gap-1 shadow-xl z-[9999] animate-scale-in w-64 max-w-[90vw]"
+                              className="fixed bg-dicecho-panel border border-dicecho-border/50 p-2 rounded-lg grid grid-cols-3 gap-1 shadow-xl z-[9999] animate-scale-in w-64 max-w-[90vw]"
                               style={menuPosition}
                             >
                               {ATTRIBUTES.map((attribute) => {
@@ -357,7 +357,7 @@ export const ChatComposer: React.FC<ChatComposerProps> = ({
                                       });
                                       setShowAttrSelect(false);
                                     }}
-                                    className="flex flex-col items-center p-2 hover:bg-indigo-600 rounded-lg transition-colors group/item"
+                                    className="flex flex-col items-center p-2 hover:bg-dicecho-primary/20 rounded-lg transition-colors group/item"
                                   >
                                     <span className="text-xs font-bold text-slate-300 group-hover/item:text-white">
                                       {attribute.label}
@@ -389,7 +389,7 @@ export const ChatComposer: React.FC<ChatComposerProps> = ({
                               setShowSkillSelect(false);
                             }
                           }}
-                          className="flex items-center justify-center px-3 bg-[#020617] border border-slate-700 rounded-xl h-10 shadow-sm hover:border-slate-500 transition-all active:bg-slate-900 group min-w-[3.5rem]"
+                          className="flex items-center justify-center px-3 bg-dicecho-card/80 border border-dicecho-border/50 rounded-lg h-10 shadow-sm hover:border-dicecho-primary/50 transition-colors active:bg-dicecho-raised group min-w-[3.5rem]"
                         >
                           <span className="text-sm font-bold text-slate-300 font-mono group-hover:text-white">
                             技能
@@ -402,7 +402,7 @@ export const ChatComposer: React.FC<ChatComposerProps> = ({
                               onClick={() => setShowSkillSelect(false)}
                             ></div>
                             <div
-                              className="fixed bg-slate-900 border border-slate-700 p-2 rounded-xl grid grid-cols-2 gap-1 shadow-xl z-[9999] animate-scale-in w-64 max-w-[90vw] max-h-64 overflow-y-auto custom-scrollbar"
+                              className="fixed bg-dicecho-panel border border-dicecho-border/50 p-2 rounded-lg grid grid-cols-2 gap-1 shadow-xl z-[9999] animate-scale-in w-64 max-w-[90vw] max-h-64 overflow-y-auto custom-scrollbar"
                               style={menuPosition}
                             >
                               {Object.keys(myChar?.skills || {}).length ===
@@ -422,7 +422,7 @@ export const ChatComposer: React.FC<ChatComposerProps> = ({
                                         });
                                         setShowSkillSelect(false);
                                       }}
-                                      className="flex justify-between items-center px-3 py-2 hover:bg-indigo-600 rounded-lg transition-colors text-left group/item"
+                                      className="flex justify-between items-center px-3 py-2 hover:bg-dicecho-primary/20 rounded-lg transition-colors text-left group/item"
                                     >
                                       <span className="text-xs font-bold text-slate-300 group-hover/item:text-white truncate max-w-[80px]">
                                         {name}
@@ -465,7 +465,7 @@ export const ChatComposer: React.FC<ChatComposerProps> = ({
                           setShowDiceSelect(false);
                         }
                       }}
-                      className="flex items-center justify-center px-3 bg-[#020617] border border-slate-700 rounded-xl h-10 min-w-[3.5rem] md:min-w-[4.5rem] shadow-sm hover:border-slate-500 transition-all active:bg-slate-900 group"
+                      className="flex items-center justify-center px-3 bg-dicecho-card/80 border border-dicecho-border/50 rounded-lg h-10 min-w-[3.5rem] md:min-w-[4.5rem] shadow-sm hover:border-dicecho-primary/50 transition-colors active:bg-dicecho-raised group"
                     >
                       <span className="text-base font-bold text-white font-mono">
                         D{diceType}
@@ -478,7 +478,7 @@ export const ChatComposer: React.FC<ChatComposerProps> = ({
                           onClick={() => setShowDiceSelect(false)}
                         ></div>
                         <div
-                          className="fixed bg-slate-900 border border-slate-700 p-2 rounded-xl grid grid-cols-3 gap-1 shadow-xl z-[9999] animate-scale-in w-48"
+                          className="fixed bg-dicecho-panel border border-dicecho-border/50 p-2 rounded-lg grid grid-cols-3 gap-1 shadow-xl z-[9999] animate-scale-in w-48"
                           style={menuPosition}
                         >
                           {[2, 3, 4, 6, 8, 10, 12, 20, 100].map((dice) => (
@@ -488,7 +488,7 @@ export const ChatComposer: React.FC<ChatComposerProps> = ({
                                 setDiceType(dice);
                                 setShowDiceSelect(false);
                               }}
-                              className="p-2 hover:bg-indigo-600 rounded-lg text-xs font-bold text-slate-300 hover:text-white transition-colors"
+                              className="p-2 hover:bg-dicecho-primary/20 rounded-lg text-xs font-bold text-slate-300 hover:text-white transition-colors"
                             >
                               D{dice}
                             </button>
@@ -502,10 +502,10 @@ export const ChatComposer: React.FC<ChatComposerProps> = ({
                     <button
                       onClick={() => setIsSecret(!isSecret)}
                       className={cn(
-                        "p-2 md:p-1.5 rounded-xl transition-colors h-10 w-10 flex items-center justify-center border shrink-0",
+                        "p-2 md:p-1.5 rounded-lg transition-colors h-10 w-10 flex items-center justify-center border shrink-0",
                         isSecret
-                          ? "bg-purple-500/20 text-purple-400 border-purple-500/50"
-                          : "bg-transparent text-slate-400 border-transparent hover:bg-slate-800 hover:text-indigo-400"
+                          ? "bg-dicecho-primary/20 text-dicecho-primary border-dicecho-primary/50"
+                          : "bg-transparent text-dicecho-muted border-transparent hover:bg-white/10 hover:text-dicecho-primary"
                       )}
                     >
                       {isSecret ? <EyeOff size={20} /> : <Eye size={20} />}
@@ -514,7 +514,7 @@ export const ChatComposer: React.FC<ChatComposerProps> = ({
 
                   <button
                     onClick={() => onRollDice(diceCount, diceType, isSecret)}
-                    className="p-2 md:p-1.5 hover:bg-slate-800 rounded-xl text-slate-400 hover:text-indigo-400 transition-colors h-10 w-10 flex items-center justify-center border border-transparent hover:border-slate-700 shrink-0"
+                    className="p-2 md:p-1.5 hover:bg-white/10 rounded-lg text-dicecho-muted hover:text-dicecho-primary transition-colors h-10 w-10 flex items-center justify-center border border-transparent hover:border-dicecho-border/50 shrink-0"
                   >
                     <Dice5 size={20} />
                   </button>
@@ -522,7 +522,7 @@ export const ChatComposer: React.FC<ChatComposerProps> = ({
                 {isKP && (
                   <button
                     onClick={onShowStory}
-                    className="p-2 text-slate-500 hover:text-slate-300 transition-colors hover:bg-white/5 rounded-lg shrink-0"
+                    className="p-2 text-dicecho-muted hover:text-slate-200 transition-colors hover:bg-white/10 rounded-lg shrink-0"
                   >
                     <FileText size={18} />
                   </button>
@@ -530,7 +530,7 @@ export const ChatComposer: React.FC<ChatComposerProps> = ({
                 {isKP && (
                   <button
                     onClick={() => setShowAIModal(true)}
-                    className="p-2 text-purple-400 hover:text-purple-300 transition-colors hover:bg-purple-500/10 rounded-lg shrink-0"
+                    className="p-2 text-dicecho-primary hover:text-white transition-colors hover:bg-dicecho-primary/15 rounded-lg shrink-0"
                   >
                     <Sparkles size={18} />
                   </button>
@@ -538,7 +538,7 @@ export const ChatComposer: React.FC<ChatComposerProps> = ({
               </div>
               <div className="flex items-center gap-2 relative w-full md:w-auto justify-end shrink-0">
                 {showRecipientSelect && (
-                  <div className="absolute bottom-full right-0 mb-3 w-52 bg-slate-950/95 backdrop-blur-md border border-slate-800/80 rounded-2xl shadow-2xl z-50 overflow-hidden animate-scale-in flex flex-col p-1 ring-1 ring-white/5">
+                  <div className="absolute bottom-full right-0 mb-3 w-52 bg-dicecho-panel/95 backdrop-blur-md border border-dicecho-border/60 rounded-lg shadow-xl z-50 overflow-hidden animate-scale-in flex flex-col p-1 ring-1 ring-white/5">
                     <div className="px-3 py-2 text-[10px] font-bold text-slate-500 uppercase tracking-wider">
                       发送给
                     </div>
@@ -548,29 +548,29 @@ export const ChatComposer: React.FC<ChatComposerProps> = ({
                         setShowRecipientSelect(false);
                       }}
                       className={cn(
-                        "px-3 py-2.5 text-left text-xs rounded-xl transition-all flex items-center gap-3 group",
+                        "px-3 py-2.5 text-left text-xs rounded-lg transition-colors flex items-center gap-3 group",
                         !recipientId
-                          ? "bg-indigo-500/10 text-indigo-400"
-                          : "text-slate-400 hover:bg-slate-800/50 hover:text-slate-200"
+                          ? "bg-dicecho-primary/18 text-dicecho-primary"
+                          : "text-dicecho-muted hover:bg-white/10 hover:text-slate-200"
                       )}
                     >
                       <div
                         className={cn(
                           "w-8 h-8 rounded-full flex items-center justify-center transition-colors",
                           !recipientId
-                            ? "bg-indigo-500/20 text-indigo-400"
-                            : "bg-slate-800 text-slate-500 group-hover:bg-slate-700"
+                            ? "bg-dicecho-primary/20 text-dicecho-primary"
+                            : "bg-dicecho-card text-dicecho-muted group-hover:bg-dicecho-raised"
                         )}
                       >
                         <Unlock size={14} />
                       </div>
                       <span className="font-medium">所有人</span>
                       {!recipientId && (
-                        <div className="ml-auto w-1.5 h-1.5 rounded-full bg-indigo-500"></div>
+                        <div className="ml-auto w-1.5 h-1.5 rounded-full bg-dicecho-primary"></div>
                       )}
                     </button>
 
-                    <div className="h-px bg-slate-800/50 my-1 mx-2" />
+                    <div className="h-px bg-dicecho-border/40 my-1 mx-2" />
 
                     <div className="max-h-48 overflow-y-auto custom-scrollbar space-y-0.5">
                       {isKP &&
@@ -584,18 +584,18 @@ export const ChatComposer: React.FC<ChatComposerProps> = ({
                                 setShowRecipientSelect(false);
                               }}
                               className={cn(
-                                "w-full px-3 py-2 text-left text-xs rounded-xl transition-all flex items-center gap-3 group",
+                                "w-full px-3 py-2 text-left text-xs rounded-lg transition-colors flex items-center gap-3 group",
                                 recipientId === character.user_id
-                                  ? "bg-indigo-500/10 text-indigo-400"
-                                  : "text-slate-400 hover:bg-slate-800/50 hover:text-slate-200"
+                                  ? "bg-dicecho-primary/18 text-dicecho-primary"
+                                  : "text-dicecho-muted hover:bg-white/10 hover:text-slate-200"
                               )}
                             >
                               <div
                                 className={cn(
                                   "w-8 h-8 rounded-full flex items-center justify-center transition-colors",
                                   recipientId === character.user_id
-                                    ? "bg-indigo-500/20 text-indigo-400"
-                                    : "bg-slate-800 text-slate-500 group-hover:bg-slate-700"
+                                    ? "bg-dicecho-primary/20 text-dicecho-primary"
+                                    : "bg-dicecho-card text-dicecho-muted group-hover:bg-dicecho-raised"
                                 )}
                               >
                                 <User size={14} />
@@ -604,7 +604,7 @@ export const ChatComposer: React.FC<ChatComposerProps> = ({
                                 {character.name}
                               </span>
                               {recipientId === character.user_id && (
-                                <div className="ml-auto w-1.5 h-1.5 rounded-full bg-indigo-500"></div>
+                                <div className="ml-auto w-1.5 h-1.5 rounded-full bg-dicecho-primary"></div>
                               )}
                             </button>
                           ))}
@@ -616,18 +616,18 @@ export const ChatComposer: React.FC<ChatComposerProps> = ({
                             setShowRecipientSelect(false);
                           }}
                           className={cn(
-                            "w-full px-3 py-2 text-left text-xs rounded-xl transition-all flex items-center gap-3 group",
+                            "w-full px-3 py-2 text-left text-xs rounded-lg transition-colors flex items-center gap-3 group",
                             recipientId === kpId
-                              ? "bg-indigo-500/10 text-indigo-400"
-                              : "text-slate-400 hover:bg-slate-800/50 hover:text-slate-200"
+                              ? "bg-dicecho-primary/18 text-dicecho-primary"
+                              : "text-dicecho-muted hover:bg-white/10 hover:text-slate-200"
                           )}
                         >
                           <div
                             className={cn(
                               "w-8 h-8 rounded-full flex items-center justify-center transition-colors",
                               recipientId === kpId
-                                ? "bg-indigo-500/20 text-indigo-400"
-                                : "bg-slate-800 text-slate-500 group-hover:bg-slate-700"
+                                ? "bg-dicecho-primary/20 text-dicecho-primary"
+                                : "bg-dicecho-card text-dicecho-muted group-hover:bg-dicecho-raised"
                             )}
                           >
                             <Crown size={14} />
@@ -636,7 +636,7 @@ export const ChatComposer: React.FC<ChatComposerProps> = ({
                             守秘人 (KP)
                           </span>
                           {recipientId === kpId && (
-                            <div className="ml-auto w-1.5 h-1.5 rounded-full bg-indigo-500"></div>
+                            <div className="ml-auto w-1.5 h-1.5 rounded-full bg-dicecho-primary"></div>
                           )}
                         </button>
                       )}
@@ -647,10 +647,10 @@ export const ChatComposer: React.FC<ChatComposerProps> = ({
                 <button
                   onClick={() => setShowRecipientSelect(!showRecipientSelect)}
                   className={cn(
-                    "h-9 px-4 rounded-xl border flex items-center gap-2 transition-all font-medium text-xs",
+                    "h-9 px-4 rounded-lg border flex items-center gap-2 transition-colors font-medium text-xs",
                     recipientId
-                      ? "bg-indigo-500/10 border-indigo-500/30 text-indigo-300 hover:bg-indigo-500/20"
-                      : "bg-slate-900 border-slate-700 text-slate-400 hover:border-slate-500 hover:text-slate-300"
+                      ? "bg-dicecho-primary/15 border-dicecho-primary/40 text-dicecho-primary hover:bg-dicecho-primary/20"
+                      : "bg-dicecho-card/80 border-dicecho-border/50 text-dicecho-muted hover:border-dicecho-primary/50 hover:text-slate-200"
                   )}
                 >
                   {recipientId ? (
@@ -667,7 +667,7 @@ export const ChatComposer: React.FC<ChatComposerProps> = ({
                   disabled={!inputText.trim() && !pendingImage}
                   size="sm"
                   icon={Send}
-                  className="rounded-lg shadow-indigo-500/20 px-4"
+                  className="rounded-lg px-4"
                 >
                   发送
                 </Button>

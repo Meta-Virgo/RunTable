@@ -4,6 +4,7 @@ import { Character, Room } from "../types";
 import { getCurrentUser } from "../services/auth";
 import {
   fetchRoomActivityCounts,
+  fetchRoomMemberUserIds,
   fetchVisibleRooms,
 } from "../services/rooms";
 import {
@@ -11,9 +12,11 @@ import {
   buildLobbyCatalogRooms,
   filterLobbyCatalogRooms,
   getLobbyCharacterRoomIds,
+  sortLobbyCatalogRooms,
+  type LobbySortMode,
   type RoomFilter,
 } from "../services/lobbyCatalogModel";
-export type { RoomFilter } from "../services/lobbyCatalogModel";
+export type { LobbySortMode, RoomFilter } from "../services/lobbyCatalogModel";
 
 interface UseLobbyCatalogOptions {
   currentUserId: string | null;
@@ -22,10 +25,13 @@ interface UseLobbyCatalogOptions {
 }
 
 const processRooms = async (rooms: any[]) => {
-  const activityCounts = await fetchRoomActivityCounts(
-    rooms.map((room) => room.id)
-  );
-  return buildLobbyCatalogRooms({ rooms, activityCounts });
+  const roomIds = rooms.map((room) => room.id);
+  const [activityCounts, memberUserIds] = await Promise.all([
+    fetchRoomActivityCounts(roomIds),
+    fetchRoomMemberUserIds(roomIds),
+  ]);
+
+  return buildLobbyCatalogRooms({ rooms, activityCounts, memberUserIds });
 };
 
 export function useLobbyCatalog({
@@ -37,6 +43,7 @@ export function useLobbyCatalog({
   const [isLoadingRooms, setIsLoadingRooms] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [roomFilter, setRoomFilter] = useState<RoomFilter>("all");
+  const [sortMode, setSortMode] = useState<LobbySortMode>("activity");
   const characterRoomIds = useMemo(
     () => getLobbyCharacterRoomIds(characters),
     [characters]
@@ -84,7 +91,7 @@ export function useLobbyCatalog({
   }, [refreshRooms]);
 
   const filteredRooms = useMemo(() => {
-    return filterLobbyCatalogRooms({
+    const nextRooms = filterLobbyCatalogRooms({
       rooms,
       searchQuery,
       roomFilter,
@@ -92,7 +99,17 @@ export function useLobbyCatalog({
       currentUserId,
       onlineUsers,
     });
-  }, [characterRoomIds, currentUserId, onlineUsers, roomFilter, rooms, searchQuery]);
+
+    return sortLobbyCatalogRooms(nextRooms, sortMode);
+  }, [
+    characterRoomIds,
+    currentUserId,
+    onlineUsers,
+    roomFilter,
+    rooms,
+    searchQuery,
+    sortMode,
+  ]);
 
   return {
     rooms,
@@ -102,6 +119,8 @@ export function useLobbyCatalog({
     setSearchQuery,
     roomFilter,
     setRoomFilter,
+    sortMode,
+    setSortMode,
     refreshRooms,
   };
 }

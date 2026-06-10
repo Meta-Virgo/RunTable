@@ -7,6 +7,29 @@ import {
 
 type RemoteResult = Promise<{ error?: { message?: string; code?: string } | null }>;
 
+function isMissingCoverImageColumnError(error: unknown) {
+  const maybeError = error as {
+    code?: string;
+    message?: string;
+    details?: string;
+    hint?: string;
+  };
+  const text = [
+    maybeError?.message,
+    maybeError?.details,
+    maybeError?.hint,
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+
+  return (
+    maybeError?.code === "42703" ||
+    maybeError?.code === "PGRST204" ||
+    text.includes("cover_image_url")
+  );
+}
+
 export async function deleteRoomSession(input: {
   roomId: string | null;
   deleteRoom: (roomId: string) => RemoteResult;
@@ -57,7 +80,11 @@ export async function concludeRoomSession(input: {
 export async function updateRoomSessionModuleSettings(input: {
   roomId: string | null;
   isKeeper: boolean;
-  info: { title: string; description: string | null };
+  info: {
+    title: string;
+    description: string | null;
+    coverImageUrl?: string | null;
+  };
   password?: string;
   updateRoomModule: (
     roomId: string,
@@ -67,10 +94,26 @@ export async function updateRoomSessionModuleSettings(input: {
 }): Promise<RoomSessionActionResult> {
   if (!input.roomId || !input.isKeeper) return { ok: false };
 
-  const { error } = await input.updateRoomModule(input.roomId, {
+  const roomUpdates = {
     title: input.info.title,
     description: input.info.description,
-  });
+    cover_image_url: input.info.coverImageUrl || null,
+  };
+  let coverWarning: string | undefined;
+  let { error } = await input.updateRoomModule(input.roomId, roomUpdates);
+
+  if (error && isMissingCoverImageColumnError(error)) {
+    const fallbackResult = await input.updateRoomModule(input.roomId, {
+      title: roomUpdates.title,
+      description: roomUpdates.description,
+    });
+
+    error = fallbackResult.error || null;
+    if (!error) {
+      coverWarning =
+        "房间基础信息已保存，但数据库还没有 cover_image_url 字段，封面暂时无法保存。";
+    }
+  }
 
   if (error) {
     console.error("Failed to update room module:", error);
@@ -86,7 +129,7 @@ export async function updateRoomSessionModuleSettings(input: {
     }
   }
 
-  return { ok: true };
+  return { ok: true, message: coverWarning };
 }
 
 export async function updateRoomSessionMusicUrl(input: {

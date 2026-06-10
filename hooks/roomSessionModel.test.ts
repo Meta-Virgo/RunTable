@@ -75,6 +75,7 @@ describe("room session model", () => {
         description: null,
         type: "voice",
         bg_music_url: "p:123",
+        cover_image_url: "https://img.test/cover.jpg",
         is_music_playing: true,
         music_track_index: 3,
       },
@@ -93,6 +94,7 @@ describe("room session model", () => {
       moduleInfo: {
         title: "The Haunting",
         description: "",
+        coverImageUrl: "https://img.test/cover.jpg",
         notes: "",
       },
       roomType: "voice",
@@ -152,6 +154,7 @@ describe("room session model", () => {
       moduleInfo: {
         title: "",
         description: "",
+        coverImageUrl: null,
         notes: "",
       },
       roomPassword: "",

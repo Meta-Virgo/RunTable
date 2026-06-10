@@ -10,6 +10,18 @@ export default {
       colors: {
         slate: { 850: "#151e32", 900: "#0f172a", 950: "#020617" },
         indigo: { 450: "#6366f1" },
+        dicecho: {
+          bg: "#384154",
+          panel: "#31394c",
+          card: "#2d3548",
+          raised: "#3f4860",
+          border: "#566078",
+          primary: "#9b86f6",
+          "primary-strong": "#826df0",
+          accent: "#70c49d",
+          rating: "#f3c462",
+          muted: "#a9afbd",
+        },
       },
       animation: {
         blob: "blob 7s infinite",

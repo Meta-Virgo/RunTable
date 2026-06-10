@@ -39,7 +39,7 @@ export const ConclusionModal: React.FC<{
       className="max-w-2xl"
     >
       <div className="p-6 space-y-6">
-        <div className="bg-indigo-500/10 border border-indigo-500/20 p-4 rounded-xl text-sm text-indigo-300">
+        <div className="bg-dicecho-primary/12 border border-dicecho-primary/25 p-4 rounded-lg text-sm text-slate-200">
           结团后，房间状态将变为“已完成”，并生成永久的跑团履历。<br></br>
           请确认每位玩家角色的最终结局，这将记录在他们的个人履历中。<br></br>
           <span className="text-amber-400 font-bold">
@@ -51,7 +51,7 @@ export const ConclusionModal: React.FC<{
           {characters.map((character) => (
             <div
               key={character.id}
-              className="flex items-center justify-between p-4 bg-slate-900/50 rounded-xl border border-white/5"
+              className="flex items-center justify-between p-4 bg-dicecho-card/70 rounded-lg border border-dicecho-border/40"
             >
               <div className="flex items-center gap-3">
                 <AvatarUpload
@@ -62,15 +62,15 @@ export const ConclusionModal: React.FC<{
                 />
                 <div>
                   <div className="font-bold text-white">{character.name}</div>
-                  <div className="text-xs text-slate-500">
+                  <div className="text-xs text-dicecho-muted">
                     {character.role}
                   </div>
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                <label className="text-xs text-slate-400">结局:</label>
+                <label className="text-xs text-dicecho-muted">结局:</label>
                 <select
-                  className="bg-slate-800 border border-slate-600 rounded px-2 py-1 text-sm text-white focus:outline-none focus:border-indigo-500"
+                  className="bg-dicecho-panel/80 border border-dicecho-border/55 rounded px-2 py-1 text-sm text-white focus:outline-none focus:border-dicecho-primary/70"
                   value={outcomes[character.user_id!] || DEFAULT_OUTCOME}
                   onChange={(event) =>
                     setOutcomes({
@@ -90,13 +90,13 @@ export const ConclusionModal: React.FC<{
             </div>
           ))}
           {characters.length === 0 && (
-            <div className="text-center text-slate-500 py-8">
+            <div className="text-center text-dicecho-muted py-8">
               没有需要结算的调查员角色。
             </div>
           )}
         </div>
       </div>
-      <div className="px-6 py-4 border-t border-white/10 bg-white/5 flex justify-end gap-3">
+      <div className="px-6 py-4 border-t border-dicecho-border/45 bg-dicecho-card/50 flex justify-end gap-3">
         <Button variant="ghost" onClick={onClose} disabled={loading}>
           取消
         </Button>

@@ -173,12 +173,8 @@ export const Login: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#020617] p-4">
-      <div className="max-w-md w-full glass-panel rounded-2xl p-8 shadow-2xl relative overflow-hidden">
-        {/* Background blobs */}
-        <div className="absolute top-[-50px] left-[-50px] w-32 h-32 bg-indigo-500/20 rounded-full blur-3xl animate-blob"></div>
-        <div className="absolute bottom-[-50px] right-[-50px] w-32 h-32 bg-purple-500/20 rounded-full blur-3xl animate-blob animation-delay-2000"></div>
-
+    <div className="min-h-screen flex items-center justify-center dicecho-page-bg p-4">
+      <div className="max-w-md w-full bg-dicecho-panel border border-dicecho-border/50 rounded-lg p-8 shadow-lg shadow-black/25 relative overflow-hidden">
         <div className="relative z-10">
           <div className="text-center mb-8">
             <h1 className="text-3xl font-bold text-white mb-2 tracking-tight">
@@ -233,7 +229,7 @@ export const Login: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => switchMode("forgot")}
-                  className="text-xs text-indigo-400 hover:text-indigo-300 transition-colors"
+                  className="text-xs text-dicecho-primary hover:text-white transition-colors"
                 >
                   忘记密码?
                 </button>

@@ -18,11 +18,7 @@ import { SquarePostDetailModal } from "./square/SquarePostDetailModal";
 import { SquarePostList } from "./square/SquarePostList";
 import { SquareProfileModal } from "./square/SquareProfileModal";
 
-interface SquareProps {
-  onScrollChange?: (direction: "up" | "down") => void;
-}
-
-export const Square: React.FC<SquareProps> = ({ onScrollChange }) => {
+export const Square: React.FC = () => {
   const {
     feed,
     composer,
@@ -86,31 +82,11 @@ export const Square: React.FC<SquareProps> = ({ onScrollChange }) => {
   const contentRef = React.useRef<HTMLDivElement>(null);
   useElasticScroll(scrollContainerRef, contentRef);
 
-  const lastScrollTop = React.useRef(0);
-
   useEffect(() => {
     const handleScroll = () => {
       if (scrollContainerRef.current) {
         const scrollTop = scrollContainerRef.current.scrollTop;
         setShowBackToTop(scrollTop > 300);
-
-        if (onScrollChange) {
-          const diff = scrollTop - lastScrollTop.current;
-          const isScrollingDown = diff > 0;
-          const threshold = isScrollingDown ? 10 : 800;
-
-          if (Math.abs(diff) > threshold) {
-            if (isScrollingDown && scrollTop > 50) {
-              onScrollChange("down");
-            } else if (!isScrollingDown || scrollTop < 20) {
-              onScrollChange("up");
-            }
-            lastScrollTop.current = scrollTop;
-          } else if (scrollTop < 20) {
-            onScrollChange("up");
-            lastScrollTop.current = scrollTop;
-          }
-        }
       }
     };
 
@@ -132,7 +108,7 @@ export const Square: React.FC<SquareProps> = ({ onScrollChange }) => {
   };
 
   return (
-    <div className="flex h-full bg-[#020617] text-slate-200 overflow-hidden relative">
+    <div className="flex h-full dicecho-page-bg text-slate-200 overflow-hidden relative">
       <SquareChannelSidebar
         activeChannelId={activeChannelId}
         categories={categories}
@@ -146,20 +122,20 @@ export const Square: React.FC<SquareProps> = ({ onScrollChange }) => {
       {/* Main Content */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Header */}
-        <header className="h-16 border-b border-white/5 flex items-center justify-between px-4 md:px-6 bg-slate-900/30 relative">
+        <header className="h-16 border-b border-dicecho-border/40 flex items-center justify-between px-4 md:px-6 bg-dicecho-panel/85 relative">
           <div className="flex items-center gap-3">
             <button
-              className="md:hidden text-slate-400 hover:text-white mr-1"
+              className="md:hidden text-dicecho-muted hover:text-white mr-1"
               onClick={openMobileSidebar}
             >
               <Menu size={24} />
             </button>
-            <Hash className="text-slate-500 hidden md:block" size={24} />
+            <Hash className="text-dicecho-primary hidden md:block" size={24} />
             <div>
               <h3 className="font-bold text-white text-lg">
                 {activeChannel?.name || "加载中..."}
               </h3>
-              <p className="text-xs text-slate-500">
+              <p className="text-xs text-dicecho-muted">
                 {activeChannel?.description || "暂无描述"}
               </p>
             </div>
@@ -168,13 +144,13 @@ export const Square: React.FC<SquareProps> = ({ onScrollChange }) => {
           <div className="flex items-center gap-4">
             <div className="relative w-64 hidden md:block">
               <Search
-                className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500"
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-dicecho-muted"
                 size={16}
               />
               <input
                 type="text"
                 placeholder="搜索话题..."
-                className="w-full bg-slate-800 border border-slate-700 rounded-full pl-9 pr-4 py-1.5 text-sm focus:outline-none focus:border-indigo-500 transition-colors"
+                className="w-full rounded-lg border border-dicecho-border/50 bg-dicecho-panel/70 pl-9 pr-4 py-1.5 text-sm text-white placeholder:text-dicecho-muted/60 focus:outline-none focus:border-dicecho-primary/70 transition-colors duration-150"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
@@ -184,11 +160,11 @@ export const Square: React.FC<SquareProps> = ({ onScrollChange }) => {
                 variant="ghost"
                 size="icon"
                 icon={Bell}
-                className={unreadCount > 0 ? "text-indigo-400" : ""}
+                className={unreadCount > 0 ? "text-dicecho-primary" : ""}
                 onClick={toggleNotifications}
               />
               {unreadCount > 0 && (
-                <span className="absolute top-0 right-0 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-slate-900 animate-pulse"></span>
+                <span className="absolute top-0 right-0 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-dicecho-panel animate-pulse"></span>
               )}
               <SquareNotificationsMenu
                 show={showNotifications}
@@ -242,10 +218,10 @@ export const Square: React.FC<SquareProps> = ({ onScrollChange }) => {
       <button
         onClick={scrollToTop}
         className={cn(
-          "fixed bottom-8 right-8 z-50 p-3 bg-indigo-600 text-white rounded-full shadow-lg shadow-indigo-600/30 transition-all duration-300 hover:bg-indigo-500 hover:scale-110",
+          "fixed bottom-8 right-8 z-50 p-3 bg-dicecho-primary-strong text-white rounded-full shadow-lg shadow-black/20 transition-opacity duration-150 hover:bg-dicecho-primary",
           showBackToTop
-            ? "opacity-100 translate-y-0"
-            : "opacity-0 translate-y-10 pointer-events-none"
+            ? "opacity-100"
+            : "opacity-0 pointer-events-none"
         )}
       >
         <ArrowUp size={24} />

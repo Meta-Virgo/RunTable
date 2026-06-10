@@ -255,10 +255,10 @@ export const RoomTools: React.FC<RoomToolsProps> = ({
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
                 className={cn(
-                  "inline-flex items-center gap-2 px-3 py-2 rounded-xl border text-sm font-semibold transition-colors",
+                  "inline-flex items-center gap-2 px-3 py-2 rounded-lg border text-sm font-semibold transition-colors",
                   activeTab === tab.id
-                    ? "bg-indigo-500/15 border-indigo-500/30 text-indigo-200"
-                    : "bg-slate-950/40 border-white/10 text-slate-400 hover:text-white hover:bg-white/5"
+                    ? "bg-dicecho-primary/20 border-dicecho-primary/40 text-white"
+                    : "bg-dicecho-card/70 border-dicecho-border/40 text-dicecho-muted hover:text-white hover:bg-dicecho-raised/70"
                 )}
               >
                 <tab.icon size={16} />
@@ -270,9 +270,9 @@ export const RoomTools: React.FC<RoomToolsProps> = ({
         {activeTab === "report" && (
           <section className="space-y-4">
             <div className="grid lg:grid-cols-2 gap-4">
-              <div className="rounded-xl border border-white/10 bg-slate-950/40 p-4">
+              <div className="rounded-lg border border-dicecho-border/45 bg-dicecho-card/70 p-4 shadow-sm">
                 <h2 className="text-white font-bold flex items-center gap-2">
-                  <FileText size={18} className="text-indigo-300" />
+                  <FileText size={18} className="text-dicecho-primary" />
                   公开战报
                 </h2>
                 <pre className="mt-3 whitespace-pre-wrap text-sm text-slate-300 leading-6 max-h-[55vh] overflow-y-auto custom-scrollbar">
@@ -280,7 +280,7 @@ export const RoomTools: React.FC<RoomToolsProps> = ({
                 </pre>
               </div>
               {isKP && (
-                <div className="rounded-xl border border-white/10 bg-slate-950/40 p-4">
+                <div className="rounded-lg border border-dicecho-border/45 bg-dicecho-card/70 p-4 shadow-sm">
                   <h2 className="text-white font-bold flex items-center gap-2">
                     <Shield size={18} className="text-amber-300" />
                     Keeper 私密段落
@@ -297,9 +297,9 @@ export const RoomTools: React.FC<RoomToolsProps> = ({
         {activeTab === "clues" && (
           <section className="grid lg:grid-cols-[360px_1fr] gap-4">
             {isKP && (
-              <div className="rounded-xl border border-white/10 bg-slate-950/40 p-4 space-y-3">
+              <div className="rounded-lg border border-dicecho-border/45 bg-dicecho-card/70 p-4 shadow-sm space-y-3">
                 <h2 className="text-white font-bold flex items-center gap-2">
-                  <ClipboardList size={18} className="text-indigo-300" />
+                  <ClipboardList size={18} className="text-dicecho-primary" />
                   新线索
                 </h2>
                 <Input label="标题" value={clueTitle} onChange={(e) => setClueTitle(e.target.value)} />
@@ -313,14 +313,14 @@ export const RoomTools: React.FC<RoomToolsProps> = ({
             )}
             <div className="space-y-3">
               {visibleClues.length === 0 && (
-                <div className="rounded-xl border border-white/10 bg-slate-950/40 p-6 text-slate-400">
+                <div className="rounded-lg border border-dicecho-border/45 bg-dicecho-card/55 p-6 text-dicecho-muted">
                   暂无线索
                 </div>
               )}
               {visibleClues.map((clue) => (
                 <article
                   key={clue.id}
-                  className="rounded-xl border border-white/10 bg-slate-950/40 p-4 space-y-3"
+                  className="rounded-lg border border-dicecho-border/45 bg-dicecho-card/70 p-4 shadow-sm space-y-3"
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div>
@@ -335,7 +335,7 @@ export const RoomTools: React.FC<RoomToolsProps> = ({
                   {clue.tags.length > 0 && (
                     <div className="flex flex-wrap gap-2">
                       {clue.tags.map((tag) => (
-                        <span key={tag} className="text-xs px-2 py-1 rounded-lg bg-indigo-500/10 text-indigo-200 border border-indigo-500/20 inline-flex items-center gap-1">
+                        <span key={tag} className="text-xs px-2 py-1 rounded-lg bg-dicecho-primary/15 text-white border border-dicecho-primary/25 inline-flex items-center gap-1">
                           <Tags size={12} />
                           {tag}
                         </span>
@@ -430,9 +430,9 @@ export const RoomTools: React.FC<RoomToolsProps> = ({
         {activeTab === "invite" && (
           <section className="grid lg:grid-cols-[360px_1fr] gap-4">
             {isKP && (
-              <div className="rounded-xl border border-white/10 bg-slate-950/40 p-4 space-y-3">
+              <div className="rounded-lg border border-dicecho-border/45 bg-dicecho-card/70 p-4 shadow-sm space-y-3">
                 <h2 className="text-white font-bold flex items-center gap-2">
-                  <CalendarClock size={18} className="text-indigo-300" />
+                  <CalendarClock size={18} className="text-dicecho-primary" />
                   开团时间
                 </h2>
                 <Input
@@ -452,13 +452,13 @@ export const RoomTools: React.FC<RoomToolsProps> = ({
                 </Button>
               </div>
             )}
-            <div className="rounded-xl border border-white/10 bg-slate-950/40 p-4">
+            <div className="rounded-lg border border-dicecho-border/45 bg-dicecho-card/70 p-4 shadow-sm">
               <h2 className="text-white font-bold">当前邀请</h2>
               <p className="mt-3 text-sm text-slate-300">
                 {inviteSummary || "暂无可见邀请"}
               </p>
               {invite && (
-                <div className="mt-4 text-xs text-slate-500 space-y-1">
+                <div className="mt-4 text-xs text-dicecho-muted space-y-1">
                   <div>Invite ID: {invite.id}</div>
                   <div>Visibility: {invite.visibility}</div>
                   {schedule && <div>Starts at: {schedule.startsAt}</div>}
@@ -477,14 +477,14 @@ export const RoomTools: React.FC<RoomToolsProps> = ({
             )}
             <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-3">
               {visibleSnapshots.length === 0 && (
-                <div className="rounded-xl border border-white/10 bg-slate-950/40 p-6 text-slate-400">
+                <div className="rounded-lg border border-dicecho-border/45 bg-dicecho-card/55 p-6 text-dicecho-muted">
                   暂无快照
                 </div>
               )}
               {visibleSnapshots.map((snapshot) => (
                 <article
                   key={snapshot.id}
-                  className="rounded-xl border border-white/10 bg-slate-950/40 p-4"
+                  className="rounded-lg border border-dicecho-border/45 bg-dicecho-card/70 p-4 shadow-sm"
                 >
                   <h3 className="font-bold text-white">{snapshot.snapshot.name}</h3>
                   <p className="text-xs text-slate-500 mt-1">
@@ -514,9 +514,9 @@ export const RoomTools: React.FC<RoomToolsProps> = ({
 
         {activeTab === "toolbox" && isKP && (
           <section className="grid lg:grid-cols-2 gap-4">
-            <div className="rounded-xl border border-white/10 bg-slate-950/40 p-4 space-y-3">
+            <div className="rounded-lg border border-dicecho-border/45 bg-dicecho-card/70 p-4 shadow-sm space-y-3">
               <h2 className="text-white font-bold flex items-center gap-2">
-                <UserCog size={18} className="text-indigo-300" />
+                <UserCog size={18} className="text-dicecho-primary" />
                 NPC / Monster 身份
               </h2>
               <div className="flex gap-2">
@@ -543,12 +543,12 @@ export const RoomTools: React.FC<RoomToolsProps> = ({
               <Textarea label="发言" rows={3} value={personaLine} onChange={(e) => setPersonaLine(e.target.value)} />
               <div className="space-y-2">
                 {personas.map((persona) => (
-                  <div key={persona.id} className="flex items-center justify-between gap-3 rounded-lg bg-white/[0.03] p-2">
+                  <div key={persona.id} className="flex items-center justify-between gap-3 rounded-lg border border-dicecho-border/35 bg-dicecho-panel/55 p-2">
                     <div className="min-w-0">
                       <div className="text-sm font-semibold text-white truncate">
                         {persona.name}
                       </div>
-                      <div className="text-xs text-slate-500 truncate">
+                      <div className="text-xs text-dicecho-muted truncate">
                         {persona.kind} {persona.description}
                       </div>
                     </div>
@@ -560,7 +560,7 @@ export const RoomTools: React.FC<RoomToolsProps> = ({
               </div>
             </div>
 
-            <div className="rounded-xl border border-white/10 bg-slate-950/40 p-4 space-y-3">
+            <div className="rounded-lg border border-dicecho-border/45 bg-dicecho-card/70 p-4 shadow-sm space-y-3">
               <h2 className="text-white font-bold flex items-center gap-2">
                 <Shield size={18} className="text-amber-300" />
                 批量暗骰

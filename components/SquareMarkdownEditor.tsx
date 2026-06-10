@@ -268,7 +268,7 @@ export const SquareMarkdownEditor: React.FC<SquareMarkdownEditorProps> = ({
                   aria-label={title}
                   onMouseDown={(event) => event.preventDefault()}
                   onClick={() => applyFormat(format)}
-                  className="h-7 w-7 inline-flex items-center justify-center rounded-md text-slate-400 hover:text-indigo-200 hover:bg-white/10 transition-colors"
+                  className="h-7 w-7 inline-flex items-center justify-center rounded-md text-dicecho-muted hover:text-white hover:bg-white/10 transition-colors"
                 >
                   <Icon size={14} />
                 </button>
@@ -276,15 +276,15 @@ export const SquareMarkdownEditor: React.FC<SquareMarkdownEditorProps> = ({
             </div>
           )}
           {showModeSwitch && !livePreview && !renderedEditing && (
-            <div className="inline-flex items-center rounded-md border border-white/10 bg-slate-900/50 p-0.5 text-[11px]">
+            <div className="inline-flex items-center rounded-md border border-dicecho-border/40 bg-dicecho-panel/70 p-0.5 text-[11px]">
               <button
                 type="button"
                 onClick={() => setMode("source")}
                 className={cn(
                   "inline-flex items-center gap-1 rounded px-2 py-1 transition-colors",
                   mode === "source"
-                    ? "bg-indigo-500/20 text-indigo-200"
-                    : "text-slate-500 hover:text-slate-200"
+                    ? "bg-dicecho-primary/20 text-white"
+                    : "text-dicecho-muted hover:text-slate-200"
                 )}
               >
                 <Pencil size={12} />
@@ -296,8 +296,8 @@ export const SquareMarkdownEditor: React.FC<SquareMarkdownEditorProps> = ({
                 className={cn(
                   "inline-flex items-center gap-1 rounded px-2 py-1 transition-colors",
                   mode === "preview"
-                    ? "bg-indigo-500/20 text-indigo-200"
-                    : "text-slate-500 hover:text-slate-200"
+                    ? "bg-dicecho-primary/20 text-white"
+                    : "text-dicecho-muted hover:text-slate-200"
                 )}
               >
                 <Eye size={12} />
@@ -311,7 +311,7 @@ export const SquareMarkdownEditor: React.FC<SquareMarkdownEditorProps> = ({
       {renderedEditing ? (
         <div className="relative">
           {!value.trim() && (
-            <div className="pointer-events-none absolute left-0 top-0 text-slate-500">
+            <div className="pointer-events-none absolute left-0 top-0 text-dicecho-muted">
               {placeholder}
             </div>
           )}
@@ -352,18 +352,18 @@ export const SquareMarkdownEditor: React.FC<SquareMarkdownEditorProps> = ({
           />
         </div>
       ) : !livePreview && mode === "preview" ? (
-        <div className="min-h-[72px] rounded-lg border border-white/10 bg-slate-950/30 px-3 py-2">
+        <div className="min-h-[72px] rounded-lg border border-dicecho-border/40 bg-dicecho-panel/50 px-3 py-2">
           {value.trim() ? (
             <SquareMarkdown source={value} variant={previewVariant} />
           ) : (
-            <div className="text-sm text-slate-600">{placeholder}</div>
+            <div className="text-sm text-dicecho-muted">{placeholder}</div>
           )}
         </div>
       ) : (
         <textarea
           ref={textareaRef}
           className={cn(
-            "w-full bg-transparent border-none focus:ring-0 outline-none text-slate-200 placeholder:text-slate-500 resize-none custom-scrollbar",
+            "w-full bg-transparent border-none focus:ring-0 outline-none text-slate-200 placeholder:text-dicecho-muted resize-none custom-scrollbar",
             textareaClassName
           )}
           placeholder={placeholder}
@@ -378,7 +378,7 @@ export const SquareMarkdownEditor: React.FC<SquareMarkdownEditorProps> = ({
         />
       )}
       {livePreview && value.trim() && (
-        <div className="rounded-lg border border-white/10 bg-slate-950/30 px-3 py-2">
+        <div className="rounded-lg border border-dicecho-border/40 bg-dicecho-panel/50 px-3 py-2">
           <SquareMarkdown source={value} variant={previewVariant} />
         </div>
       )}

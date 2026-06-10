@@ -157,44 +157,41 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
           {/* Control Panel (KP Only) - Only show in Sidebar mode */}
           {isKP && showInput && mode === "sidebar" && (
             <div
-              className={`bg-slate-900/95 backdrop-blur border border-slate-700 p-3 rounded-xl shadow-2xl animate-slide-up z-50 ${
-                mode === "sidebar"
-                  ? "absolute top-4 left-4 right-4"
-                  : isMobile
-                  ? "w-[calc(100vw-32px)] max-w-[280px] mb-2"
-                  : "w-72 mb-2"
-              }`}
+              className="relative z-20 w-full shrink-0 rounded-lg border border-dicecho-border/60 bg-dicecho-card/80 p-4 dicecho-card-shadow"
             >
               <div className="flex justify-between items-center mb-3">
-                <span className="text-xs font-bold text-slate-400 flex items-center gap-1">
-                  <Music size={12} />
+                <span className="text-xs font-bold text-white flex items-center gap-2">
+                  <span className="flex h-6 w-6 items-center justify-center rounded-md border border-dicecho-primary/35 bg-dicecho-primary/15 text-dicecho-primary">
+                    <Music size={13} />
+                  </span>
                   背景音乐设置
                 </span>
                 <button
                   onClick={() => setShowInput(false)}
-                  className="text-slate-500 hover:text-white transition-colors"
+                  aria-label="关闭背景音乐设置"
+                  className="flex h-7 w-7 items-center justify-center rounded-md text-dicecho-muted transition-colors hover:bg-dicecho-raised/70 hover:text-white"
                 >
                   <X size={14} />
                 </button>
               </div>
 
-              <div className="flex bg-slate-800 rounded-lg p-1 mb-2">
+              <div className="flex bg-dicecho-panel/80 rounded-lg p-1 mb-3 border border-dicecho-border/45">
                 <button
                   onClick={() => setMusicType("song")}
-                  className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 text-xs font-medium rounded-md transition-all ${
+                  className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 text-xs font-medium rounded-md border transition-colors ${
                     musicType === "song"
-                      ? "bg-indigo-600 text-white shadow-sm"
-                      : "text-slate-400 hover:text-slate-200"
+                      ? "border-dicecho-primary/55 bg-dicecho-primary/18 text-white"
+                      : "border-transparent text-dicecho-muted hover:bg-dicecho-raised/55 hover:text-white"
                   }`}
                 >
                   <Disc size={12} /> 单曲
                 </button>
                 <button
                   onClick={() => setMusicType("playlist")}
-                  className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 text-xs font-medium rounded-md transition-all ${
+                  className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 text-xs font-medium rounded-md border transition-colors ${
                     musicType === "playlist"
-                      ? "bg-indigo-600 text-white shadow-sm"
-                      : "text-slate-400 hover:text-slate-200"
+                      ? "border-dicecho-primary/55 bg-dicecho-primary/18 text-white"
+                      : "border-transparent text-dicecho-muted hover:bg-dicecho-raised/55 hover:text-white"
                   }`}
                 >
                   <ListMusic size={12} /> 歌单
@@ -210,7 +207,7 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
                       ? "输入歌单ID或链接..."
                       : "输入单曲ID或链接..."
                   }
-                  className="w-full bg-slate-950 border border-slate-700 rounded-lg px-2 py-1.5 text-xs text-white focus:border-indigo-500 outline-none transition-all placeholder-slate-600 font-mono"
+                  className="w-full rounded-lg border border-dicecho-border/55 bg-dicecho-panel/85 px-3 py-2 text-xs text-white outline-none transition-colors duration-150 placeholder-dicecho-muted/60 focus:border-dicecho-primary/80 focus:ring-1 focus:ring-dicecho-primary/25 font-mono"
                   onKeyDown={(e) => e.key === "Enter" && handleSave()}
                 />
 
@@ -222,20 +219,20 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
                       onUpdateUrl(""); // Stop music
                       setShowInput(false);
                     }}
-                    className="text-rose-400 hover:text-rose-300 hover:bg-rose-500/10"
+                    className="border border-rose-400/25 text-rose-300 hover:text-rose-200 hover:bg-rose-500/10"
                   >
                     停止播放
                   </Button>
                   <Button
                     size="xs"
                     onClick={handleSave}
-                    className="bg-indigo-600 hover:bg-indigo-500"
+                    className="bg-dicecho-primary-strong hover:bg-dicecho-primary"
                   >
                     同步播放
                   </Button>
                 </div>
               </div>
-              <p className="text-[10px] text-slate-600 mt-2 leading-relaxed">
+              <p className="text-[10px] text-dicecho-muted/75 mt-3 leading-relaxed">
                 * 支持输入 ID (如 571246314) 或完整链接。
                 <br />* 仅支持网易云音乐免费资源。
               </p>
@@ -263,7 +260,7 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
                     cy="26"
                     r="24"
                     fill="none"
-                    stroke="#334155"
+                    stroke="#566078"
                     strokeWidth="2"
                     className="opacity-50"
                   />
@@ -272,7 +269,7 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
                     cy="26"
                     r="24"
                     fill="none"
-                    stroke="#c084fc" // Purple-400
+                    stroke="#9b86f6"
                     strokeWidth="2"
                     strokeDasharray={2 * Math.PI * 24}
                     strokeDashoffset={
@@ -288,13 +285,13 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
                   onClick={() => !hasMoved && setIsCollapsed(!isCollapsed)}
                   className={`p-3 rounded-full border shadow-lg backdrop-blur transition-all shrink-0 active:cursor-grabbing flex items-center justify-center relative z-10 ${
                     isCollapsed
-                      ? "bg-slate-900/90 border-slate-700 text-slate-400 hover:text-white hover:bg-slate-800 cursor-pointer"
-                      : "bg-indigo-600 border-indigo-500 text-white cursor-pointer hover:bg-indigo-500"
+                      ? "bg-dicecho-panel/90 border-dicecho-border/60 text-dicecho-muted hover:text-white hover:bg-dicecho-raised cursor-pointer"
+                      : "bg-dicecho-primary-strong border-dicecho-primary text-white cursor-pointer hover:bg-dicecho-primary"
                   }`}
                 >
                   <Music
                     size={20}
-                    className={isPlaying ? "animate-pulse text-indigo-100" : ""}
+                    className={isPlaying ? "animate-pulse text-white" : ""}
                   />
                 </div>
               </div>
@@ -307,7 +304,7 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
                   className={`transition-all duration-300 overflow-hidden flex flex-col ${playerWidthClass} h-full ${
                     parsedType === 2
                       ? "bg-transparent border-none shadow-none"
-                      : "bg-slate-900/90 backdrop-blur rounded-xl shadow-xl border border-slate-700/50"
+                      : "bg-dicecho-card/70 rounded-lg dicecho-card-shadow border border-dicecho-border/55"
                   }`}
                 >
                   {/* Custom UI for Songs & Playlist Header */}
@@ -315,13 +312,13 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
                     className={`p-3 flex items-center gap-3 shrink-0 ${
                       parsedType === 2
                         ? "bg-transparent hidden"
-                        : "bg-slate-800/50"
+                        : "bg-dicecho-panel/65 border-b border-dicecho-border/35"
                     }`}
                   >
                     {/* Album Art Placeholder */}
                     <div
                       onClick={() => parsedType === 2 && togglePlay()}
-                      className={`w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center border border-slate-700 shrink-0 animate-spin-slow overflow-hidden ${
+                      className={`w-10 h-10 rounded-full bg-dicecho-card flex items-center justify-center border border-dicecho-border/50 shrink-0 animate-spin-slow overflow-hidden ${
                         parsedType === 2
                           ? "cursor-pointer hover:scale-105 transition-transform"
                           : ""
@@ -344,11 +341,11 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
                           />
                           {/* Vinyl center hole for single song */}
                           {parsedType === 2 && (
-                            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-1.5 h-1.5 bg-slate-800 rounded-full border border-slate-600"></div>
+                            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-1.5 h-1.5 bg-dicecho-card rounded-full border border-dicecho-border"></div>
                           )}
                         </div>
                       ) : (
-                        <Music size={18} className="text-indigo-400" />
+                        <Music size={18} className="text-dicecho-primary" />
                       )}
                     </div>
 
@@ -363,20 +360,20 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
                                   "未知歌曲"
                                 : "背景音乐";
                             return (
-                              <div className="text-xs font-bold text-slate-200 truncate w-full">
+                              <div className="text-xs font-bold text-white truncate w-full">
                                 {trackName}
                               </div>
                             );
                           })()}
                         </div>
-                        <span className="text-[10px] text-slate-500 font-mono">
+                        <span className="text-[10px] text-dicecho-muted font-mono">
                           {formatTime(currentTime)} / {formatTime(duration)}
                         </span>
                       </div>
 
                       {/* Progress Bar */}
                       <div
-                        className="h-1 bg-slate-700 rounded-full overflow-hidden cursor-pointer group"
+                        className="h-1 bg-dicecho-raised rounded-full overflow-hidden cursor-pointer group"
                         onClick={(e) => {
                           if (!audioRef.current || !duration) return;
                           const rect = e.currentTarget.getBoundingClientRect();
@@ -386,7 +383,7 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
                         }}
                       >
                         <div
-                          className="h-full bg-indigo-500 group-hover:bg-indigo-400 transition-all relative"
+                          className="h-full bg-dicecho-primary group-hover:bg-dicecho-primary-strong transition-all relative"
                           style={{
                             width: `${(currentTime / duration) * 100}%`,
                           }}
@@ -400,7 +397,7 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
                         <>
                           <button
                             onClick={togglePlayMode}
-                            className="w-6 h-6 rounded-full text-slate-400 hover:text-white flex items-center justify-center transition-all mr-1"
+                            className="w-6 h-6 rounded-full text-dicecho-muted hover:text-white flex items-center justify-center transition-all mr-1"
                           >
                             {playMode === "sequence" ? (
                               <Repeat size={14} fill="currentColor" />
@@ -412,7 +409,7 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
                           </button>
                           <button
                             onClick={playPrev}
-                            className="w-6 h-6 rounded-full text-slate-400 hover:text-white flex items-center justify-center transition-all"
+                            className="w-6 h-6 rounded-full text-dicecho-muted hover:text-white flex items-center justify-center transition-all"
                           >
                             <SkipBack size={14} fill="currentColor" />
                           </button>
@@ -421,7 +418,7 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
 
                       <button
                         onClick={togglePlay}
-                        className="w-8 h-8 rounded-full bg-indigo-600 hover:bg-indigo-500 text-white flex items-center justify-center transition-all shadow-lg shrink-0"
+                        className="w-8 h-8 rounded-full bg-dicecho-primary-strong hover:bg-dicecho-primary text-white flex items-center justify-center transition-all shadow-lg shadow-dicecho-primary/20 shrink-0"
                       >
                         {isPlaying ? (
                           <Pause size={14} fill="currentColor" />
@@ -437,7 +434,7 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
                       {parsedType === 0 && (
                         <button
                           onClick={() => playNext()}
-                          className="w-6 h-6 rounded-full text-slate-400 hover:text-white flex items-center justify-center transition-all"
+                          className="w-6 h-6 rounded-full text-dicecho-muted hover:text-white flex items-center justify-center transition-all"
                         >
                           <SkipForward size={14} fill="currentColor" />
                         </button>
@@ -449,15 +446,15 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
                   {parsedType === 0 && (
                     <div
                       ref={playlistScrollRef}
-                      className="flex-1 overflow-y-auto custom-scrollbar bg-slate-900/50 border-t border-slate-700/50 overscroll-y-none"
+                      className="flex-1 overflow-y-auto custom-scrollbar bg-dicecho-card/45 border-t border-dicecho-border/40 overscroll-y-none"
                     >
                       <div ref={playlistContentRef}>
                         {isLoadingPlaylist ? (
-                          <div className="p-4 text-center text-xs text-slate-500">
+                          <div className="p-4 text-center text-xs text-dicecho-muted">
                             正在加载歌单...
                           </div>
                         ) : playlistTracks.length > 0 ? (
-                          <div className="divide-y divide-slate-800/50">
+                          <div className="divide-y divide-dicecho-border/25">
                             {playlistTracks.map((track, idx) => (
                               <div
                                 key={track.id}
@@ -469,9 +466,9 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
                                 onClick={() => {
                                   if (!isLoadingSong) setCurrentTrackIndex(idx);
                                 }}
-                                className={`p-2 flex items-center gap-2 cursor-pointer transition-colors hover:bg-slate-800/50 group ${
+                                className={`p-2 flex items-center gap-2 cursor-pointer transition-colors hover:bg-dicecho-raised/45 group ${
                                   currentTrackIndex === idx
-                                    ? "bg-indigo-500/10"
+                                    ? "bg-dicecho-primary/12"
                                     : ""
                                 } ${isLoadingSong ? "cursor-not-allowed" : ""}`}
                               >
@@ -479,25 +476,25 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
                                 <span
                                   className={`text-[10px] w-6 text-center shrink-0 ${
                                     currentTrackIndex === idx
-                                      ? "text-indigo-400 font-bold"
-                                      : "text-slate-600 group-hover:text-slate-400"
+                                      ? "text-dicecho-primary font-bold"
+                                      : "text-dicecho-muted/60 group-hover:text-dicecho-muted"
                                   }`}
                                 >
                                   {currentTrackIndex === idx &&
                                   isLoadingSong ? (
                                     <Loader2
                                       size={10}
-                                      className="mx-auto animate-spin text-indigo-500"
+                                      className="mx-auto animate-spin text-dicecho-primary"
                                     />
                                   ) : currentTrackIndex === idx ? (
-                                    <div className="w-2 h-2 rounded-full bg-indigo-500 mx-auto animate-pulse shadow-[0_0_8px_rgba(99,102,241,0.5)]" />
+                                    <div className="w-2 h-2 rounded-full bg-dicecho-primary mx-auto animate-pulse shadow-[0_0_8px_rgba(155,134,246,0.5)]" />
                                   ) : (
                                     idx + 1
                                   )}
                                 </span>
 
                                 {/* Album Art (Small) */}
-                                <div className="w-8 h-8 rounded bg-slate-800 overflow-hidden shrink-0 border border-slate-700/50">
+                                <div className="w-8 h-8 rounded bg-dicecho-raised overflow-hidden shrink-0 border border-dicecho-border/50">
                                   {track.album?.picUrl || track.al?.picUrl ? (
                                     <img
                                       src={
@@ -507,7 +504,7 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
                                       className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity"
                                     />
                                   ) : (
-                                    <div className="w-full h-full flex items-center justify-center text-slate-600">
+                                    <div className="w-full h-full flex items-center justify-center text-dicecho-muted/60">
                                       <Disc size={12} />
                                     </div>
                                   )}
@@ -517,13 +514,13 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
                                   <div
                                     className={`text-xs truncate font-medium ${
                                       currentTrackIndex === idx
-                                        ? "text-indigo-300"
-                                        : "text-slate-300 group-hover:text-slate-200"
+                                        ? "text-dicecho-primary"
+                                        : "text-white/85 group-hover:text-white"
                                     }`}
                                   >
                                     {track.name}
                                   </div>
-                                  <div className="text-[10px] text-slate-500 truncate group-hover:text-slate-400">
+                                  <div className="text-[10px] text-dicecho-muted truncate group-hover:text-dicecho-muted/95">
                                     {track.artists
                                       ?.map((a: any) => a.name)
                                       .join(", ") ||
@@ -532,7 +529,7 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
                                         .join(", ")}
                                   </div>
                                 </div>
-                                <span className="text-[10px] text-slate-600 font-mono shrink-0">
+                                <span className="text-[10px] text-dicecho-muted/70 font-mono shrink-0">
                                   {formatTime(
                                     track.duration / 1000 || track.dt / 1000
                                   )}
@@ -545,20 +542,20 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
                               <div
                                 ref={loadMoreRef}
                                 onClick={loadMoreTracks}
-                                className="p-3 text-center text-[10px] text-slate-500 hover:text-indigo-400 cursor-pointer transition-colors"
+                                className="p-3 text-center text-[10px] text-dicecho-muted hover:text-dicecho-primary cursor-pointer transition-colors"
                               >
                                 {isLoadingMore ? (
                                   <span className="flex items-center justify-center gap-2">
                                     <div
-                                      className="w-1.5 h-1.5 bg-indigo-500 rounded-full animate-bounce"
+                                      className="w-1.5 h-1.5 bg-dicecho-primary rounded-full"
                                       style={{ animationDelay: "0ms" }}
                                     />
                                     <div
-                                      className="w-1.5 h-1.5 bg-indigo-500 rounded-full animate-bounce"
+                                      className="w-1.5 h-1.5 bg-dicecho-primary rounded-full"
                                       style={{ animationDelay: "150ms" }}
                                     />
                                     <div
-                                      className="w-1.5 h-1.5 bg-indigo-500 rounded-full animate-bounce"
+                                      className="w-1.5 h-1.5 bg-dicecho-primary rounded-full"
                                       style={{ animationDelay: "300ms" }}
                                     />
                                   </span>
@@ -570,7 +567,7 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
                           </div>
                         ) : (
                           <div className="p-4 text-center flex flex-col items-center gap-2">
-                            <span className="text-xs text-slate-500">
+                            <span className="text-xs text-dicecho-muted">
                               无法加载歌单信息
                             </span>
                             <Button
@@ -579,7 +576,7 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
                               onClick={() =>
                                 parsedId && fetchPlaylist(parsedId)
                               }
-                              className="text-indigo-400 hover:text-indigo-300"
+                              className="text-dicecho-primary hover:text-white"
                             >
                               点击重试
                             </Button>
@@ -591,7 +588,7 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
 
                   {/* Single Song Mode: Large Record Player */}
                   {parsedType === 2 && (
-                    <div className="flex-1 flex items-center justify-center relative overflow-hidden">
+                    <div className="flex-1 flex items-center justify-center relative overflow-hidden rounded-lg bg-dicecho-card/35 border border-dicecho-border/35">
                       {/* Record Player Container */}
                       <div
                         onClick={togglePlay}
@@ -599,20 +596,20 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
                       >
                         {/* Vinyl Disc */}
                         <div
-                          className={`w-64 h-64 rounded-full bg-[#111] shadow-2xl flex items-center justify-center relative animate-spin`}
+                          className={`w-64 h-64 rounded-full bg-dicecho-card shadow-xl shadow-black/35 flex items-center justify-center relative animate-spin`}
                           style={{
                             animationDuration: "8s",
                             animationPlayState: isPlaying
                               ? "running"
                               : "paused",
                             background:
-                              "radial-gradient(circle, #1a1a1a 0%, #111 30%, #000 31%, #111 32%, #000 33%, #111 34%, #000 35%, #111 36%, #000 37%, #111 38%, #000 39%, #111 40%, #000 41%, #111 42%, #000 43%, #111 44%, #000 45%, #111 46%, #000 47%, #111 48%, #000 49%, #111 50%, #000 51%, #111 52%, #000 53%, #111 54%, #000 55%, #111 56%, #000 57%, #111 58%, #000 59%, #111 60%, #000 61%, #111 62%, #000 63%, #111 64%, #000 65%, #111 66%, #000 67%, #111 68%, #000 69%, #111 70%, #181818 100%)",
+                              "radial-gradient(circle, #384154 0%, #31394c 28%, #232b3d 29%, #3f4860 30%, #232b3d 32%, #3f4860 34%, #232b3d 36%, #3f4860 38%, #232b3d 40%, #3f4860 42%, #232b3d 44%, #3f4860 46%, #232b3d 48%, #3f4860 50%, #232b3d 52%, #3f4860 54%, #232b3d 56%, #3f4860 58%, #232b3d 60%, #31394c 100%)",
                             boxShadow:
-                              "0 0 20px rgba(0,0,0,0.8), inset 0 0 0 2px #222",
+                              "0 0 20px rgba(0,0,0,0.35), inset 0 0 0 2px rgba(86,96,120,0.45)",
                           }}
                         >
                           {/* Inner Label / Cover */}
-                          <div className="w-28 h-28 rounded-full overflow-hidden border-4 border-[#222] relative shadow-inner">
+                          <div className="w-28 h-28 rounded-full overflow-hidden border-4 border-dicecho-border/60 relative shadow-inner">
                             {playlistTracks[currentTrackIndex]?.album?.picUrl ||
                             playlistTracks[currentTrackIndex]?.al?.picUrl ? (
                               <img
@@ -625,7 +622,7 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
                                 className="w-full h-full object-cover"
                               />
                             ) : (
-                              <div className="w-full h-full bg-slate-800 flex items-center justify-center text-slate-500">
+                              <div className="w-full h-full bg-dicecho-raised flex items-center justify-center text-dicecho-muted">
                                 <Music size={32} />
                               </div>
                             )}
@@ -638,7 +635,7 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
                               </div>
                             )}
                             {/* Center Hole */}
-                            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-3 h-3 bg-[#e5e5e5] rounded-full border border-[#999] z-30"></div>
+                            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-3 h-3 bg-dicecho-bg rounded-full border border-dicecho-border z-30"></div>
                           </div>
                         </div>
 
@@ -652,15 +649,15 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
                           }}
                         >
                           {/* Base */}
-                          <div className="absolute top-0 left-0 w-12 h-12 rounded-full bg-neutral-800 shadow-xl border border-white/5 z-20 flex items-center justify-center">
-                            <div className="w-4 h-4 rounded-full bg-neutral-600 shadow-inner"></div>
+                          <div className="absolute top-0 left-0 w-12 h-12 rounded-full bg-dicecho-raised shadow-xl border border-dicecho-border/50 z-20 flex items-center justify-center">
+                            <div className="w-4 h-4 rounded-full bg-dicecho-border shadow-inner"></div>
                           </div>
 
                           {/* Rod */}
-                          <div className="absolute top-6 left-6 w-2 h-32 bg-neutral-700 origin-top transform -rotate-12 rounded-full shadow-lg z-10"></div>
+                          <div className="absolute top-6 left-6 w-2 h-32 bg-dicecho-border origin-top transform -rotate-12 rounded-full shadow-lg z-10"></div>
 
                           {/* Head */}
-                          <div className="absolute bottom-6 right-7 w-6 h-9 bg-neutral-800 rounded shadow-xl transform rotate-[18deg] z-20 border border-white/5"></div>
+                          <div className="absolute bottom-6 right-7 w-6 h-9 bg-dicecho-raised rounded shadow-xl transform rotate-[18deg] z-20 border border-dicecho-border/50"></div>
                         </div>
                       </div>
                     </div>
@@ -743,8 +740,8 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
                                   className={`absolute rounded-[24px] shadow-xl border-2 transition-all duration-300 flex items-center justify-center overflow-hidden pointer-events-auto cursor-pointer group/item
                                     ${
                                       isVisualCenter
-                                        ? "border-indigo-500 z-50 ring-2 ring-indigo-500/20"
-                                        : "border-slate-700 hover:border-slate-500 bg-slate-800"
+                                        ? "border-dicecho-primary z-50 ring-2 ring-dicecho-primary/20"
+                                        : "border-dicecho-border hover:border-dicecho-primary/60 bg-dicecho-card"
                                     }
                                 `}
                                   style={{
@@ -795,7 +792,7 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
                                   ) : (
                                     <Music
                                       size={size / 2}
-                                      className="text-slate-500"
+                                      className="text-dicecho-muted"
                                     />
                                   )}
 
@@ -840,7 +837,7 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
                                   {/* Progress Bar for Current - Only if Playing */}
                                   {isPlayingTrack && (
                                     <div
-                                      className="absolute -bottom-3 left-1/2 -translate-x-1/2 w-16 h-1 bg-slate-700/80 rounded-full overflow-hidden pointer-events-auto"
+                                      className="absolute -bottom-3 left-1/2 -translate-x-1/2 w-16 h-1 bg-dicecho-raised/90 rounded-full overflow-hidden pointer-events-auto"
                                       onClick={(e) => {
                                         e.stopPropagation();
                                         if (!audioRef.current || !duration)
@@ -854,7 +851,7 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
                                       }}
                                     >
                                       <div
-                                        className="h-full bg-indigo-500"
+                                        className="h-full bg-dicecho-primary"
                                         style={{
                                           width: `${
                                             (currentTime / duration) * 100
@@ -878,10 +875,10 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
               <div className="flex shrink-0 flex-row w-full justify-end items-center mt-2">
                 <button
                   onClick={() => setShowInput(!showInput)}
-                  className={`p-3 rounded-full shadow-lg transition-all border border-white/5 ${
+                  className={`p-3 rounded-full shadow-lg transition-all border ${
                     showInput
-                      ? "bg-indigo-600 text-white"
-                      : "bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-white"
+                      ? "bg-dicecho-primary-strong text-white border-dicecho-primary/70"
+                      : "bg-dicecho-card text-dicecho-muted border-dicecho-border/50 hover:bg-dicecho-raised hover:text-white hover:border-dicecho-primary/50"
                   }`}
                 >
                   <Music size={20} />
@@ -892,6 +889,10 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
         </div>
       </div>
     );
+
+  if (mode === "fixed" && isHidden) {
+    return <>{audioContent}</>;
+  }
 
   if (mode === "fixed" && !isMobile) {
     return (

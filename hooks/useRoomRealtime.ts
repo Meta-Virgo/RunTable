@@ -298,6 +298,10 @@ export function createRoomRealtimeAdapter(input: {
         title: room.title !== undefined ? room.title : previous.title,
         description:
           room.description !== undefined ? room.description : previous.description,
+        coverImageUrl:
+          room.cover_image_url !== undefined
+            ? room.cover_image_url
+            : previous.coverImageUrl,
       }));
     },
     syncPresence: input.syncPresence,

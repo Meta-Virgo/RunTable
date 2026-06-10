@@ -87,7 +87,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   const logsEndRef = useRef<HTMLDivElement>(null);
   const logsContainerRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
-  useElasticScroll(logsContainerRef, contentRef);
+  useElasticScroll(logsContainerRef, contentRef, { enabled: true });
 
   const [isAutoScroll, setIsAutoScroll] = useState(true);
   const [prevScrollHeight, setPrevScrollHeight] = useState(0);

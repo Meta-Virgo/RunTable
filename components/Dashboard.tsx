@@ -64,12 +64,12 @@ export const Dashboard: React.FC<DashboardProps> = ({
           <section>
             <div
               onClick={onEditModule}
-              className="group glass-panel bg-slate-800/40 rounded-2xl p-6 md:p-8 relative overflow-hidden transition-all cursor-pointer hover:bg-slate-800/60"
+              className="group rounded-lg border border-dicecho-border/45 bg-dicecho-card/70 p-6 md:p-8 relative overflow-hidden transition-colors cursor-pointer hover:bg-dicecho-raised/70 shadow-sm"
             >
               <div className="absolute top-0 right-0 p-4 opacity-100 md:opacity-0 group-hover:opacity-100 transition-opacity text-slate-400">
                 <Edit2 size={20} />
               </div>
-              <h2 className="text-2xl md:text-3xl font-bold text-white mb-3 md:mb-4 group-hover:text-indigo-300 transition-colors">
+              <h2 className="text-2xl md:text-3xl font-bold text-white mb-3 md:mb-4 group-hover:text-dicecho-primary transition-colors">
                 {moduleInfo.title || "未命名模组"}
               </h2>
               <p className="text-slate-400 leading-relaxed max-w-3xl text-sm md:text-base line-clamp-3 md:line-clamp-none">
@@ -83,14 +83,14 @@ export const Dashboard: React.FC<DashboardProps> = ({
         <section>
           <div className="flex justify-between items-end mb-6">
             <h2 className="text-xl md:text-2xl font-bold text-white flex items-center gap-3">
-              <Users className="text-purple-400" /> <span>调查员档案</span>
+              <Users className="text-dicecho-primary" /> <span>调查员档案</span>
               <span className="text-sm font-normal text-slate-500 self-end mb-1 ml-2">
                 {pcCharacters.length} 人
               </span>
             </h2>
           </div>
           {pcCharacters.length === 0 ? (
-            <div className="p-8 md:p-12 rounded-2xl flex flex-col items-center justify-center text-slate-500 border border-white/5 border-dashed">
+            <div className="p-8 md:p-12 rounded-lg flex flex-col items-center justify-center text-dicecho-muted border border-dicecho-border/45 border-dashed bg-dicecho-card/35">
               <User size={48} className="mb-4 opacity-20" />
               <p>暂无调查员</p>
             </div>
@@ -100,15 +100,15 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 <div
                   key={inv.id}
                   onClick={() => onEditChar(inv)}
-                  className="glass-panel bg-slate-800/30 hover:bg-slate-800/50 p-5 md:p-6 rounded-2xl relative overflow-hidden group cursor-pointer transition-all"
+                  className="rounded-lg border border-dicecho-border/45 bg-dicecho-card/70 hover:bg-dicecho-raised/70 p-5 md:p-6 relative overflow-hidden group cursor-pointer transition-colors shadow-sm"
                 >
                   <div className="flex items-start gap-4 mb-4 md:mb-6">
                     <div
                       className={cn(
                         "rounded-xl shrink-0 flex items-center justify-center",
                         inv.avatar_url
-                          ? "w-12 h-12 md:w-14 md:h-14 border border-white/10 overflow-hidden bg-slate-900"
-                          : "p-3 bg-purple-500/10 text-purple-400 border border-purple-500/20"
+                          ? "w-12 h-12 md:w-14 md:h-14 border border-dicecho-border/45 overflow-hidden bg-dicecho-panel"
+                          : "p-3 bg-dicecho-primary/15 text-dicecho-primary border border-dicecho-primary/25"
                       )}
                     >
                       {inv.avatar_url ? (
@@ -122,7 +122,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                       )}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="font-bold text-white text-lg truncate group-hover:text-purple-400 transition-colors">
+                      <div className="font-bold text-white text-lg truncate group-hover:text-dicecho-primary transition-colors">
                         {inv.name}
                       </div>
                       <div className="text-xs text-slate-400 mt-1">
@@ -154,7 +154,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                       icon={Zap}
                     />
                   </div>
-                  <div className="text-xs text-slate-500 line-clamp-3 bg-slate-950/30 p-3 rounded-xl border border-white/5 min-h-[3.5rem] leading-relaxed whitespace-pre-wrap">
+                  <div className="text-xs text-dicecho-muted line-clamp-3 bg-dicecho-panel/55 p-3 rounded-lg border border-dicecho-border/35 min-h-[3.5rem] leading-relaxed whitespace-pre-wrap">
                     {inv.backstory || "暂无背景故事..."}
                   </div>
                 </div>
@@ -183,7 +183,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
               </Button>
             </div>
             {npcCharacters.length === 0 ? (
-              <div className="p-8 md:p-12 rounded-2xl flex flex-col items-center justify-center text-slate-500 border border-white/5 border-dashed">
+              <div className="p-8 md:p-12 rounded-lg flex flex-col items-center justify-center text-dicecho-muted border border-dicecho-border/45 border-dashed bg-dicecho-card/35">
                 <Swords size={48} className="mb-4 opacity-20" />
                 <p>暂无 NPC 或怪物</p>
               </div>
@@ -195,7 +195,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                     <div
                       key={npc.id}
                       onClick={() => onEditChar(npc)}
-                      className="glass-panel bg-slate-800/30 p-5 md:p-6 rounded-2xl relative overflow-hidden group transition-all cursor-pointer hover:bg-slate-800/50"
+                      className="rounded-lg border border-dicecho-border/45 bg-dicecho-card/70 p-5 md:p-6 relative overflow-hidden group transition-colors cursor-pointer hover:bg-dicecho-raised/70 shadow-sm"
                     >
                       <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity z-10">
                         <button
@@ -203,7 +203,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                             e.stopPropagation();
                             onDuplicateChar(npc);
                           }}
-                          className="p-1.5 bg-slate-900/80 text-slate-400 hover:text-white rounded-lg hover:bg-indigo-600 transition-colors border border-white/10"
+                          className="p-1.5 bg-dicecho-panel/80 text-dicecho-muted hover:text-white rounded-lg hover:bg-dicecho-primary-strong transition-colors border border-dicecho-border/40"
                           title="复制角色"
                         >
                           <Copy size={14} />
@@ -260,16 +260,16 @@ export const Dashboard: React.FC<DashboardProps> = ({
                         />
                       </div>
                       <div className="grid grid-cols-2 gap-4 mb-4">
-                        <div className="bg-slate-950/40 rounded px-2 py-1 flex justify-between items-center border border-white/5">
-                          <span className="text-[10px] text-slate-500 font-bold">
+                        <div className="bg-dicecho-panel/55 rounded px-2 py-1 flex justify-between items-center border border-dicecho-border/35">
+                          <span className="text-[10px] text-dicecho-muted font-bold">
                             STR
                           </span>
                           <span className="text-sm font-mono text-slate-300">
                             {npc.str}
                           </span>
                         </div>
-                        <div className="bg-slate-950/40 rounded px-2 py-1 flex justify-between items-center border border-white/5">
-                          <span className="text-[10px] text-slate-500 font-bold">
+                        <div className="bg-dicecho-panel/55 rounded px-2 py-1 flex justify-between items-center border border-dicecho-border/35">
+                          <span className="text-[10px] text-dicecho-muted font-bold">
                             DEX
                           </span>
                           <span className="text-sm font-mono text-slate-300">
@@ -277,7 +277,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                           </span>
                         </div>
                       </div>
-                      <div className="text-xs text-slate-500 line-clamp-3 bg-slate-950/30 p-3 rounded-xl border border-white/5 min-h-[3.5rem] leading-relaxed whitespace-pre-wrap">
+                      <div className="text-xs text-dicecho-muted line-clamp-3 bg-dicecho-panel/55 p-3 rounded-lg border border-dicecho-border/35 min-h-[3.5rem] leading-relaxed whitespace-pre-wrap">
                         {npc.backstory || "..."}
                       </div>
                     </div>
@@ -297,7 +297,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
               </h2>
             </div>
 
-            <div className="glass-panel bg-amber-500/10 border-amber-500/20 p-6 md:p-8 rounded-2xl flex flex-col md:flex-row justify-between items-center gap-6">
+            <div className="rounded-lg border border-amber-500/20 bg-amber-500/10 p-6 md:p-8 flex flex-col md:flex-row justify-between items-center gap-6 shadow-sm">
               <div className="flex-1">
                 <h3 className="text-lg font-bold text-white mb-2">完结跑团</h3>
                 <p className="text-slate-400 text-sm leading-relaxed">
@@ -314,7 +314,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
               </Button>
             </div>
 
-            <div className="glass-panel bg-red-900/10 border-red-500/20 p-6 md:p-8 rounded-2xl flex flex-col md:flex-row justify-between items-center gap-6">
+            <div className="rounded-lg border border-red-500/20 bg-red-900/10 p-6 md:p-8 flex flex-col md:flex-row justify-between items-center gap-6 shadow-sm">
               <div className="flex-1">
                 <h3 className="text-lg font-bold text-white mb-2">
                   清空聊天记录
@@ -362,7 +362,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
               </div>
             </div>
 
-            <div className="glass-panel bg-red-900/10 border-red-500/20 p-6 md:p-8 rounded-2xl flex flex-col md:flex-row justify-between items-center gap-6">
+            <div className="rounded-lg border border-red-500/20 bg-red-900/10 p-6 md:p-8 flex flex-col md:flex-row justify-between items-center gap-6 shadow-sm">
               <div className="flex-1">
                 <h3 className="text-lg font-bold text-white mb-2">删除房间</h3>
                 <p className="text-slate-400 text-sm leading-relaxed">

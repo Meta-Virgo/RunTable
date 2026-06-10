@@ -4,6 +4,7 @@ import {
   buildLobbyCatalogRooms,
   filterLobbyCatalogRooms,
   getLobbyCharacterRoomIds,
+  sortLobbyCatalogRooms,
   type LobbyRoom,
 } from "./lobbyCatalogModel";
 
@@ -23,15 +24,17 @@ const room = (overrides: Partial<LobbyRoom> = {}): LobbyRoom => ({
 });
 
 describe("lobby catalog model", () => {
-  it("marks zombie and archived rooms and sorts active rooms first", () => {
-    const active = room({ id: "active" });
+  it("marks zombie and archived rooms and sorts active rooms first by default", () => {
+    const active = room({ id: "active", room_number: 20 });
     const zombie = room({
       id: "zombie",
+      room_number: 1,
       created_at: "2026-06-07T00:00:00.000Z",
       last_active_at: "2026-06-08T22:00:00.000Z",
     });
     const archived = room({
       id: "archived",
+      room_number: 10,
       last_active_at: "2026-05-30T00:00:00.000Z",
     });
 
@@ -44,6 +47,10 @@ describe("lobby catalog model", () => {
           { room_id: "archived", character_count: 3, message_count: 10 },
         ],
       ]),
+      memberUserIds: new Map([
+        ["active", ["keeper-1", "player-1"]],
+        ["zombie", ["keeper-1"]],
+      ]),
       now,
     });
 
@@ -53,9 +60,31 @@ describe("lobby catalog model", () => {
       "zombie",
     ]);
     expect(processed.find((item) => item.id === "zombie")?.isZombie).toBe(true);
+    expect(processed.find((item) => item.id === "zombie")?.characterCount).toBe(
+      1
+    );
+    expect(processed.find((item) => item.id === "zombie")?.messageCount).toBe(2);
+    expect(processed.find((item) => item.id === "active")?.activeMemberCount).toBe(
+      2
+    );
+    expect(processed.find((item) => item.id === "active")?.activeMemberIds).toEqual(
+      ["keeper-1", "player-1"]
+    );
     expect(processed.find((item) => item.id === "archived")?.isArchived).toBe(
       true
     );
+  });
+
+  it("can sort visible rooms by room number", () => {
+    const rooms = [
+      room({ id: "active", room_number: 20, isZombie: false }),
+      room({ id: "archived", room_number: 10, isZombie: false }),
+      room({ id: "zombie", room_number: 1, isZombie: true }),
+    ];
+
+    expect(
+      sortLobbyCatalogRooms(rooms, "room_number").map((item) => item.id)
+    ).toEqual(["archived", "active", "zombie"]);
   });
 
   it("filters by search text, ownership, creator, online keeper, and archive state", () => {
@@ -127,6 +156,7 @@ describe("lobby catalog model", () => {
     const current = [
       room({
         id: "existing",
+        room_number: 20,
         last_active_at: "2026-06-08T23:30:00.000Z",
       }),
     ];
@@ -136,6 +166,7 @@ describe("lobby catalog model", () => {
       eventType: "INSERT",
       newRoom: room({
         id: "newer",
+        room_number: 10,
         last_active_at: "2026-06-08T23:50:00.000Z",
       }),
       now,

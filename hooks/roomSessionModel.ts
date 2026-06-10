@@ -18,7 +18,13 @@ export type VoiceConnectionStatus =
 
 export type RoomSessionRoom = Pick<
   Room,
-  "id" | "kp_id" | "title" | "description" | "type" | "bg_music_url"
+  | "id"
+  | "kp_id"
+  | "title"
+  | "description"
+  | "type"
+  | "bg_music_url"
+  | "cover_image_url"
 > & {
   is_music_playing?: boolean | null;
   music_track_index?: number | null;
@@ -181,6 +187,7 @@ export function buildAppliedRoomSnapshotState(
     moduleInfo: {
       title: room.title,
       description: room.description || "",
+      coverImageUrl: room.cover_image_url || null,
       notes: "",
     },
     roomType: room.type || "text",

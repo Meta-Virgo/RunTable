@@ -140,6 +140,7 @@ describe("room realtime adapter", () => {
     let moduleInfo: ModuleInfo = {
       title: "Old",
       description: "Old description",
+      coverImageUrl: "https://img.test/old.jpg",
       notes: "keep",
     };
     let bgMusicUrl: string | null = null;
@@ -168,6 +169,7 @@ describe("room realtime adapter", () => {
 
     adapter.applyRoomPatch({
       title: "New",
+      cover_image_url: "https://img.test/new.jpg",
       bg_music_url: "s:1",
       is_music_playing: true,
       music_track_index: 2,
@@ -176,6 +178,7 @@ describe("room realtime adapter", () => {
     expect(moduleInfo).toEqual({
       title: "New",
       description: "Old description",
+      coverImageUrl: "https://img.test/new.jpg",
       notes: "keep",
     });
     expect(bgMusicUrl).toBe("s:1");

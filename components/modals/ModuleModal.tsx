@@ -38,6 +38,14 @@ export const ModuleModal: React.FC<{
           placeholder="例如：无尽食欲..."
         />
         <Input
+          label="房间封面 URL"
+          value={localInfo.coverImageUrl || ""}
+          onChange={(e) =>
+            setLocalInfo({ ...localInfo, coverImageUrl: e.target.value })
+          }
+          placeholder="粘贴图片链接，留空则不显示封面"
+        />
+        <Input
           label="房间密码 (留空公开)"
           value={localPassword}
           onChange={(e) => setLocalPassword(e.target.value)}

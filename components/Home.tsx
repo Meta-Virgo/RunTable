@@ -92,6 +92,7 @@ export const Home: React.FC<HomeProps> = ({
   const [showCreateRoom, setShowCreateRoom] = useState(false);
   const [newRoomTitle, setNewRoomTitle] = useState("");
   const [newRoomDesc, setNewRoomDesc] = useState("");
+  const [newRoomCoverImageUrl, setNewRoomCoverImageUrl] = useState("");
   const [newRoomPassword, setNewRoomPassword] = useState("");
   const [newRoomType, setNewRoomType] = useState<"text" | "voice">("text");
 
@@ -117,7 +118,6 @@ export const Home: React.FC<HomeProps> = ({
   const [showHistoryModal, setShowHistoryModal] = useState(false);
 
   // Friend Requests Count
-  const [showHeader, setShowHeader] = useState(true);
   const [showBackToTop, setShowBackToTop] = useState(false);
   const mainRef = React.useRef<HTMLElement>(null);
   const mainContentRef = React.useRef<HTMLDivElement>(null);
@@ -144,6 +144,8 @@ export const Home: React.FC<HomeProps> = ({
     setSearchQuery,
     roomFilter,
     setRoomFilter,
+    sortMode,
+    setSortMode,
     refreshRooms,
   } = useLobbyCatalog({
     currentUserId,
@@ -155,11 +157,7 @@ export const Home: React.FC<HomeProps> = ({
     disabled: activeTab === "square",
   });
 
-  const lastScrollTop = React.useRef(0);
-
-  // Reset header visibility when switching tabs
   useEffect(() => {
-    setShowHeader(true);
     setShowBackToTop(false);
   }, [activeTab]);
 
@@ -172,23 +170,6 @@ export const Home: React.FC<HomeProps> = ({
         const scrollTop = mainRef.current.scrollTop;
         setShowBackToTop(scrollTop > 300);
 
-        const diff = scrollTop - lastScrollTop.current;
-        const isScrollingDown = diff > 0;
-        const threshold = isScrollingDown ? 10 : 800; // 向下敏感(10)，向上极大阈值(800)防止误触
-
-        if (Math.abs(diff) > threshold) {
-          if (isScrollingDown && scrollTop > 50) {
-            setShowHeader(false);
-          } else if (!isScrollingDown || scrollTop < 20) {
-            // 向上滚动超过阈值 或 在顶部区域 -> 显示
-            setShowHeader(true);
-          }
-          lastScrollTop.current = scrollTop;
-        } else if (scrollTop < 20) {
-          // 强制处理回到顶部的情况，防止累积距离不够导致不显示
-          setShowHeader(true);
-          lastScrollTop.current = scrollTop;
-        }
       }
     };
 
@@ -221,6 +202,7 @@ export const Home: React.FC<HomeProps> = ({
     const { data, error } = await createRoom({
       title: newRoomTitle,
       description: newRoomDesc,
+      coverImageUrl: newRoomCoverImageUrl.trim() || null,
       kpId: user.id,
       hasPassword: !!newRoomPassword,
       type: newRoomType,
@@ -238,6 +220,7 @@ export const Home: React.FC<HomeProps> = ({
       }
       setNewRoomTitle("");
       setNewRoomDesc("");
+      setNewRoomCoverImageUrl("");
       setNewRoomPassword("");
       setNewRoomType("text");
       setShowCreateRoom(false);
@@ -257,6 +240,7 @@ export const Home: React.FC<HomeProps> = ({
     const { error } = await updateRoomDetails(editingRoom.id, {
       title: editingRoom.title,
       description: editingRoom.description,
+      cover_image_url: editingRoom.cover_image_url || null,
     });
 
     if (!error) {
@@ -330,10 +314,9 @@ export const Home: React.FC<HomeProps> = ({
   };
 
   return (
-    <div className="h-[100dvh] overflow-hidden bg-[#020617] text-slate-200 flex flex-col font-sans">
+    <div className="h-[100dvh] overflow-hidden dicecho-page-bg text-slate-200 flex flex-col font-sans selection:bg-dicecho-primary/30">
       <HomeHeader
         activeTab={activeTab}
-        showHeader={showHeader}
         friendRequestCount={friendRequestCount}
         onSelectTab={setActiveTab}
         onLogout={onLogout}
@@ -354,7 +337,6 @@ export const Home: React.FC<HomeProps> = ({
               friendRequestCount={friendRequestCount}
               onSelectTab={setActiveTab}
               mode="square"
-              showHeader={showHeader}
             />
             <div className="flex-1 min-h-0 relative">
               <Suspense
@@ -364,14 +346,14 @@ export const Home: React.FC<HomeProps> = ({
                   </div>
                 }
               >
-                <Square onScrollChange={(dir) => setShowHeader(dir === "up")} />
+                <Square />
               </Suspense>
             </div>
           </>
         ) : (
           <div
             ref={mainContentRef}
-            className="container mx-auto p-4 md:p-8 max-w-6xl"
+            className="container mx-auto p-4 md:p-8 max-w-7xl"
           >
             {/* Mobile Nav */}
             <HomeMobileNav
@@ -390,7 +372,10 @@ export const Home: React.FC<HomeProps> = ({
                 setSearchQuery={setSearchQuery}
                 roomFilter={roomFilter}
                 setRoomFilter={setRoomFilter}
+                sortMode={sortMode}
+                setSortMode={setSortMode}
                 myCharacters={myCharacters}
+                onlineUsers={onlineUsers}
                 onJoinRoom={onJoinRoom}
                 showCreateRoom={showCreateRoom}
                 setShowCreateRoom={setShowCreateRoom}
@@ -398,6 +383,8 @@ export const Home: React.FC<HomeProps> = ({
                 setNewRoomTitle={setNewRoomTitle}
                 newRoomDesc={newRoomDesc}
                 setNewRoomDesc={setNewRoomDesc}
+                newRoomCoverImageUrl={newRoomCoverImageUrl}
+                setNewRoomCoverImageUrl={setNewRoomCoverImageUrl}
                 newRoomPassword={newRoomPassword}
                 setNewRoomPassword={setNewRoomPassword}
                 newRoomType={newRoomType}
@@ -424,10 +411,9 @@ export const Home: React.FC<HomeProps> = ({
                   {myCharacters.map((char) => (
                     <div
                       key={char.id}
-                      className="bg-slate-800/30 border border-slate-700/50 hover:border-indigo-500/30 rounded-xl p-5 transition-all group relative overflow-hidden"
+                      className="bg-dicecho-card/80 border border-dicecho-border/40 hover:border-dicecho-primary/50 rounded-lg p-5 transition-all group relative overflow-hidden shadow-sm"
                     >
-                      <div className="absolute top-0 left-0 w-1 h-full bg-indigo-500/50"></div>
-                      <div className="flex gap-4 mb-3 pl-3">
+                      <div className="flex gap-4 mb-3">
                         <div className="flex-shrink-0">
                           <AvatarUpload
                             url={char.avatar_url}
@@ -447,7 +433,7 @@ export const Home: React.FC<HomeProps> = ({
                               </p>
                             </div>
                             <div className="text-right">
-                              <div className="text-lg font-mono font-bold text-indigo-400">
+                              <div className="text-lg font-mono font-bold text-dicecho-primary">
                                 {char.hp}
                                 <span className="text-xs text-slate-500 ml-1">
                                   HP
@@ -461,13 +447,13 @@ export const Home: React.FC<HomeProps> = ({
                         </div>
                       </div>
 
-                      <div className="mb-4 pl-3">
+                      <div className="mb-4">
                         <p className="text-xs text-slate-300 line-clamp-3 leading-relaxed">
                           {char.backstory || "暂无背景故事..."}
                         </p>
                       </div>
 
-                      <div className="pl-3">
+                      <div>
                         <Button
                           variant="secondary"
                           size="sm"
@@ -483,7 +469,7 @@ export const Home: React.FC<HomeProps> = ({
                     </div>
                   ))}
                   {myCharacters.length === 0 && (
-                    <div className="col-span-full py-12 text-center text-slate-500 border-2 border-dashed border-slate-800 rounded-xl">
+                    <div className="col-span-full py-12 text-center text-dicecho-muted border-2 border-dashed border-dicecho-border/40 rounded-lg">
                       <User size={48} className="mx-auto mb-3 opacity-20" />
                       <p>还没有创建角色，点击右上角新建</p>
                     </div>
@@ -507,10 +493,8 @@ export const Home: React.FC<HomeProps> = ({
                 }
               />
             ) : (
-              <div className="max-w-2xl mx-auto space-y-8 animate-slide-up">
-                <div className="bg-slate-800/30 border border-slate-700/50 rounded-2xl p-8 text-center relative overflow-hidden">
-                  <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500"></div>
-
+              <div className="max-w-2xl mx-auto space-y-8">
+                <div className="bg-dicecho-card/80 border border-dicecho-border/40 rounded-lg p-8 text-center relative overflow-hidden shadow-sm">
                   {!isEditingProfile ? (
                     <>
                       <div className="absolute top-4 right-4">
@@ -533,7 +517,7 @@ export const Home: React.FC<HomeProps> = ({
                       </div>
                       {isVip && (
                         <div className="absolute top-4 left-4">
-                          <span className="bg-gradient-to-r from-purple-600 to-indigo-600 text-white text-xs font-bold px-2 py-1 rounded-full shadow-lg border border-purple-400/30">
+                          <span className="bg-dicecho-primary-strong text-white text-xs font-bold px-2 py-1 rounded-full shadow-sm border border-dicecho-primary/40">
                             VIP
                           </span>
                         </div>
@@ -588,21 +572,19 @@ export const Home: React.FC<HomeProps> = ({
                       <div className="relative inline-flex items-center gap-2">
                         <h2
                           className={`text-2xl font-bold mb-1 transition-colors ${
-                            isVip
-                              ? "text-purple-400 drop-shadow-[0_0_10px_rgba(168,85,247,0.5)]"
-                              : "text-white"
+                            isVip ? "text-dicecho-primary" : "text-white"
                           }`}
                         >
                           {userNickname || "未命名用户"}
                         </h2>
                         {levelInfo && (
-                          <span className="bg-indigo-500/20 text-indigo-300 text-[10px] font-bold px-1.5 py-0.5 rounded border border-indigo-500/30">
+                          <span className="bg-dicecho-primary/20 text-dicecho-primary text-[10px] font-bold px-1.5 py-0.5 rounded border border-dicecho-primary/30">
                             LV.{levelInfo.level}
                           </span>
                         )}
                       </div>
                       <div className="flex justify-center items-center gap-2 mb-4">
-                        <span className="text-sm text-slate-400 font-mono bg-slate-900/50 px-2 py-1 rounded">
+                        <span className="text-sm text-dicecho-muted font-mono bg-dicecho-panel/70 px-2 py-1 rounded">
                           UID: {userCode || "---"}
                         </span>
                       </div>
@@ -614,18 +596,18 @@ export const Home: React.FC<HomeProps> = ({
 
                       <div className="grid grid-cols-2 gap-4 text-left mt-6">
                         <div
-                          className="bg-slate-900/50 p-4 rounded-xl border border-slate-700/30 cursor-pointer hover:bg-slate-800 hover:border-indigo-500/50 transition-all group"
+                          className="bg-dicecho-panel/70 p-4 rounded-lg border border-dicecho-border/30 cursor-pointer hover:bg-dicecho-raised hover:border-dicecho-primary/50 transition-all group"
                           onClick={() => setShowHistoryModal(true)}
                         >
-                          <div className="text-xs text-slate-500 uppercase font-bold mb-1 group-hover:text-indigo-400 transition-colors">
+                          <div className="text-xs text-dicecho-muted uppercase font-bold mb-1 group-hover:text-dicecho-primary transition-colors">
                             个人履历
                           </div>
-                          <div className="text-2xl font-mono font-bold text-indigo-400">
+                          <div className="text-2xl font-mono font-bold text-dicecho-primary">
                             {playerHistory.length + kpHistory.length}
                           </div>
                         </div>
-                        <div className="bg-slate-900/50 p-4 rounded-xl border border-slate-700/30">
-                          <div className="text-xs text-slate-500 uppercase font-bold mb-1">
+                        <div className="bg-dicecho-panel/70 p-4 rounded-lg border border-dicecho-border/30">
+                          <div className="text-xs text-dicecho-muted uppercase font-bold mb-1">
                             注册时间
                           </div>
                           <div className="text-sm text-slate-300">
@@ -682,7 +664,7 @@ export const Home: React.FC<HomeProps> = ({
                 </div>
 
                 {!isEditingProfile && (
-                  <div className="bg-slate-800/30 border border-slate-700/50 rounded-2xl p-6 text-center">
+                  <div className="bg-dicecho-card/80 border border-dicecho-border/40 rounded-lg p-6 text-center shadow-sm">
                     <h3 className="text-sm font-bold text-slate-400 mb-4 uppercase tracking-wider">
                       账户安全
                     </h3>
@@ -703,13 +685,13 @@ export const Home: React.FC<HomeProps> = ({
                 )}
 
                 {/* Suggestion Section */}
-                <div className="bg-slate-800/30 border border-slate-700/50 rounded-2xl p-6 text-center">
+                <div className="bg-dicecho-card/80 border border-dicecho-border/40 rounded-lg p-6 text-center shadow-sm">
                   <h3 className="text-sm font-bold text-slate-400 mb-2 uppercase tracking-wider">
                     由衷期待您建议和反馈!
                   </h3>
                   <a
                     href="mailto:may331@foxmail.com"
-                    className="text-indigo-400 hover:text-indigo-300 font-mono transition-colors text-lg"
+                    className="text-dicecho-primary hover:text-white font-mono transition-colors text-lg"
                   >
                     may331@foxmail.com
                   </a>
@@ -724,10 +706,10 @@ export const Home: React.FC<HomeProps> = ({
       <button
         onClick={scrollToTop}
         className={cn(
-          "fixed bottom-8 right-8 z-50 p-3 bg-indigo-600 text-white rounded-full shadow-lg shadow-indigo-600/30 transition-all duration-300 hover:bg-indigo-500 hover:scale-110",
+          "fixed bottom-8 right-8 z-50 p-3 bg-dicecho-primary-strong text-white rounded-full shadow-lg shadow-black/20 transition-opacity duration-150 hover:bg-dicecho-primary",
           activeTab === "rooms" && showBackToTop
-            ? "opacity-100 translate-y-0"
-            : "opacity-0 translate-y-10 pointer-events-none"
+            ? "opacity-100"
+            : "opacity-0 pointer-events-none"
         )}
       >
         <ArrowUp size={24} />
@@ -748,6 +730,17 @@ export const Home: React.FC<HomeProps> = ({
               onChange={(e) =>
                 setEditingRoom({ ...editingRoom, title: e.target.value })
               }
+            />
+            <Input
+              label="房间封面 URL（可选）"
+              value={editingRoom.cover_image_url || ""}
+              onChange={(e) =>
+                setEditingRoom({
+                  ...editingRoom,
+                  cover_image_url: e.target.value,
+                })
+              }
+              placeholder="https://example.com/cover.jpg"
             />
             <Input
               label="房间密码 (留空公开)"

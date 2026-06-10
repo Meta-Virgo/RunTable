@@ -35,6 +35,7 @@ export interface Room {
   has_password?: boolean;
   last_active_at?: string;
   bg_music_url?: string | null;
+  cover_image_url?: string | null;
   type: "text" | "voice";
 }
 
@@ -150,6 +151,7 @@ export interface Log {
 export interface ModuleInfo {
   title: string;
   description: string;
+  coverImageUrl?: string | null;
   notes: string;
 }
 

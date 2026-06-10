@@ -17,7 +17,7 @@ const SquarePostContent: React.FC<{ content: string }> = ({ content }) => {
     <div className="mb-2">
       <div
         className={cn(
-          "text-slate-300 text-sm leading-relaxed",
+          "text-slate-200 text-sm leading-relaxed",
           shouldTruncate && !expanded && "max-h-36 overflow-hidden"
         )}
       >
@@ -25,7 +25,7 @@ const SquarePostContent: React.FC<{ content: string }> = ({ content }) => {
       </div>
       {shouldTruncate && (
         <button
-          className="mt-1 text-indigo-400 hover:text-indigo-300 text-xs font-bold hover:underline"
+          className="mt-1 text-dicecho-primary hover:text-white text-xs font-bold hover:underline"
           onClick={(event) => {
             event.stopPropagation();
             setExpanded(!expanded);
@@ -70,8 +70,8 @@ export const SquarePostList: React.FC<SquarePostListProps> = ({
 
   if (loadingPosts) {
     return (
-      <div className="text-center py-10 text-slate-500">
-        <Loader2 className="animate-spin mx-auto mb-2" />
+      <div className="text-center py-10 text-dicecho-muted">
+        <Loader2 className="animate-spin mx-auto mb-2 text-dicecho-primary" />
         加载中...
       </div>
     );
@@ -79,7 +79,7 @@ export const SquarePostList: React.FC<SquarePostListProps> = ({
 
   if (posts.length === 0) {
     return (
-      <div className="text-center py-10 text-slate-500">
+      <div className="text-center py-10 text-dicecho-muted">
         暂无帖子，来抢沙发吧！
       </div>
     );
@@ -88,8 +88,11 @@ export const SquarePostList: React.FC<SquarePostListProps> = ({
   return (
     <>
       {visiblePosts.map((post) => (
-        <div key={post.id} className="group flex gap-4 animate-fade-in">
-          <div className="w-10 h-10 rounded-full bg-slate-700 flex items-center justify-center text-slate-300 font-bold shrink-0 overflow-hidden">
+        <div
+          key={post.id}
+          className="group flex gap-4 rounded-lg border border-dicecho-border/40 bg-dicecho-card/80 p-4 shadow-sm animate-fade-in dicecho-card-shadow"
+        >
+          <div className="w-10 h-10 rounded-full bg-dicecho-panel flex items-center justify-center text-slate-300 font-bold shrink-0 overflow-hidden border border-dicecho-border/40">
             <button
               className="w-full h-full"
               onClick={() => openProfile(post.user_id)}
@@ -110,7 +113,7 @@ export const SquarePostList: React.FC<SquarePostListProps> = ({
               <button
                 className={cn(
                   "font-bold text-sm",
-                  post.profiles?.is_vip ? "text-purple-400" : "text-white"
+                  post.profiles?.is_vip ? "text-dicecho-primary" : "text-white"
                 )}
                 onClick={() => openProfile(post.user_id)}
               >
@@ -131,7 +134,7 @@ export const SquarePostList: React.FC<SquarePostListProps> = ({
                   <img
                     src={post.image_url}
                     alt="Post Image"
-                    className="max-h-64 rounded-lg border border-white/10"
+                    className="max-h-64 rounded-lg border border-dicecho-border/40"
                   />
                 </div>
               )}
@@ -142,7 +145,7 @@ export const SquarePostList: React.FC<SquarePostListProps> = ({
                 {post.tags.map((tag) => (
                   <span
                     key={tag}
-                    className="text-[10px] bg-indigo-500/10 text-indigo-400 px-1.5 py-0.5 rounded"
+                    className="text-[10px] bg-dicecho-primary/10 text-dicecho-primary px-1.5 py-0.5 rounded border border-dicecho-primary/20"
                   >
                     #{tag}
                   </span>
@@ -151,12 +154,12 @@ export const SquarePostList: React.FC<SquarePostListProps> = ({
             )}
 
             <div className="flex justify-between items-center mt-2">
-              <div className="text-xs text-slate-500">
+              <div className="text-xs text-dicecho-muted">
                 {formatSquareTime(post.created_at)}
               </div>
-              <div className="flex items-center gap-6 text-slate-500 text-xs">
+              <div className="flex items-center gap-6 text-dicecho-muted text-xs">
                 <button
-                  className="flex items-center gap-1 hover:text-indigo-400 transition-colors"
+                  className="flex items-center gap-1 hover:text-dicecho-primary transition-colors"
                   onClick={() => {
                     openPost(post.id);
                   }}
@@ -178,7 +181,7 @@ export const SquarePostList: React.FC<SquarePostListProps> = ({
                   {post.like_count} 赞
                   {post.liked_by && post.liked_by.length > 0 && (
                     <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover/like:block z-50">
-                      <div className="bg-slate-900 text-slate-200 text-xs px-2 py-1 rounded border border-slate-700 whitespace-nowrap shadow-xl">
+                      <div className="bg-dicecho-panel text-slate-200 text-xs px-2 py-1 rounded border border-dicecho-border/50 whitespace-nowrap shadow-xl">
                         {post.liked_by
                           .slice(0, 5)
                           .map((user) => user.nickname)
@@ -204,21 +207,21 @@ export const SquarePostList: React.FC<SquarePostListProps> = ({
             {(post.comment_count || 0) > 0 && (
               <>
                 {post.latest_comments === undefined ? (
-                  <div className="mt-3 bg-slate-900/20 rounded-lg p-3 border border-white/5 flex flex-col gap-2 animate-pulse">
+                  <div className="mt-3 bg-dicecho-panel/45 rounded-lg p-3 border border-dicecho-border/30 flex flex-col gap-2 animate-pulse">
                     <div className="flex items-center gap-2">
-                      <div className="w-12 h-3 bg-slate-700/50 rounded" />
-                      <div className="flex-1 h-3 bg-slate-700/30 rounded" />
+                      <div className="w-12 h-3 bg-dicecho-border/50 rounded" />
+                      <div className="flex-1 h-3 bg-dicecho-border/30 rounded" />
                     </div>
                   </div>
                 ) : (
                   post.latest_comments.length > 0 && (
-                    <div className="mt-3 bg-slate-900/40 rounded-lg p-3 text-xs border border-white/5 animate-fade-in">
+                    <div className="mt-3 bg-dicecho-panel/55 rounded-lg p-3 text-xs border border-dicecho-border/30 animate-fade-in">
                       {post.latest_comments.map((comment) => (
                         <div
                           key={comment.id}
                           className="mb-1 last:mb-0 text-slate-300 flex items-start"
                         >
-                          <span className="font-bold text-slate-200 mr-2 shrink-0">
+                          <span className="font-bold text-slate-100 mr-2 shrink-0">
                             {comment.profiles?.nickname || "未知"}:
                           </span>
                           <span className="line-clamp-2 break-all">
@@ -228,7 +231,7 @@ export const SquarePostList: React.FC<SquarePostListProps> = ({
                       ))}
                       {(post.comment_count || 0) > 1 && (
                         <button
-                          className="text-indigo-400 mt-2 hover:text-indigo-300 font-medium flex items-center gap-1"
+                          className="text-dicecho-primary mt-2 hover:text-white font-medium flex items-center gap-1"
                           onClick={() => {
                             openPost(post.id);
                           }}
@@ -248,4 +251,3 @@ export const SquarePostList: React.FC<SquarePostListProps> = ({
     </>
   );
 };
-

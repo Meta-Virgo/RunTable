@@ -1,20 +1,26 @@
 import React from "react";
-import { LogOut } from "lucide-react";
+import {
+  BookOpen,
+  Dices,
+  LogOut,
+  MessageSquare,
+  User,
+  Users,
+} from "lucide-react";
 import { Button, cn } from "../UI";
 
 export type HomeTab = "rooms" | "characters" | "friends" | "profile" | "square";
 
-const HOME_TABS: { id: HomeTab; label: string }[] = [
-  { id: "rooms", label: "大厅" },
-  { id: "square", label: "广场" },
-  { id: "characters", label: "车卡" },
-  { id: "friends", label: "好友" },
-  { id: "profile", label: "我的" },
+const HOME_TABS: { id: HomeTab; label: string; icon: React.ElementType }[] = [
+  { id: "rooms", label: "大厅", icon: BookOpen },
+  { id: "square", label: "广场", icon: MessageSquare },
+  { id: "characters", label: "车卡", icon: Dices },
+  { id: "friends", label: "好友", icon: Users },
+  { id: "profile", label: "我的", icon: User },
 ];
 
 interface HomeHeaderProps {
   activeTab: HomeTab;
-  showHeader: boolean;
   friendRequestCount: number;
   onSelectTab: (tab: HomeTab) => void;
   onLogout: () => void;
@@ -22,47 +28,50 @@ interface HomeHeaderProps {
 
 export const HomeHeader: React.FC<HomeHeaderProps> = ({
   activeTab,
-  showHeader,
   friendRequestCount,
   onSelectTab,
   onLogout,
 }) => (
-  <header
-    className={cn(
-      "min-h-[4rem] h-auto pt-safe border-b border-white/5 bg-slate-900/50 backdrop-blur-md flex items-center justify-between px-6 sticky top-0 z-20 transition-all duration-300 ease-in-out",
-      showHeader
-        ? "translate-y-0"
-        : "-translate-y-full -mb-[4.1rem] opacity-0 pointer-events-none"
-    )}
-  >
-    <div className="flex items-center gap-4">
-      <h1 className="text-xl font-bold text-white tracking-tight">
-        RunTable Pro
-      </h1>
-      <nav className="hidden md:flex bg-slate-800/50 p-1 rounded-lg">
-        {HOME_TABS.map((tab) => (
-          <button
-            key={tab.id}
-            onClick={() => onSelectTab(tab.id)}
-            className={cn(
-              "px-4 py-1.5 rounded-md text-sm font-medium transition-all",
-              activeTab === tab.id
-                ? "bg-indigo-600 text-white shadow-lg"
-                : "text-slate-400 hover:text-white",
-              tab.id === "friends" && "relative"
-            )}
-          >
-            {tab.label}
-            {tab.id === "friends" && friendRequestCount > 0 && (
-              <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-slate-900 animate-pulse" />
-            )}
-          </button>
-        ))}
-      </nav>
+  <header className="min-h-[4rem] h-auto pt-safe border-b border-dicecho-border/40 bg-dicecho-panel/95 backdrop-blur-md sticky top-0 z-20 shadow">
+    <div className="mx-auto flex min-h-16 w-full max-w-7xl items-center justify-between gap-4 px-4 md:px-6">
+      <div className="flex items-center gap-4">
+        <div className="flex items-center gap-2">
+          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-dicecho-primary text-white shadow-sm">
+            <Dices size={19} />
+          </span>
+          <h1 className="text-xl font-bold text-white tracking-normal">
+            RunTable
+          </h1>
+        </div>
+        <nav className="hidden items-center gap-1 md:flex">
+          {HOME_TABS.map((tab) => {
+            const Icon = tab.icon;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => onSelectTab(tab.id)}
+                className={cn(
+                  "relative inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-all",
+                  activeTab === tab.id
+                    ? "bg-dicecho-primary/20 text-white"
+                    : "text-dicecho-muted hover:bg-white/10 hover:text-white",
+                  tab.id === "friends" && "relative"
+                )}
+              >
+                <Icon size={16} />
+                {tab.label}
+                {tab.id === "friends" && friendRequestCount > 0 && (
+                  <span className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full border-2 border-dicecho-panel bg-red-500 animate-pulse" />
+                )}
+              </button>
+            );
+          })}
+        </nav>
+      </div>
+      <Button variant="ghost" icon={LogOut} onClick={onLogout}>
+        退出
+      </Button>
     </div>
-    <Button variant="ghost" icon={LogOut} onClick={onLogout}>
-      退出
-    </Button>
   </header>
 );
 
@@ -71,7 +80,6 @@ interface HomeMobileNavProps {
   friendRequestCount: number;
   onSelectTab: (tab: HomeTab) => void;
   mode: "default" | "square";
-  showHeader?: boolean;
 }
 
 export const HomeMobileNav: React.FC<HomeMobileNavProps> = ({
@@ -79,36 +87,35 @@ export const HomeMobileNav: React.FC<HomeMobileNavProps> = ({
   friendRequestCount,
   onSelectTab,
   mode,
-  showHeader = true,
 }) => (
   <div
     className={cn(
-      "md:hidden flex bg-slate-800/50 p-1 rounded-lg",
+      "md:hidden flex rounded-lg border border-dicecho-border/40 bg-dicecho-panel/90 p-1 shadow-sm",
       mode === "default" && "mb-6",
-      mode === "square" &&
-        "m-4 shrink-0 overflow-hidden transition-all duration-300 ease-in-out",
-      mode === "square" &&
-        (showHeader
-          ? "translate-y-0 opacity-100"
-          : "-translate-y-full -mt-16 opacity-0 pointer-events-none")
+      mode === "square" && "m-4 shrink-0 overflow-hidden"
     )}
   >
-    {HOME_TABS.map((tab) => (
-      <button
-        key={tab.id}
-        onClick={() => onSelectTab(tab.id)}
-        className={cn(
-          "flex-1 py-2 rounded-md text-sm font-medium",
-          activeTab === tab.id ? "bg-indigo-600 text-white" : "text-slate-400",
-          tab.id === "friends" && "relative"
-        )}
-      >
-        {tab.label}
-        {tab.id === "friends" && friendRequestCount > 0 && (
-          <span className="absolute top-1 right-2 w-2 h-2 bg-red-500 rounded-full animate-pulse" />
-        )}
-      </button>
-    ))}
+    {HOME_TABS.map((tab) => {
+      const Icon = tab.icon;
+      return (
+        <button
+          key={tab.id}
+          onClick={() => onSelectTab(tab.id)}
+          className={cn(
+            "relative flex-1 rounded-md py-2 text-sm font-medium transition-all",
+            activeTab === tab.id
+              ? "bg-dicecho-primary/25 text-white"
+              : "text-dicecho-muted"
+          )}
+          title={tab.label}
+        >
+          <Icon size={16} className="mx-auto mb-0.5" />
+          <span className="block text-[11px] leading-none">{tab.label}</span>
+          {tab.id === "friends" && friendRequestCount > 0 && (
+            <span className="absolute top-1 right-2 w-2 h-2 bg-red-500 rounded-full animate-pulse" />
+          )}
+        </button>
+      );
+    })}
   </div>
 );
-

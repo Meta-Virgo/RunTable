@@ -26,6 +26,14 @@ import {
   applyCharacterImport,
 } from "../../services/characterImportModel";
 
+const characterSectionClass =
+  "rounded-lg border border-dicecho-border/40 bg-dicecho-card/70 p-4 shadow-sm";
+const characterSectionTitleClass =
+  "flex items-center gap-2 text-sm font-semibold text-white";
+const characterSubtleTextClass = "text-xs text-dicecho-muted";
+const characterInsetClass =
+  "rounded-lg border border-dicecho-border/35 bg-dicecho-panel/65";
+
 const ItemListEditor: React.FC<{
   title: string;
   icon: React.ElementType;
@@ -100,9 +108,9 @@ const ItemListEditor: React.FC<{
   };
 
   return (
-    <div className="bg-slate-900/40 p-5 rounded-2xl border border-white/5 flex flex-col h-full">
+    <div className={cn(characterSectionClass, "flex flex-col h-full")}>
       <div className="flex justify-between items-center mb-4">
-        <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2">
+        <h4 className={characterSectionTitleClass}>
           <Icon size={12} /> {title}
         </h4>
         {!disabled && !isAdding && (
@@ -125,14 +133,14 @@ const ItemListEditor: React.FC<{
       </div>
 
       {isAdding && (
-        <div className="flex flex-col gap-2 mb-4 bg-slate-950/50 p-2 rounded-lg border border-white/10 animate-fade-in">
+        <div className={cn("flex flex-col gap-2 mb-4 p-3 animate-fade-in", characterInsetClass)}>
           <div className="flex gap-2 items-center">
             <input
               ref={inputRef}
               value={newItemName}
               onChange={(e) => setNewItemName(e.target.value)}
               placeholder="名称..."
-              className="flex-1 min-w-0 bg-transparent text-sm text-white focus:outline-none"
+                className="flex-1 min-w-0 bg-transparent text-sm text-white placeholder:text-dicecho-muted/60 focus:outline-none"
               onKeyDown={(e) => {
                 if (e.key === "Enter" && !e.shiftKey) {
                   e.preventDefault();
@@ -146,8 +154,8 @@ const ItemListEditor: React.FC<{
                 }
               }}
             />
-            <div className="flex items-center gap-1 border-l border-white/10 pl-2">
-              <span className="text-xs text-slate-500">
+            <div className="flex items-center gap-1 border-l border-dicecho-border/40 pl-2">
+              <span className={characterSubtleTextClass}>
                 {title === "法术 / 能力" ? "MP" : "x"}
               </span>
               <input
@@ -163,7 +171,7 @@ const ItemListEditor: React.FC<{
             value={newItemDesc}
             onChange={(e) => setNewItemDesc(e.target.value)}
             placeholder="详细描述 (可选)..."
-            className="w-full bg-transparent text-xs text-slate-400 focus:outline-none border-t border-white/5 pt-2 resize-none"
+            className="w-full bg-transparent text-xs text-dicecho-muted placeholder:text-dicecho-muted/60 focus:outline-none border-t border-dicecho-border/30 pt-2 resize-none"
             rows={2}
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.shiftKey) {
@@ -205,21 +213,19 @@ const ItemListEditor: React.FC<{
         {items.map((item, idx) => (
           <div
             key={idx}
-            className="flex flex-col p-2 bg-slate-950/30 rounded-lg border border-white/5 group hover:bg-slate-950/50 transition-colors cursor-pointer"
+            className="flex flex-col p-2 rounded-lg border border-dicecho-border/30 bg-dicecho-panel/45 group hover:border-dicecho-primary/35 hover:bg-dicecho-raised/40 transition-colors cursor-pointer"
             onClick={() => setExpandedIndex(expandedIndex === idx ? null : idx)}
           >
             <div className="flex items-center justify-between">
-              <span
-                className="text-sm text-slate-300 font-medium truncate flex-1 mr-2"
-              >
+              <span className="text-sm text-white/90 font-medium truncate flex-1 mr-2">
                 {item.name}
               </span>
               <div className="flex items-center gap-2">
-                <div className="flex items-center gap-1 bg-slate-900 rounded-md px-1.5 py-0.5 border border-white/5">
-                  <span className="text-xs text-slate-500">
+                <div className="flex items-center gap-1 rounded-md border border-dicecho-border/30 bg-dicecho-card/80 px-1.5 py-0.5">
+                  <span className={characterSubtleTextClass}>
                     {title === "法术 / 能力" ? "MP" : "x"}
                   </span>
-                  <span className="text-sm font-mono text-indigo-300">
+                  <span className="text-sm font-mono text-dicecho-primary">
                     {item.quantity}
                   </span>
                 </div>
@@ -232,13 +238,13 @@ const ItemListEditor: React.FC<{
                       <>
                         <button
                           onClick={() => handleEdit(idx)}
-                          className="p-1 hover:text-indigo-400 text-slate-500 transition-colors"
+                          className="p-1 text-dicecho-muted hover:text-dicecho-primary transition-colors"
                         >
                           <Edit size={12} />
                         </button>
                         <button
                           onClick={() => handleRemove(idx)}
-                          className="p-1 hover:text-red-400 text-slate-500 transition-colors"
+                          className="p-1 text-dicecho-muted hover:text-red-400 transition-colors"
                         >
                           <Trash2 size={12} />
                         </button>
@@ -247,13 +253,13 @@ const ItemListEditor: React.FC<{
                       <>
                         <button
                           onClick={() => handleUpdateQty(idx, 1)}
-                          className="p-1 hover:text-indigo-400 text-slate-500 transition-colors"
+                          className="p-1 text-dicecho-muted hover:text-dicecho-primary transition-colors"
                         >
                           <Plus size={12} />
                         </button>
                         <button
                           onClick={() => handleUpdateQty(idx, -1)}
-                          className="p-1 hover:text-red-400 text-slate-500 transition-colors"
+                          className="p-1 text-dicecho-muted hover:text-red-400 transition-colors"
                         >
                           <Minus size={12} />
                         </button>
@@ -264,14 +270,14 @@ const ItemListEditor: React.FC<{
               </div>
             </div>
             {expandedIndex === idx && (
-              <div className="mt-2 text-xs text-slate-400 border-t border-white/5 pt-2 whitespace-pre-wrap animate-fade-in break-all">
+              <div className="mt-2 text-xs text-dicecho-muted border-t border-dicecho-border/30 pt-2 whitespace-pre-wrap animate-fade-in break-all">
                 {item.description || "暂无描述"}
               </div>
             )}
           </div>
         ))}
         {items.length === 0 && !isAdding && (
-          <div className="text-center text-slate-600 text-xs py-8">
+          <div className="text-center text-dicecho-muted/70 text-xs py-8">
             暂无条目
           </div>
         )}
@@ -396,7 +402,7 @@ export const CharacterModal: React.FC<{
       icon={readOnly ? FileText : UserPlus}
       className="max-w-4xl"
     >
-      <div className="p-6 md:p-8 space-y-6 md:space-y-8 overflow-y-auto custom-scrollbar flex-1">
+      <div className="flex-1 space-y-5 overflow-y-auto p-5 md:p-6 custom-scrollbar">
         {!readOnly && (
           <div className="flex justify-end">
             <Button
@@ -411,7 +417,7 @@ export const CharacterModal: React.FC<{
         )}
 
         {showImport && (
-          <div className="bg-slate-900/50 p-4 rounded-xl border border-white/10 animate-slide-up">
+          <div className={characterSectionClass}>
             <Textarea
               label="粘贴 .st 指令 (例如: .st 力量60str60...)"
               value={importText}
@@ -427,12 +433,19 @@ export const CharacterModal: React.FC<{
           </div>
         )}
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="md:col-span-2 bg-slate-900/40 p-5 rounded-2xl border border-white/5 flex flex-col h-full">
+        <div className="grid grid-cols-1 gap-5 md:grid-cols-3">
+          <div
+            className={cn(
+              characterSectionClass,
+              "md:col-span-2 flex flex-col h-full"
+            )}
+          >
             <div className="flex justify-between items-start mb-4">
-              <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2 mt-2">
-                <User size={14} /> 基础信息
-              </h4>
+              <div>
+                <h4 className={characterSectionTitleClass}>
+                  <User size={14} className="text-dicecho-primary" /> 基础信息
+                </h4>
+              </div>
               <AvatarUpload
                 url={form.avatar_url}
                 onUpload={(url) => setForm({ ...form, avatar_url: url })}
@@ -471,19 +484,19 @@ export const CharacterModal: React.FC<{
               </div>
               {["NPC", "怪物"].includes(initialData.role) && !readOnly && (
                 <div className="col-span-2 pt-2">
-                  <div className="flex p-1 bg-slate-950/50 rounded-xl border border-white/5 w-full">
+                  <div className="flex w-full rounded-lg border border-dicecho-border/40 bg-dicecho-panel/60 p-1">
                     {["NPC", "怪物"].map((r) => (
                       <button
                         key={r}
                         type="button"
                         onClick={() => setForm({ ...form, role: r })}
                         className={cn(
-                          "flex-1 px-4 py-2 rounded-lg text-xs font-bold transition-all duration-200",
+                          "flex-1 px-4 py-2 rounded-md text-xs font-bold transition-colors duration-150",
                           form.role === r
                             ? r === "怪物"
-                              ? "bg-rose-600 text-white shadow-lg"
-                              : "bg-cyan-600 text-white shadow-lg"
-                            : "text-slate-400 hover:text-white hover:bg-white/5"
+                              ? "bg-red-500/20 text-red-200 border border-red-500/30"
+                              : "bg-dicecho-primary/20 text-white border border-dicecho-primary/35"
+                            : "border border-transparent text-dicecho-muted hover:text-white hover:bg-white/10"
                         )}
                       >
                         {r}
@@ -496,12 +509,17 @@ export const CharacterModal: React.FC<{
 
             <AttributeRadar
               character={form}
-              className="mt-6 border-t border-white/5 pt-6"
+              className="mt-5 border-t border-dicecho-border/30 pt-5"
             />
           </div>
-          <div className="md:col-span-1 bg-slate-900/40 p-5 rounded-2xl border border-white/5 flex flex-col h-full">
-            <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-4 flex items-center gap-2">
-              <Activity size={14} /> 衍生状态
+          <div
+            className={cn(
+              characterSectionClass,
+              "md:col-span-1 flex flex-col h-full"
+            )}
+          >
+            <h4 className={cn(characterSectionTitleClass, "mb-4")}>
+              <Activity size={14} className="text-dicecho-accent" /> 衍生状态
             </h4>
             <div className="space-y-4 flex-1">
               {[
@@ -517,13 +535,13 @@ export const CharacterModal: React.FC<{
                 },
                 {
                   label: "MP",
-                  color: "text-blue-400",
+                  color: "text-dicecho-primary",
                   key: "mp" as keyof Character,
                 },
               ].map((stat) => (
                 <div
                   key={stat.key}
-                  className="flex flex-col gap-1 p-3 bg-slate-950 rounded-xl border border-white/5"
+                  className="flex flex-col gap-2 rounded-lg border border-dicecho-border/35 bg-dicecho-panel/65 p-3"
                 >
                   <label className={cn("font-bold text-sm mb-1", stat.color)}>
                     {stat.label}
@@ -537,17 +555,17 @@ export const CharacterModal: React.FC<{
                 </div>
               ))}
 
-              <div className="grid grid-cols-2 gap-3 pt-2 border-t border-white/5">
-                <div className="flex flex-col gap-1 p-2 bg-slate-950 rounded-xl border border-white/5 text-center">
-                  <label className="text-[10px] font-bold uppercase tracking-wider text-amber-400">
+              <div className="grid grid-cols-2 gap-3 border-t border-dicecho-border/30 pt-2">
+                <div className="flex flex-col gap-1 rounded-lg border border-dicecho-border/35 bg-dicecho-panel/65 p-2 text-center">
+                  <label className="text-[10px] font-bold uppercase tracking-wider text-dicecho-rating">
                     DB
                   </label>
                   <div className="text-base font-mono font-bold text-white">
                     {form.db || "0"}
                   </div>
                 </div>
-                <div className="flex flex-col gap-1 p-2 bg-slate-950 rounded-xl border border-white/5 text-center">
-                  <label className="text-[10px] font-bold uppercase tracking-wider text-amber-400">
+                <div className="flex flex-col gap-1 rounded-lg border border-dicecho-border/35 bg-dicecho-panel/65 p-2 text-center">
+                  <label className="text-[10px] font-bold uppercase tracking-wider text-dicecho-rating">
                     Build
                   </label>
                   <div className="text-base font-mono font-bold text-white">
@@ -559,17 +577,17 @@ export const CharacterModal: React.FC<{
           </div>
         </div>
 
-        <div className="bg-slate-900/40 p-5 rounded-2xl border border-white/5">
-          <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-4 flex items-center gap-2">
-            <Activity size={12} /> 基础属性
+        <div className={characterSectionClass}>
+          <h4 className={cn(characterSectionTitleClass, "mb-4")}>
+            <Activity size={12} className="text-dicecho-primary" /> 基础属性
           </h4>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
             {CHARACTER_IMPORT_ATTRIBUTES.map((attr) => (
               <div
                 key={attr.key}
-                className="flex flex-col group items-center p-2 bg-slate-950/30 rounded-xl border border-white/5"
+                className="flex flex-col group items-center rounded-lg border border-dicecho-border/35 bg-dicecho-panel/55 p-2"
               >
-                <label className="text-[10px] text-slate-500 uppercase font-bold mb-2 group-hover:text-indigo-400 transition-colors w-full text-left ml-1">
+                <label className="mb-2 ml-1 w-full text-left text-[10px] font-bold uppercase text-dicecho-muted transition-colors group-hover:text-dicecho-primary">
                   {attr.label}
                 </label>
                 <NumberStepper
@@ -585,10 +603,10 @@ export const CharacterModal: React.FC<{
           </div>
         </div>
 
-        <div className="bg-slate-900/40 p-5 rounded-2xl border border-white/5">
+        <div className={characterSectionClass}>
           <div className="flex justify-between items-center mb-4">
-            <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2">
-              <BookOpen size={12} /> 技能列表
+            <h4 className={characterSectionTitleClass}>
+              <BookOpen size={12} className="text-dicecho-accent" /> 技能列表
             </h4>
             {!readOnly && !isAddingSkill && (
               <Button
@@ -605,7 +623,10 @@ export const CharacterModal: React.FC<{
           {isAddingSkill && (
             <div
               ref={skillInputRef}
-              className="flex gap-2 mb-4 items-center bg-slate-950/50 p-2 rounded-lg border border-white/10 animate-fade-in"
+              className={cn(
+                "flex gap-2 mb-4 items-center p-2 animate-fade-in",
+                characterInsetClass
+              )}
             >
               <Input
                 value={newSkillName}
@@ -636,18 +657,16 @@ export const CharacterModal: React.FC<{
               .map(([name, val]) => (
                 <div
                   key={name}
-                  className="flex flex-col gap-1 p-2 bg-slate-950/30 rounded-lg border border-white/5 relative group"
+                  className="relative flex flex-col gap-1 rounded-lg border border-dicecho-border/30 bg-dicecho-panel/55 p-2 group"
                 >
                   <div className="flex justify-between items-center">
-                    <span
-                      className="text-xs text-slate-300 font-bold truncate"
-                    >
+                    <span className="text-xs text-white/90 font-bold truncate">
                       {name}
                     </span>
                     {!readOnly && (
                       <button
                         onClick={() => removeSkill(name)}
-                        className="text-slate-600 hover:text-red-400 transition-colors"
+                        className="text-dicecho-muted hover:text-red-400 transition-colors"
                       >
                         <X size={12} />
                       </button>
@@ -669,31 +688,35 @@ export const CharacterModal: React.FC<{
                 </div>
               ))}
             {Object.keys(form.skills || {}).length === 0 && (
-              <div className="col-span-full text-center text-slate-600 text-xs py-4">
+              <div className="col-span-full text-center text-dicecho-muted/70 text-xs py-4">
                 暂无技能，请手动添加或通过 .st 导入
               </div>
             )}
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <Textarea
-            label="背景故事"
-            value={form.backstory}
-            onChange={(e) => setForm({ ...form, backstory: e.target.value })}
-            rows={5}
-            disabled={readOnly}
-          />
-          <Textarea
-            label="详细备注"
-            value={form.notes}
-            onChange={(e) => setForm({ ...form, notes: e.target.value })}
-            rows={5}
-            disabled={readOnly}
-          />
+        <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+          <div className={characterSectionClass}>
+            <Textarea
+              label="背景故事"
+              value={form.backstory}
+              onChange={(e) => setForm({ ...form, backstory: e.target.value })}
+              rows={5}
+              disabled={readOnly}
+            />
+          </div>
+          <div className={characterSectionClass}>
+            <Textarea
+              label="详细备注"
+              value={form.notes}
+              onChange={(e) => setForm({ ...form, notes: e.target.value })}
+              rows={5}
+              disabled={readOnly}
+            />
+          </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 h-72">
+        <div className="grid grid-cols-1 gap-5 md:grid-cols-2 h-72">
           <ItemListEditor
             title="物品清单"
             icon={Package}
@@ -710,7 +733,7 @@ export const CharacterModal: React.FC<{
           />
         </div>
       </div>
-      <div className="px-6 md:px-8 py-4 md:py-6 border-t border-white/10 bg-white/5 flex flex-col md:flex-row justify-between items-center gap-4 shrink-0">
+      <div className="flex shrink-0 flex-col items-center justify-between gap-4 border-t border-dicecho-border/40 bg-dicecho-card/80 px-5 py-4 md:flex-row md:px-6">
         {!readOnly && isEditing && (
           <div className="flex items-center gap-2 w-full md:w-auto justify-center md:justify-start">
             {(form.type === "investigator" || form.role === "调查员") &&

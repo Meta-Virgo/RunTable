@@ -19,20 +19,20 @@ export const SquareConfirmDialog: React.FC<SquareConfirmDialogProps> = ({
 
   return (
     <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-      <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-sm shadow-2xl overflow-hidden">
-        <div className="p-4 border-b border-slate-800">
+      <div className="bg-dicecho-panel border border-dicecho-border/50 rounded-lg w-full max-w-sm shadow-lg shadow-black/25 overflow-hidden">
+        <div className="p-4 border-b border-dicecho-border/40">
           <h3 className="text-lg font-bold text-white">{title}</h3>
         </div>
         <div className="p-4 text-slate-300 text-sm">{content}</div>
-        <div className="p-4 flex justify-end gap-2 border-t border-slate-800">
+        <div className="p-4 flex justify-end gap-2 border-t border-dicecho-border/40">
           <button
-            className="px-3 py-1.5 text-xs rounded-xl border border-slate-700 text-slate-300 hover:bg-slate-800 transition-colors"
+            className="px-3 py-1.5 text-xs rounded-lg border border-dicecho-border/50 text-slate-300 hover:bg-white/10 transition-colors"
             onClick={onCancel}
           >
             取消
           </button>
           <button
-            className="px-3 py-1.5 text-xs rounded-xl bg-red-600 hover:bg-red-500 text-white shadow-lg shadow-red-500/20 border border-red-500/50 transition-colors"
+            className="px-3 py-1.5 text-xs rounded-lg bg-red-600 hover:bg-red-500 text-white shadow-sm border border-red-500/50 transition-colors"
             onClick={onConfirm}
           >
             删除
@@ -42,4 +42,3 @@ export const SquareConfirmDialog: React.FC<SquareConfirmDialogProps> = ({
     </div>
   );
 };
-

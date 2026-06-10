@@ -473,9 +473,9 @@ export const AttributeRadar: React.FC<AttributeRadarProps> = ({
             <polygon
               key={i}
               points={points}
-              fill={scale === 1 ? "rgba(99, 102, 241, 0.03)" : "none"}
-              stroke={scale === 1 ? "#818cf8" : "#ffffff"}
-              strokeOpacity={scale === 1 ? 0.5 : 0.05}
+              fill={scale === 1 ? "rgba(155, 134, 246, 0.08)" : "none"}
+              stroke={scale === 1 ? "#9b86f6" : "#566078"}
+              strokeOpacity={scale === 1 ? 0.55 : 0.22}
               strokeWidth={scale === 1 ? 1 : 0.5}
               strokeDasharray={scale === 1 ? "none" : "4 2"}
             />
@@ -493,8 +493,8 @@ export const AttributeRadar: React.FC<AttributeRadarProps> = ({
                 y1={center}
                 x2={x}
                 y2={y}
-                stroke="#ffffff"
-                strokeOpacity={0.05}
+                stroke="#566078"
+                strokeOpacity={0.18}
                 strokeWidth={0.5}
               />
             );
@@ -518,16 +518,16 @@ export const AttributeRadar: React.FC<AttributeRadarProps> = ({
                 dominantBaseline="middle"
                 fill={
                   selectedAttr === key
-                    ? "#818cf8"
+                    ? "#9b86f6"
                     : isOverflow
-                    ? "#f472b6"
-                    : "#64748b"
+                    ? "#f3c462"
+                    : "#a9afbd"
                 }
                 fontSize={selectedAttr === key ? 12 : 10}
                 fontWeight={
                   selectedAttr === key || isOverflow ? "bold" : "normal"
                 }
-                className="uppercase transition-colors duration-200 cursor-pointer select-none hover:text-indigo-400 pointer-events-none"
+                className="uppercase transition-colors duration-150 cursor-pointer select-none pointer-events-none"
               >
                 {ATTR_LABELS[key]}
               </text>
@@ -537,10 +537,10 @@ export const AttributeRadar: React.FC<AttributeRadarProps> = ({
           {/* Data Polygon */}
           <polygon
             points={polyPoints}
-            fill="rgba(99, 102, 241, 0.2)"
-            stroke="#6366f1"
+            fill="rgba(155, 134, 246, 0.22)"
+            stroke="#9b86f6"
             strokeWidth={2}
-            className="drop-shadow-[0_0_8px_rgba(99,102,241,0.5)] pointer-events-none"
+            className="drop-shadow-[0_0_8px_rgba(155,134,246,0.35)] pointer-events-none"
           />
 
           {/* Data Points */}
@@ -555,16 +555,16 @@ export const AttributeRadar: React.FC<AttributeRadarProps> = ({
                 r={selectedAttr === v.key ? 6 : isOverflow ? 4 : 3}
                 fill={
                   selectedAttr === v.key
-                    ? "#818cf8"
+                    ? "#9b86f6"
                     : isOverflow
-                    ? "#f472b6"
-                    : "#6366f1"
+                    ? "#f3c462"
+                    : "#826df0"
                 }
                 stroke={isOverflow ? "#fff" : "none"}
                 strokeWidth={isOverflow ? 1.5 : 0}
                 className={cn(
-                  "transition-all duration-200 cursor-pointer hover:r-6 hover:fill-indigo-300 pointer-events-none",
-                  isOverflow && "drop-shadow-[0_0_4px_rgba(244,114,182,0.8)]"
+                  "transition-[r,fill] duration-150 cursor-pointer pointer-events-none",
+                  isOverflow && "drop-shadow-[0_0_4px_rgba(243,196,98,0.75)]"
                 )}
               />
             );
@@ -605,7 +605,7 @@ export const AttributeRadar: React.FC<AttributeRadarProps> = ({
           <span
             className={cn(
               "text-xs font-medium tracking-widest mb-1 transition-colors duration-300",
-              isGodMode ? "text-amber-200/60" : "text-slate-500"
+              isGodMode ? "text-dicecho-rating/80" : "text-dicecho-muted"
             )}
           >
             我猜你是...
@@ -614,7 +614,7 @@ export const AttributeRadar: React.FC<AttributeRadarProps> = ({
             className={cn(
               "text-5xl font-black tracking-tighter transition-colors duration-300 leading-none mb-3",
               isGodMode
-                ? "text-amber-400 drop-shadow-[0_0_15px_rgba(251,191,36,0.6)]"
+                ? "text-dicecho-rating drop-shadow-[0_0_15px_rgba(243,196,98,0.35)]"
                 : "text-white"
             )}
           >
@@ -625,7 +625,7 @@ export const AttributeRadar: React.FC<AttributeRadarProps> = ({
             <span
               className={cn(
                 "text-xs font-bold uppercase tracking-[0.15em] transition-colors duration-300",
-                isGodMode ? "text-amber-300" : "text-slate-500"
+                isGodMode ? "text-dicecho-rating" : "text-dicecho-muted"
               )}
             >
               {activeDescData?.name || activeAttrKey.toUpperCase()}
@@ -633,15 +633,15 @@ export const AttributeRadar: React.FC<AttributeRadarProps> = ({
             <div
               className={cn(
                 "h-px w-8 transition-colors duration-300",
-                isGodMode ? "bg-amber-500/50" : "bg-slate-700"
+                isGodMode ? "bg-dicecho-rating/50" : "bg-dicecho-border"
               )}
             />
             <span
               className={cn(
                 "font-mono text-lg transition-colors duration-300",
                 isGodMode
-                  ? "text-amber-400 font-bold"
-                  : "text-indigo-400 font-medium"
+                  ? "text-dicecho-rating font-bold"
+                  : "text-dicecho-primary font-medium"
               )}
             >
               {activeAttrValue}
@@ -651,7 +651,7 @@ export const AttributeRadar: React.FC<AttributeRadarProps> = ({
           <p
             className={cn(
               "text-sm leading-relaxed font-light transition-colors duration-300 max-w-md",
-              isGodMode ? "text-amber-100/80" : "text-slate-400"
+              isGodMode ? "text-dicecho-rating/80" : "text-dicecho-muted"
             )}
           >
             {activeDesc.desc}

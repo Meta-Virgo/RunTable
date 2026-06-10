@@ -123,10 +123,10 @@ const MicrophoneButton = ({ isOpen }: { isOpen: boolean }) => {
     <button
       onClick={handleToggle}
       className={cn(
-        "w-full flex items-center gap-3 px-3 py-3 rounded-xl transition-all duration-300 group border",
+        "w-full flex items-center gap-3 px-3 py-3 rounded-lg transition-colors group border",
         enabled
-          ? "bg-indigo-600/10 text-indigo-300 border-indigo-500/20"
-          : "text-rose-400 hover:text-white hover:bg-white/5 border-transparent",
+          ? "bg-dicecho-primary/15 text-white border-dicecho-primary/35"
+          : "text-rose-300 hover:text-white hover:bg-white/10 border-transparent",
         !isOpen && "justify-center"
       )}
     >
@@ -135,7 +135,7 @@ const MicrophoneButton = ({ isOpen }: { isOpen: boolean }) => {
           size={20}
           className={cn(
             "transition-colors",
-            enabled ? "text-indigo-400" : "text-rose-500"
+            enabled ? "text-dicecho-primary" : "text-rose-400"
           )}
         />
       ) : (
@@ -143,7 +143,7 @@ const MicrophoneButton = ({ isOpen }: { isOpen: boolean }) => {
           size={20}
           className={cn(
             "transition-colors",
-            enabled ? "text-indigo-400" : "text-rose-500"
+            enabled ? "text-dicecho-primary" : "text-rose-400"
           )}
         />
       )}
@@ -220,23 +220,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
       ? "border-rose-500/30"
       : isNPC
       ? "border-cyan-500/30"
-      : "border-purple-500/30";
-    const activeBg = isMonster
-      ? "from-rose-500/20"
-      : isNPC
-      ? "from-cyan-500/20"
-      : "from-purple-500/20";
+      : "border-dicecho-primary/35";
     const iconBg = isMonster
       ? activeCharId === char.id
-        ? "bg-rose-600 text-white"
-        : "bg-slate-800 text-slate-400 group-hover:bg-rose-900/50 group-hover:text-rose-400"
+        ? "bg-rose-500/80 text-white"
+        : "bg-dicecho-card text-dicecho-muted group-hover:bg-dicecho-raised group-hover:text-rose-300"
       : isNPC
       ? activeCharId === char.id
-        ? "bg-cyan-600 text-white"
-        : "bg-slate-800 text-slate-400 group-hover:bg-cyan-900/50 group-hover:text-cyan-400"
+        ? "bg-cyan-500/80 text-white"
+        : "bg-dicecho-card text-dicecho-muted group-hover:bg-dicecho-raised group-hover:text-cyan-300"
       : activeCharId === char.id
-      ? "bg-purple-600 text-white"
-      : "bg-slate-800 text-slate-400 group-hover:bg-purple-900/50 group-hover:text-purple-400";
+      ? "bg-dicecho-primary-strong text-white"
+      : "bg-dicecho-card text-dicecho-muted group-hover:bg-dicecho-raised group-hover:text-dicecho-primary";
 
     const isOnline = char.isOnline;
 
@@ -245,10 +240,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
         key={char.id}
         onClick={() => isClickable && handleCharClick(char.id)}
         className={cn(
-          "relative group flex items-center gap-3 p-2 rounded-xl transition-all duration-300 border",
+          "relative group flex items-center gap-3 p-2 rounded-lg transition-colors border",
           activeCharId === char.id
-            ? `bg-gradient-to-r ${activeBg} to-transparent ${activeBorder}`
-            : "bg-transparent border-transparent hover:bg-white/5",
+            ? `bg-dicecho-primary/16 ${activeBorder}`
+            : "bg-transparent border-transparent hover:bg-white/10",
           !isOpen && "justify-center",
           isClickable ? "cursor-pointer" : "cursor-default",
           showOnline && !isOnline && "opacity-50 grayscale"
@@ -259,7 +254,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             className={cn(
               "transition-colors flex items-center justify-center",
               char.avatar_url
-                ? "w-[34px] h-[34px] rounded-lg overflow-hidden border border-white/10 bg-slate-900"
+                ? "w-[34px] h-[34px] rounded-lg overflow-hidden border border-dicecho-border/40 bg-dicecho-card"
                 : "p-2 rounded-lg",
               !char.avatar_url && iconBg
             )}
@@ -301,7 +296,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               e.stopPropagation();
               onOpenStatusEdit(char.id);
             }}
-            className="absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded-lg text-slate-500 hover:text-white hover:bg-slate-700 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-all cursor-pointer"
+            className="absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded-lg text-dicecho-muted hover:text-white hover:bg-dicecho-raised opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-all cursor-pointer"
           >
             <Activity size={14} />
           </button>
@@ -314,10 +309,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
     <div
       onClick={() => handleCharClick("pc")}
       className={cn(
-        "relative group flex items-center gap-3 p-2 rounded-xl cursor-pointer transition-all duration-300 border",
+        "relative group flex items-center gap-3 p-2 rounded-lg cursor-pointer transition-colors border",
         activeCharId === "pc"
-          ? "bg-gradient-to-r from-indigo-500/20 to-transparent border-indigo-500/30 shadow-[inset_2px_0_0_0_#6366f1]"
-          : "bg-transparent border-transparent hover:bg-white/5",
+          ? "bg-dicecho-primary/16 border-dicecho-primary/40 shadow-[inset_2px_0_0_0_#9b86f6]"
+          : "bg-transparent border-transparent hover:bg-white/10",
         !isOpen && "justify-center",
         !kpOnline && "opacity-50 grayscale"
       )}
@@ -326,8 +321,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
         className={cn(
           "p-2 rounded-lg shrink-0 transition-colors relative",
           activeCharId === "pc" || kpOnline
-            ? "bg-indigo-500 text-white"
-            : "bg-slate-800 text-slate-400 group-hover:bg-slate-700"
+            ? "bg-dicecho-primary-strong text-white"
+            : "bg-dicecho-card text-dicecho-muted group-hover:bg-dicecho-raised"
         )}
       >
         <Crown size={18} />
@@ -349,7 +344,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </div>
       )}
       {activeCharId === "pc" && isOpen && (
-        <div className="absolute right-2 w-1.5 h-1.5 rounded-full bg-indigo-400 shadow-[0_0_10px_#6366f1]"></div>
+        <div className="absolute right-2 w-1.5 h-1.5 rounded-full bg-dicecho-primary shadow-[0_0_10px_#9b86f6]"></div>
       )}
     </div>
   );
@@ -364,7 +359,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       )}
       <aside
         className={cn(
-          "glass-panel !border-0 flex flex-col transition-all duration-300 ease-in-out z-40 shrink-0",
+          "flex flex-col border-r border-dicecho-border/40 bg-dicecho-panel/90 shadow-sm transition-all duration-300 ease-in-out z-40 shrink-0",
           "fixed inset-y-0 left-0 h-full",
           "md:relative",
           isOpen
@@ -373,9 +368,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
         )}
       >
         {/* Header Section */}
-        <div className="h-16 shrink-0 pt-safe flex items-center justify-center px-4 border-b border-white/5 bg-slate-900/30 backdrop-blur-md">
-          <div className="flex items-center gap-3 text-indigo-400 overflow-hidden w-full justify-center">
-            <div className="bg-gradient-to-br from-indigo-500 to-purple-600 p-2.5 rounded-xl text-white shrink-0 shadow-lg shadow-indigo-500/20">
+        <div className="h-16 shrink-0 pt-safe flex items-center justify-center px-4 border-b border-dicecho-border/40 bg-dicecho-card/60">
+          <div className="flex items-center gap-3 text-dicecho-primary overflow-hidden w-full justify-center">
+            <div className="bg-dicecho-primary-strong p-2.5 rounded-lg text-white shrink-0 shadow-sm">
               <Dice5 size={24} />
             </div>
             {isOpen && (
@@ -383,7 +378,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 <span className="font-bold text-lg tracking-tight text-white whitespace-nowrap">
                   RunTable
                 </span>
-                <span className="text-[10px] text-indigo-300 font-medium tracking-widest uppercase">
+                <span className="text-[10px] text-dicecho-muted font-medium tracking-widest uppercase">
                   Pro Edition
                 </span>
               </div>
@@ -414,8 +409,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 className={cn(
                   "w-full flex items-center gap-3 px-3 py-3 rounded-xl transition-all duration-300 group",
                   view === nav.id
-                    ? "bg-indigo-600/10 text-indigo-300 border border-indigo-500/20"
-                    : "text-slate-400 hover:text-white hover:bg-white/5 border border-transparent",
+                    ? "bg-dicecho-primary/18 text-white border border-dicecho-primary/45"
+                    : "text-dicecho-muted hover:text-white hover:bg-white/10 border border-transparent",
                   !isOpen && "justify-center"
                 )}
               >
@@ -424,8 +419,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   className={cn(
                     "transition-colors",
                     view === nav.id
-                      ? "text-indigo-400"
-                      : "text-slate-500 group-hover:text-slate-300"
+                      ? "text-dicecho-primary"
+                      : "text-dicecho-muted group-hover:text-slate-200"
                   )}
                 />
                 {isOpen && (
@@ -471,7 +466,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   {isOpen && (
                     <div className="text-xs font-bold text-slate-500 uppercase tracking-wider px-1 flex justify-between">
                       <span>调查员</span>
-                      <span className="text-[10px] bg-slate-800 px-1.5 rounded text-slate-400">
+                      <span className="text-[10px] bg-dicecho-card px-1.5 rounded text-dicecho-muted">
                         {pcCharacters.length}
                       </span>
                     </div>
@@ -495,10 +490,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </div>
         </div>
 
-        <div className="p-4 border-t border-white/5 hidden md:block">
+        <div className="p-4 border-t border-dicecho-border/40 hidden md:block">
           <button
             onClick={() => setIsOpen(!isOpen)}
-            className="w-full flex items-center justify-center p-2 text-slate-500 hover:text-white hover:bg-white/5 rounded-xl transition-colors"
+            className="w-full flex items-center justify-center p-2 text-dicecho-muted hover:text-white hover:bg-white/10 rounded-lg transition-colors"
           >
             {isOpen ? <ChevronLeft size={16} /> : <ChevronRight size={16} />}
           </button>

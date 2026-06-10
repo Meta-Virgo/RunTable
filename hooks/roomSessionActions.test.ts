@@ -99,7 +99,7 @@ describe("room session actions", () => {
       updateRoomSessionModuleSettings({
         roomId: "room-1",
         isKeeper: false,
-        info: { title: "Room", description: "desc" },
+        info: { title: "Room", description: "desc", coverImageUrl: "https://img.test/cover.jpg" },
         password: "pw",
         updateRoomModule,
         setRoomPassword,
@@ -112,7 +112,7 @@ describe("room session actions", () => {
       updateRoomSessionModuleSettings({
         roomId: "room-1",
         isKeeper: true,
-        info: { title: "Room", description: "desc" },
+        info: { title: "Room", description: "desc", coverImageUrl: "https://img.test/cover.jpg" },
         password: "pw",
         updateRoomModule,
         setRoomPassword,
@@ -121,6 +121,7 @@ describe("room session actions", () => {
     expect(updateRoomModule).toHaveBeenCalledWith("room-1", {
       title: "Room",
       description: "desc",
+      cover_image_url: "https://img.test/cover.jpg",
     });
     expect(setRoomPassword).toHaveBeenCalledWith("room-1", "pw");
   });
@@ -145,6 +146,49 @@ describe("room session actions", () => {
     ).resolves.toEqual({ ok: false, message: "淇濆瓨澶辫触: denied" });
     expect(setRoomPassword).not.toHaveBeenCalled();
     consoleError.mockRestore();
+  });
+
+  it("falls back when the room cover image column is missing", async () => {
+    const updateRoomModule = vi
+      .fn()
+      .mockResolvedValueOnce({
+        error: {
+          code: "PGRST204",
+          message:
+            "Could not find the 'cover_image_url' column of 'rooms' in the schema cache",
+        },
+      })
+      .mockResolvedValueOnce({ error: null });
+    const setRoomPassword = vi.fn().mockResolvedValue(undefined);
+
+    await expect(
+      updateRoomSessionModuleSettings({
+        roomId: "room-1",
+        isKeeper: true,
+        info: {
+          title: "Room",
+          description: "desc",
+          coverImageUrl: "https://img.test/cover.jpg",
+        },
+        password: "pw",
+        updateRoomModule,
+        setRoomPassword,
+      })
+    ).resolves.toMatchObject({
+      ok: true,
+      message: expect.stringContaining("cover_image_url"),
+    });
+
+    expect(updateRoomModule).toHaveBeenNthCalledWith(1, "room-1", {
+      title: "Room",
+      description: "desc",
+      cover_image_url: "https://img.test/cover.jpg",
+    });
+    expect(updateRoomModule).toHaveBeenNthCalledWith(2, "room-1", {
+      title: "Room",
+      description: "desc",
+    });
+    expect(setRoomPassword).toHaveBeenCalledWith("room-1", "pw");
   });
 
   it("marks missing music sync schema warnings separately from other failures", async () => {

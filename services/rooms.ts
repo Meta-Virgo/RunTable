@@ -2,9 +2,14 @@ import { supabase } from "../supabase";
 import type { RoomMembership } from "./roomAuthority";
 
 export const ROOM_SELECT =
-  "id, created_at, kp_id, title, description, status, room_number, has_password, last_active_at, bg_music_url, type, is_music_playing, music_track_index";
+  "id, created_at, kp_id, title, description, status, room_number, has_password, last_active_at, bg_music_url, cover_image_url, type, is_music_playing, music_track_index";
 
 export const ROOM_WITH_COUNTS_SELECT = `${ROOM_SELECT}, characters(count), messages(count)`;
+
+const LEGACY_ROOM_SELECT =
+  "id, created_at, kp_id, title, description, status, room_number, has_password, last_active_at, bg_music_url, type, is_music_playing, music_track_index";
+
+const LEGACY_ROOM_WITH_COUNTS_SELECT = `${LEGACY_ROOM_SELECT}, characters(count), messages(count)`;
 
 export interface RoomActivityCount {
   room_id: string;
@@ -12,25 +17,102 @@ export interface RoomActivityCount {
   message_count: number;
 }
 
+export interface RoomMemberUserId {
+  room_id: string;
+  user_id: string;
+}
+
+function isMissingCoverImageColumnError(error: unknown) {
+  const maybeError = error as {
+    code?: string;
+    message?: string;
+    details?: string;
+    hint?: string;
+  };
+  const text = [
+    maybeError?.message,
+    maybeError?.details,
+    maybeError?.hint,
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+
+  return (
+    maybeError?.code === "42703" ||
+    maybeError?.code === "PGRST204" ||
+    text.includes("cover_image_url")
+  );
+}
+
+function isMissingRoomMemberUserIdsSupportError(error: unknown) {
+  const maybeError = error as {
+    code?: string;
+    message?: string;
+    details?: string;
+    hint?: string;
+  };
+  const text = [
+    maybeError?.message,
+    maybeError?.details,
+    maybeError?.hint,
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+
+  return (
+    maybeError?.code === "42883" ||
+    maybeError?.code === "PGRST202" ||
+    maybeError?.code === "42P01" ||
+    text.includes("get_room_member_user_ids") ||
+    text.includes("room_members")
+  );
+}
+
 export async function fetchRoomById(roomId: string) {
-  return supabase.from("rooms").select(ROOM_SELECT).eq("id", roomId).single();
+  const result = await supabase
+    .from("rooms")
+    .select(ROOM_SELECT)
+    .eq("id", roomId)
+    .single();
+
+  if (!result.error || !isMissingCoverImageColumnError(result.error)) {
+    return result;
+  }
+
+  return supabase
+    .from("rooms")
+    .select(LEGACY_ROOM_SELECT)
+    .eq("id", roomId)
+    .single();
 }
 
 export async function fetchVisibleRooms(userId?: string) {
-  let query = supabase
-    .from("rooms")
-    .select(ROOM_WITH_COUNTS_SELECT)
-    .order("last_active_at", { ascending: false, nullsFirst: false });
+  const runQuery = (select: string) => {
+    let query = supabase
+      .from("rooms")
+      .select(select)
+      .order("last_active_at", { ascending: false, nullsFirst: false });
 
-  if (userId) {
-    query = query
-      .or(`status.eq.open,kp_id.eq.${userId}`)
-      .neq("status", "completed");
-  } else {
-    query = query.eq("status", "open");
+    if (userId) {
+      query = query
+        .or(`status.eq.open,kp_id.eq.${userId}`)
+        .neq("status", "completed");
+    } else {
+      query = query.eq("status", "open");
+    }
+
+    return query;
+  };
+
+  const result = await runQuery(ROOM_WITH_COUNTS_SELECT);
+
+  if (!result.error || !isMissingCoverImageColumnError(result.error)) {
+    return result;
   }
 
-  return query;
+  return runQuery(LEGACY_ROOM_WITH_COUNTS_SELECT);
 }
 
 export async function fetchRoomActivityCounts(roomIds: string[]) {
@@ -53,32 +135,90 @@ export async function fetchRoomActivityCounts(roomIds: string[]) {
   );
 }
 
+export async function fetchRoomMemberUserIds(roomIds: string[]) {
+  if (roomIds.length === 0) return new Map<string, string[]>();
+
+  const { data, error } = await supabase.rpc("get_room_member_user_ids", {
+    p_room_ids: roomIds,
+  });
+
+  if (error) {
+    if (isMissingRoomMemberUserIdsSupportError(error)) {
+      return new Map<string, string[]>();
+    }
+
+    console.warn("Failed to fetch room member user ids:", error);
+    return new Map<string, string[]>();
+  }
+
+  return ((data || []) as RoomMemberUserId[]).reduce((roomMembers, item) => {
+    const current = roomMembers.get(item.room_id) || [];
+    current.push(item.user_id);
+    roomMembers.set(item.room_id, current);
+    return roomMembers;
+  }, new Map<string, string[]>());
+}
+
 export async function createRoom(input: {
   title: string;
   description: string;
+  coverImageUrl?: string | null;
   kpId: string;
   hasPassword: boolean;
   type: "text" | "voice";
 }) {
-  return supabase
+  const payload = {
+    title: input.title,
+    description: input.description,
+    cover_image_url: input.coverImageUrl || null,
+    kp_id: input.kpId,
+    status: "open",
+    has_password: input.hasPassword,
+    type: input.type,
+  };
+
+  const result = await supabase
     .from("rooms")
-    .insert({
-      title: input.title,
-      description: input.description,
-      kp_id: input.kpId,
-      status: "open",
-      has_password: input.hasPassword,
-      type: input.type,
-    })
+    .insert(payload)
     .select()
     .single();
+
+  if (!result.error || !isMissingCoverImageColumnError(result.error)) {
+    return result;
+  }
+
+  const legacyPayload = {
+    title: payload.title,
+    description: payload.description,
+    kp_id: payload.kp_id,
+    status: payload.status,
+    has_password: payload.has_password,
+    type: payload.type,
+  };
+
+  return supabase.from("rooms").insert(legacyPayload).select().single();
 }
 
 export async function updateRoomDetails(
   roomId: string,
-  details: { title: string; description: string | null }
+  details: {
+    title: string;
+    description: string | null;
+    cover_image_url?: string | null;
+  }
 ) {
-  return supabase.from("rooms").update(details).eq("id", roomId);
+  const result = await supabase.from("rooms").update(details).eq("id", roomId);
+
+  if (!result.error || !isMissingCoverImageColumnError(result.error)) {
+    return result;
+  }
+
+  const legacyDetails = {
+    title: details.title,
+    description: details.description,
+  };
+
+  return supabase.from("rooms").update(legacyDetails).eq("id", roomId);
 }
 
 export async function deleteRoom(roomId: string) {
