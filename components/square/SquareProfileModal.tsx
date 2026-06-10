@@ -8,6 +8,7 @@ import {
 } from "../../services/squareProfileModel";
 import { AvatarUpload } from "../AvatarUpload";
 import { Modal } from "../UI";
+import { themeRgb } from "../../utils/theme";
 
 interface SquareProfileModalProps {
   isOpen: boolean;
@@ -59,7 +60,7 @@ export const SquareProfileModal: React.FC<SquareProfileModalProps> = ({
                   cy="50"
                   r="48"
                   fill="none"
-                  stroke="#31394c"
+                  stroke={themeRgb("panel")}
                   strokeWidth="3"
                 />
                 <circle
@@ -67,7 +68,7 @@ export const SquareProfileModal: React.FC<SquareProfileModalProps> = ({
                   cy="50"
                   r="48"
                   fill="none"
-                  stroke="#9b86f6"
+                  stroke={themeRgb("primary")}
                   strokeWidth="3"
                   strokeDasharray="301.59"
                   strokeDashoffset="52.77825"

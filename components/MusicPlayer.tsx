@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { Button } from "./UI";
 import { useMusicPlaybackController } from "../hooks/useMusicPlaybackController";
+import { themeRgb } from "../utils/theme";
 
 interface MusicPlayerProps {
   url: string | null;
@@ -260,7 +261,7 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
                     cy="26"
                     r="24"
                     fill="none"
-                    stroke="#566078"
+                    stroke={themeRgb("border")}
                     strokeWidth="2"
                     className="opacity-50"
                   />
@@ -269,7 +270,7 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
                     cy="26"
                     r="24"
                     fill="none"
-                    stroke="#9b86f6"
+                    stroke={themeRgb("primary")}
                     strokeWidth="2"
                     strokeDasharray={2 * Math.PI * 24}
                     strokeDashoffset={
@@ -603,7 +604,7 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
                               ? "running"
                               : "paused",
                             background:
-                              "radial-gradient(circle, #384154 0%, #31394c 28%, #232b3d 29%, #3f4860 30%, #232b3d 32%, #3f4860 34%, #232b3d 36%, #3f4860 38%, #232b3d 40%, #3f4860 42%, #232b3d 44%, #3f4860 46%, #232b3d 48%, #3f4860 50%, #232b3d 52%, #3f4860 54%, #232b3d 56%, #3f4860 58%, #232b3d 60%, #31394c 100%)",
+                              "radial-gradient(circle, rgb(var(--theme-bg)) 0%, rgb(var(--theme-panel)) 28%, rgb(var(--theme-card)) 29%, rgb(var(--theme-raised)) 30%, rgb(var(--theme-card)) 32%, rgb(var(--theme-raised)) 34%, rgb(var(--theme-card)) 36%, rgb(var(--theme-raised)) 38%, rgb(var(--theme-card)) 40%, rgb(var(--theme-raised)) 42%, rgb(var(--theme-card)) 44%, rgb(var(--theme-raised)) 46%, rgb(var(--theme-card)) 48%, rgb(var(--theme-raised)) 50%, rgb(var(--theme-card)) 52%, rgb(var(--theme-raised)) 54%, rgb(var(--theme-card)) 56%, rgb(var(--theme-raised)) 58%, rgb(var(--theme-card)) 60%, rgb(var(--theme-panel)) 100%)",
                             boxShadow:
                               "0 0 20px rgba(0,0,0,0.35), inset 0 0 0 2px rgba(86,96,120,0.45)",
                           }}

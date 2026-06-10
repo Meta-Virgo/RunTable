@@ -311,7 +311,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       className={cn(
         "relative group flex items-center gap-3 p-2 rounded-lg cursor-pointer transition-colors border",
         activeCharId === "pc"
-          ? "bg-dicecho-primary/16 border-dicecho-primary/40 shadow-[inset_2px_0_0_0_#9b86f6]"
+          ? "bg-dicecho-primary/16 border-dicecho-primary/40 shadow-[inset_2px_0_0_0_rgb(var(--theme-primary))]"
           : "bg-transparent border-transparent hover:bg-white/10",
         !isOpen && "justify-center",
         !kpOnline && "opacity-50 grayscale"
@@ -344,7 +344,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </div>
       )}
       {activeCharId === "pc" && isOpen && (
-        <div className="absolute right-2 w-1.5 h-1.5 rounded-full bg-dicecho-primary shadow-[0_0_10px_#9b86f6]"></div>
+        <div className="absolute right-2 w-1.5 h-1.5 rounded-full bg-dicecho-primary shadow-[0_0_10px_rgb(var(--theme-primary))]"></div>
       )}
     </div>
   );

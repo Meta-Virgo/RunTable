@@ -1,19 +1,19 @@
 import React, { useMemo } from "react";
 import {
+  AlertTriangle,
   CalendarClock,
+  Check,
   ClipboardList,
   FileText,
   Link,
   Lock,
-  MessageSquare,
-  ScrollText,
   Send,
+  Settings,
   Shield,
   Sparkles,
   Tags,
-  UserCog,
 } from "lucide-react";
-import type { Character, Log } from "../types";
+import type { Log } from "../types";
 import { Button, Input, Textarea, cn } from "./UI";
 import {
   createClue,
@@ -27,44 +27,24 @@ import {
   createRoomSchedule,
   getVisibleInviteSummary,
 } from "../services/invitations";
-import {
-  createKeeperPersonaTemplate,
-  createPersonaMessage,
-  createSecretBatchRolls,
-  type KeeperPersonaTemplate,
-} from "../services/keeperToolbox";
-import {
-  createSessionSnapshots,
-  listVisibleSnapshots,
-} from "../services/sessionSnapshots";
 import { buildSessionReport } from "../utils/storyReport";
-import type { RoomMemberPanelItem } from "../services/roomMembers";
 import { nowIso, parseTags, useRoomToolsState } from "../hooks/useRoomToolsState";
-
-type AddLog = (
-  type: Log["type"],
-  content: string,
-  customCharId?: string,
-  recipientId?: string | null,
-  meta?: Record<string, any>
-) => Promise<void>;
 
 interface RoomToolsProps {
   roomId: string;
   isKP: boolean;
   userId?: string;
   logs: Log[];
-  characters: Character[];
-  roomMemberItems: RoomMemberPanelItem[];
-  addLog: AddLog;
+  onDeleteRoom: () => void;
+  onClearChat: () => void;
+  onConcludeGame: () => void;
 }
 
 const tabs = [
   { id: "report", label: "战报", icon: FileText },
   { id: "clues", label: "线索墙", icon: ClipboardList },
   { id: "invite", label: "邀请排期", icon: CalendarClock },
-  { id: "snapshots", label: "角色快照", icon: ScrollText },
-  { id: "toolbox", label: "KP工具", icon: UserCog },
+  { id: "management", label: "跑团管理", icon: Settings },
 ] as const;
 
 export const RoomTools: React.FC<RoomToolsProps> = ({
@@ -72,10 +52,12 @@ export const RoomTools: React.FC<RoomToolsProps> = ({
   isKP,
   userId,
   logs,
-  characters,
-  roomMemberItems,
-  addLog,
+  onDeleteRoom,
+  onClearChat,
+  onConcludeGame,
 }) => {
+  const [deleteConfirm, setDeleteConfirm] = React.useState(false);
+  const [clearChatConfirm, setClearChatConfirm] = React.useState(false);
   const {
     activeTab,
     setActiveTab,
@@ -97,22 +79,6 @@ export const RoomTools: React.FC<RoomToolsProps> = ({
     setStartsAt,
     scheduleNote,
     setScheduleNote,
-    snapshots,
-    setSnapshots,
-    personaName,
-    setPersonaName,
-    personaKind,
-    setPersonaKind,
-    personaDescription,
-    setPersonaDescription,
-    personaLine,
-    setPersonaLine,
-    personas,
-    setPersonas,
-    batchReason,
-    setBatchReason,
-    batchTargets,
-    setBatchTargets,
   } = useRoomToolsState(roomId);
 
   const report = useMemo(() => buildSessionReport(logs), [logs]);
@@ -120,10 +86,6 @@ export const RoomTools: React.FC<RoomToolsProps> = ({
   const visibleClues = listVisibleClues(clues, {
     role: viewerRole,
     status: "active",
-  });
-  const visibleSnapshots = listVisibleSnapshots(snapshots, {
-    role: viewerRole,
-    userId: userId || "",
   });
   const inviteSummary =
     invite && userId ? getVisibleInviteSummary(invite, schedule, userId) : null;
@@ -170,86 +132,15 @@ export const RoomTools: React.FC<RoomToolsProps> = ({
     );
   };
 
-  const handleCaptureSnapshots = () => {
-    const activeUserIds = new Set(
-      roomMemberItems.map((member) => member.userId)
-    );
-    characters.forEach((character) => {
-      if (character.user_id) activeUserIds.add(character.user_id);
-    });
-    setSnapshots(
-      createSessionSnapshots({
-        roomId,
-        sessionId: `session-${Date.now()}`,
-        endedAt: nowIso(),
-        characters: characters.filter((character) => character.type === "investigator"),
-        activeMemberUserIds: activeUserIds,
-      })
-    );
-  };
-
-  const handleCreatePersona = () => {
-    if (!personaName.trim()) return;
-    setPersonas((prev) => [
-      createKeeperPersonaTemplate({
-        id: `persona-${Date.now()}`,
-        roomId,
-        kind: personaKind,
-        name: personaName.trim(),
-        description: personaDescription.trim(),
-      }),
-      ...prev,
-    ]);
-    setPersonaName("");
-    setPersonaDescription("");
-  };
-
-  const handlePersonaSpeak = async (template: KeeperPersonaTemplate) => {
-    if (!personaLine.trim()) return;
-    const message = createPersonaMessage(template, personaLine.trim());
-    await addLog(
-      "normal",
-      `[${message.charRole}: ${message.charName}] ${message.content}`,
-      "pc"
-    );
-    setPersonaLine("");
-  };
-
-  const handleBatchSecretRoll = async () => {
-    const targets = batchTargets
-      .split(/\r?\n|,/)
-      .map((target) => target.trim())
-      .filter(Boolean);
-    if (!batchReason.trim() || targets.length === 0) return;
-    const rolls = targets.map(() => Math.floor(Math.random() * 100) + 1);
-    const result = createSecretBatchRolls({
-      reason: batchReason.trim(),
-      targets,
-      rolls,
-    });
-    await addLog("system", result.publicSummary, "pc");
-    await addLog(
-      "dice_secret",
-      JSON.stringify({
-        count: targets.length,
-        type: 100,
-        total: rolls.reduce((sum, roll) => sum + roll, 0),
-        details: rolls,
-        checkName: batchReason.trim(),
-        batch: result.keeperResults,
-      }),
-      "pc"
-    );
-    setBatchReason("");
-    setBatchTargets("");
-  };
-
   return (
     <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar px-4 md:px-8 py-6">
       <div className="max-w-6xl mx-auto space-y-5">
         <div className="flex flex-wrap gap-2">
           {tabs
-            .filter((tab) => tab.id !== "toolbox" || isKP)
+            .filter(
+              (tab) =>
+                tab.id !== "management" || isKP
+            )
             .map((tab) => (
               <button
                 key={tab.id}
@@ -468,114 +359,118 @@ export const RoomTools: React.FC<RoomToolsProps> = ({
           </section>
         )}
 
-        {activeTab === "snapshots" && (
+        {activeTab === "management" && isKP && (
           <section className="space-y-4">
-            {isKP && (
-              <Button icon={ScrollText} onClick={handleCaptureSnapshots}>
-                捕获当前角色快照
-              </Button>
-            )}
-            <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-3">
-              {visibleSnapshots.length === 0 && (
-                <div className="rounded-lg border border-dicecho-border/45 bg-dicecho-card/55 p-6 text-dicecho-muted">
-                  暂无快照
-                </div>
-              )}
-              {visibleSnapshots.map((snapshot) => (
-                <article
-                  key={snapshot.id}
-                  className="rounded-lg border border-dicecho-border/45 bg-dicecho-card/70 p-4 shadow-sm"
-                >
-                  <h3 className="font-bold text-white">{snapshot.snapshot.name}</h3>
-                  <p className="text-xs text-slate-500 mt-1">
-                    {snapshot.capturedAt}
-                  </p>
-                  <div className="grid grid-cols-3 gap-2 mt-3 text-sm">
-                    <div className="rounded-lg bg-red-500/10 p-2 text-red-200">
-                      HP {snapshot.snapshot.hp}
-                    </div>
-                    <div className="rounded-lg bg-emerald-500/10 p-2 text-emerald-200">
-                      SAN {snapshot.snapshot.san}
-                    </div>
-                    <div className="rounded-lg bg-blue-500/10 p-2 text-blue-200">
-                      MP {snapshot.snapshot.mp}
-                    </div>
-                  </div>
-                  {snapshot.snapshot.notes && (
-                    <p className="mt-3 text-sm text-slate-300">
-                      {snapshot.snapshot.notes}
-                    </p>
-                  )}
-                </article>
-              ))}
-            </div>
-          </section>
-        )}
-
-        {activeTab === "toolbox" && isKP && (
-          <section className="grid lg:grid-cols-2 gap-4">
-            <div className="rounded-lg border border-dicecho-border/45 bg-dicecho-card/70 p-4 shadow-sm space-y-3">
-              <h2 className="text-white font-bold flex items-center gap-2">
-                <UserCog size={18} className="text-dicecho-primary" />
-                NPC / Monster 身份
-              </h2>
-              <div className="flex gap-2">
-                <Button
-                  size="sm"
-                  variant={personaKind === "npc" ? "active" : "secondary"}
-                  onClick={() => setPersonaKind("npc")}
-                >
-                  NPC
-                </Button>
-                <Button
-                  size="sm"
-                  variant={personaKind === "monster" ? "active" : "secondary"}
-                  onClick={() => setPersonaKind("monster")}
-                >
-                  Monster
-                </Button>
+            <div className="rounded-lg border border-dicecho-accent/30 bg-dicecho-accent/12 p-6 md:p-8 flex flex-col md:flex-row justify-between items-center gap-6 shadow-sm">
+              <div className="flex-1">
+                <h3 className="text-lg font-bold text-white mb-2">完结跑团</h3>
+                <p className="text-slate-400 text-sm leading-relaxed">
+                  当跑团结束时使用此功能。系统将生成跑团履历，记录所有玩家的最终状态，并将房间标记为“已完成”。
+                </p>
               </div>
-              <Input label="名称" value={personaName} onChange={(e) => setPersonaName(e.target.value)} />
-              <Textarea label="描述" rows={3} value={personaDescription} onChange={(e) => setPersonaDescription(e.target.value)} />
-              <Button onClick={handleCreatePersona} disabled={!personaName.trim()}>
-                保存身份
+              <Button
+                onClick={onConcludeGame}
+                variant="ghost"
+                size="lg"
+                icon={Check}
+                className="border border-dicecho-accent/70 bg-dicecho-accent/15 text-[#bff1d5] hover:bg-dicecho-accent/25 hover:text-white hover:border-dicecho-accent"
+              >
+                结团结算
               </Button>
-              <Textarea label="发言" rows={3} value={personaLine} onChange={(e) => setPersonaLine(e.target.value)} />
-              <div className="space-y-2">
-                {personas.map((persona) => (
-                  <div key={persona.id} className="flex items-center justify-between gap-3 rounded-lg border border-dicecho-border/35 bg-dicecho-panel/55 p-2">
-                    <div className="min-w-0">
-                      <div className="text-sm font-semibold text-white truncate">
-                        {persona.name}
-                      </div>
-                      <div className="text-xs text-dicecho-muted truncate">
-                        {persona.kind} {persona.description}
-                      </div>
+            </div>
+
+            <div className="rounded-lg border border-red-500/20 bg-red-900/10 p-6 md:p-8 flex flex-col md:flex-row justify-between items-center gap-6 shadow-sm">
+              <div className="flex-1">
+                <h3 className="text-lg font-bold text-white mb-2">
+                  清空聊天记录
+                </h3>
+                <p className="text-slate-400 text-sm leading-relaxed">
+                  删除当前房间的所有聊天记录（包括骰子和图片）。此操作不可恢复。
+                </p>
+              </div>
+              <div className="flex items-center gap-4 shrink-0">
+                {clearChatConfirm ? (
+                  <>
+                    <div className="flex flex-col items-end gap-1">
+                      <Button
+                        onClick={() => {
+                          onClearChat();
+                          setClearChatConfirm(false);
+                        }}
+                        variant="dangerActive"
+                        icon={AlertTriangle}
+                        size="lg"
+                      >
+                        确认清空
+                      </Button>
+                      <span className="text-[10px] text-red-400 font-bold uppercase tracking-wider animate-pulse">
+                        此操作不可撤销
+                      </span>
                     </div>
-                    <Button size="xs" icon={MessageSquare} onClick={() => handlePersonaSpeak(persona)}>
-                      发言
+                    <Button
+                      onClick={() => setClearChatConfirm(false)}
+                      variant="ghost"
+                    >
+                      取消
                     </Button>
-                  </div>
-                ))}
+                  </>
+                ) : (
+                  <Button
+                    onClick={() => setClearChatConfirm(true)}
+                    variant="danger"
+                    icon={AlertTriangle}
+                    size="lg"
+                  >
+                    清空记录
+                  </Button>
+                )}
               </div>
             </div>
 
-            <div className="rounded-lg border border-dicecho-border/45 bg-dicecho-card/70 p-4 shadow-sm space-y-3">
-              <h2 className="text-white font-bold flex items-center gap-2">
-                <Shield size={18} className="text-amber-300" />
-                批量暗骰
-              </h2>
-              <Input label="原因" value={batchReason} onChange={(e) => setBatchReason(e.target.value)} />
-              <Textarea
-                label="目标"
-                rows={6}
-                value={batchTargets}
-                onChange={(e) => setBatchTargets(e.target.value)}
-                placeholder="Alice&#10;Bob"
-              />
-              <Button icon={Shield} onClick={handleBatchSecretRoll}>
-                执行暗骰
-              </Button>
+            <div className="rounded-lg border border-red-500/20 bg-red-900/10 p-6 md:p-8 flex flex-col md:flex-row justify-between items-center gap-6 shadow-sm">
+              <div className="flex-1">
+                <h3 className="text-lg font-bold text-white mb-2">删除房间</h3>
+                <p className="text-slate-400 text-sm leading-relaxed">
+                  这将永久删除该房间及其所有数据。此操作不可恢复。
+                </p>
+              </div>
+              <div className="flex items-center gap-4 shrink-0">
+                {deleteConfirm ? (
+                  <>
+                    <div className="flex flex-col items-end gap-1">
+                      <Button
+                        onClick={() => {
+                          onDeleteRoom();
+                          setDeleteConfirm(false);
+                        }}
+                        variant="dangerActive"
+                        icon={AlertTriangle}
+                        size="lg"
+                      >
+                        确认删除
+                      </Button>
+                      <span className="text-[10px] text-red-400 font-bold uppercase tracking-wider animate-pulse">
+                        此操作不可撤销
+                      </span>
+                    </div>
+                    <Button
+                      onClick={() => setDeleteConfirm(false)}
+                      variant="ghost"
+                    >
+                      取消
+                    </Button>
+                  </>
+                ) : (
+                  <Button
+                    onClick={() => setDeleteConfirm(true)}
+                    variant="danger"
+                    icon={AlertTriangle}
+                    size="lg"
+                  >
+                    删除房间
+                  </Button>
+                )}
+              </div>
             </div>
           </section>
         )}

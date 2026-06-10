@@ -17,8 +17,6 @@ describe("room tools model", () => {
       clues: [],
       invite: null,
       schedule: null,
-      snapshots: [],
-      personas: [],
     });
   });
 
@@ -30,15 +28,12 @@ describe("room tools model", () => {
       parsePersistedRoomToolsState(
         JSON.stringify({
           clues: [{ id: "clue-1" }],
-          snapshots: [{ id: "snapshot-1" }],
         })
       )
     ).toMatchObject({
       clues: [{ id: "clue-1" }],
       invite: null,
       schedule: null,
-      snapshots: [{ id: "snapshot-1" }],
-      personas: [],
     });
   });
 
@@ -48,15 +43,11 @@ describe("room tools model", () => {
         clues: [{ id: "clue-1" }] as any,
         invite: { id: "invite-1" } as any,
         schedule: { roomId: "room-1" } as any,
-        snapshots: [],
-        personas: [{ id: "persona-1" }] as any,
       })
     ).toMatchObject({
       clues: [{ id: "clue-1" }],
       invite: { id: "invite-1" },
       schedule: { roomId: "room-1" },
-      snapshots: [],
-      personas: [{ id: "persona-1" }],
     });
   });
 

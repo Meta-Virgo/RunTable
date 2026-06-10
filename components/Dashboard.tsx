@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React from "react";
 import {
   Edit2,
   UserPlus,
@@ -9,8 +9,6 @@ import {
   Heart,
   Zap,
   Brain,
-  AlertTriangle,
-  Check,
   Copy,
 } from "lucide-react";
 import { Button, StatBadge, cn } from "./UI";
@@ -24,9 +22,6 @@ interface DashboardProps {
   onAddChar: (role: string) => void;
   onEditChar: (char: Character) => void;
   onDuplicateChar: (char: Character) => void;
-  onDeleteRoom: () => void;
-  onClearChat: () => void;
-  onConcludeGame: () => void;
   isKP: boolean;
 }
 
@@ -37,13 +32,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
   onAddChar,
   onEditChar,
   onDuplicateChar,
-  onDeleteRoom,
-  onClearChat,
-  onConcludeGame,
   isKP,
 }) => {
-  const [resetConfirm, setResetConfirm] = useState(false);
-  const [clearChatConfirm, setClearChatConfirm] = useState(false);
   const pcCharacters = characters.filter((c) => c.role === "调查员");
   const npcCharacters = characters.filter((c) =>
     ["NPC", "怪物"].includes(c.role)
@@ -285,128 +275,6 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 })}
               </div>
             )}
-          </section>
-        )}
-
-        {/* Game Management - KP Only */}
-        {isKP && (
-          <section className="space-y-6">
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-xl md:text-2xl font-bold text-white flex items-center gap-3">
-                <Zap className="text-amber-400" /> 跑团管理
-              </h2>
-            </div>
-
-            <div className="rounded-lg border border-amber-500/20 bg-amber-500/10 p-6 md:p-8 flex flex-col md:flex-row justify-between items-center gap-6 shadow-sm">
-              <div className="flex-1">
-                <h3 className="text-lg font-bold text-white mb-2">完结跑团</h3>
-                <p className="text-slate-400 text-sm leading-relaxed">
-                  当跑团结束时使用此功能。系统将生成跑团履历，记录所有玩家的最终状态，并将房间标记为“已完成”。
-                </p>
-              </div>
-              <Button
-                onClick={onConcludeGame}
-                variant="primarySoft"
-                size="lg"
-                icon={Check}
-              >
-                结团结算
-              </Button>
-            </div>
-
-            <div className="rounded-lg border border-red-500/20 bg-red-900/10 p-6 md:p-8 flex flex-col md:flex-row justify-between items-center gap-6 shadow-sm">
-              <div className="flex-1">
-                <h3 className="text-lg font-bold text-white mb-2">
-                  清空聊天记录
-                </h3>
-                <p className="text-slate-400 text-sm leading-relaxed">
-                  删除当前房间的所有聊天记录（包括骰子和图片）。此操作不可恢复。
-                </p>
-              </div>
-              <div className="flex items-center gap-4 shrink-0">
-                {clearChatConfirm ? (
-                  <>
-                    <div className="flex flex-col items-end gap-1">
-                      <Button
-                        onClick={() => {
-                          onClearChat();
-                          setClearChatConfirm(false);
-                        }}
-                        variant="dangerActive"
-                        icon={AlertTriangle}
-                        size="lg"
-                      >
-                        确认清空
-                      </Button>
-                      <span className="text-[10px] text-red-400 font-bold uppercase tracking-wider animate-pulse">
-                        此操作不可撤销
-                      </span>
-                    </div>
-                    <Button
-                      onClick={() => setClearChatConfirm(false)}
-                      variant="ghost"
-                    >
-                      取消
-                    </Button>
-                  </>
-                ) : (
-                  <Button
-                    onClick={() => setClearChatConfirm(true)}
-                    variant="danger"
-                    icon={AlertTriangle}
-                    size="lg"
-                  >
-                    清空记录
-                  </Button>
-                )}
-              </div>
-            </div>
-
-            <div className="rounded-lg border border-red-500/20 bg-red-900/10 p-6 md:p-8 flex flex-col md:flex-row justify-between items-center gap-6 shadow-sm">
-              <div className="flex-1">
-                <h3 className="text-lg font-bold text-white mb-2">删除房间</h3>
-                <p className="text-slate-400 text-sm leading-relaxed">
-                  这将永久删除该房间及其所有数据。此操作不可恢复。
-                </p>
-              </div>
-              <div className="flex items-center gap-4 shrink-0">
-                {resetConfirm ? (
-                  <>
-                    <div className="flex flex-col items-end gap-1">
-                      <Button
-                        onClick={() => {
-                          onDeleteRoom();
-                          setResetConfirm(false);
-                        }}
-                        variant="dangerActive"
-                        icon={AlertTriangle}
-                        size="lg"
-                      >
-                        确认删除
-                      </Button>
-                      <span className="text-[10px] text-red-400 font-bold uppercase tracking-wider animate-pulse">
-                        此操作不可撤销
-                      </span>
-                    </div>
-                    <Button
-                      onClick={() => setResetConfirm(false)}
-                      variant="ghost"
-                    >
-                      取消
-                    </Button>
-                  </>
-                ) : (
-                  <Button
-                    onClick={() => setResetConfirm(true)}
-                    variant="danger"
-                    icon={AlertTriangle}
-                    size="lg"
-                  >
-                    删除房间
-                  </Button>
-                )}
-              </div>
-            </div>
           </section>
         )}
       </div>

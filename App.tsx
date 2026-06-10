@@ -551,9 +551,6 @@ const App: React.FC = () => {
               setShowCharModal(true);
             }}
             onDuplicateChar={handleDuplicateCharacter}
-            onDeleteRoom={handleDeleteRoom}
-            onClearChat={handleClearChat}
-            onConcludeGame={() => setShowConclusionModal(true)}
             isKP={isKP}
           />
         ) : view === "tools" ? (
@@ -562,9 +559,9 @@ const App: React.FC = () => {
             isKP={isKP}
             userId={session.user.id}
             logs={logs}
-            characters={derivedCharacters}
-            roomMemberItems={roomMemberItems}
-            addLog={addLog}
+            onDeleteRoom={handleDeleteRoom}
+            onClearChat={handleClearChat}
+            onConcludeGame={() => setShowConclusionModal(true)}
           />
         ) : null}
 

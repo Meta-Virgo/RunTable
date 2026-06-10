@@ -1,14 +1,10 @@
 import type { RoomClue } from "./clueWall";
 import type { RoomInvite, RoomSchedule } from "./invitations";
-import type { KeeperPersonaTemplate } from "./keeperToolbox";
-import type { SessionCharacterSnapshot } from "./sessionSnapshots";
 
 export interface PersistedRoomToolsState {
   clues: RoomClue[];
   invite: RoomInvite | null;
   schedule: RoomSchedule | null;
-  snapshots: SessionCharacterSnapshot[];
-  personas: KeeperPersonaTemplate[];
 }
 
 export function getRoomToolsStorageKey(roomId: string) {
@@ -20,8 +16,6 @@ export function buildEmptyRoomToolsState(): PersistedRoomToolsState {
     clues: [],
     invite: null,
     schedule: null,
-    snapshots: [],
-    personas: [],
   };
 }
 
@@ -33,8 +27,6 @@ export function parsePersistedRoomToolsState(raw: string | null) {
     clues: parsed.clues || [],
     invite: parsed.invite || null,
     schedule: parsed.schedule || null,
-    snapshots: parsed.snapshots || [],
-    personas: parsed.personas || [],
   };
 }
 
@@ -45,8 +37,6 @@ export function buildPersistedRoomToolsState(
     clues: state.clues,
     invite: state.invite,
     schedule: state.schedule,
-    snapshots: state.snapshots,
-    personas: state.personas,
   };
 }
 

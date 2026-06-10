@@ -15,6 +15,7 @@ import {
 import { AvatarUpload } from "./AvatarUpload";
 import { useElasticScroll } from "../hooks/useElasticScroll";
 import { HomeHistoryModal } from "./home/HomeHistoryModal";
+import { themeRgb } from "../utils/theme";
 import {
   fetchFriendsProfileHistory,
   getFriendsHistoryCharacterDisplay,
@@ -442,7 +443,7 @@ export const Friends: React.FC<FriendsProps> = ({ currentUser }) => {
                       cy="50"
                       r="48"
                       fill="none"
-                      stroke="#31394c"
+                      stroke={themeRgb("panel")}
                       strokeWidth="3"
                     ></circle>
                     <circle
@@ -450,7 +451,7 @@ export const Friends: React.FC<FriendsProps> = ({ currentUser }) => {
                       cy="50"
                       r="48"
                       fill="none"
-                      stroke="#9b86f6"
+                      stroke={themeRgb("primary")}
                       strokeWidth="3"
                       strokeDasharray="301.59"
                       strokeDashoffset="52.77825"

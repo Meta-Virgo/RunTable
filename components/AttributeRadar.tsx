@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from "react";
 import { Character } from "../types";
 import { cn } from "./UI";
+import { themeRgb } from "../utils/theme";
 
 interface AttributeRadarProps {
   character: Character;
@@ -473,8 +474,10 @@ export const AttributeRadar: React.FC<AttributeRadarProps> = ({
             <polygon
               key={i}
               points={points}
-              fill={scale === 1 ? "rgba(155, 134, 246, 0.08)" : "none"}
-              stroke={scale === 1 ? "#9b86f6" : "#566078"}
+              fill={scale === 1 ? themeRgb("primary", 0.08) : "none"}
+              stroke={
+                scale === 1 ? themeRgb("primary") : themeRgb("border")
+              }
               strokeOpacity={scale === 1 ? 0.55 : 0.22}
               strokeWidth={scale === 1 ? 1 : 0.5}
               strokeDasharray={scale === 1 ? "none" : "4 2"}
@@ -493,7 +496,7 @@ export const AttributeRadar: React.FC<AttributeRadarProps> = ({
                 y1={center}
                 x2={x}
                 y2={y}
-                stroke="#566078"
+                stroke={themeRgb("border")}
                 strokeOpacity={0.18}
                 strokeWidth={0.5}
               />
@@ -518,10 +521,10 @@ export const AttributeRadar: React.FC<AttributeRadarProps> = ({
                 dominantBaseline="middle"
                 fill={
                   selectedAttr === key
-                    ? "#9b86f6"
+                    ? themeRgb("primary")
                     : isOverflow
                     ? "#f3c462"
-                    : "#a9afbd"
+                    : themeRgb("muted")
                 }
                 fontSize={selectedAttr === key ? 12 : 10}
                 fontWeight={
@@ -537,10 +540,10 @@ export const AttributeRadar: React.FC<AttributeRadarProps> = ({
           {/* Data Polygon */}
           <polygon
             points={polyPoints}
-            fill="rgba(155, 134, 246, 0.22)"
-            stroke="#9b86f6"
+            fill={themeRgb("primary", 0.22)}
+            stroke={themeRgb("primary")}
             strokeWidth={2}
-            className="drop-shadow-[0_0_8px_rgba(155,134,246,0.35)] pointer-events-none"
+            className="drop-shadow-[0_0_8px_rgb(var(--theme-primary)/0.35)] pointer-events-none"
           />
 
           {/* Data Points */}
@@ -555,10 +558,10 @@ export const AttributeRadar: React.FC<AttributeRadarProps> = ({
                 r={selectedAttr === v.key ? 6 : isOverflow ? 4 : 3}
                 fill={
                   selectedAttr === v.key
-                    ? "#9b86f6"
+                    ? themeRgb("primary")
                     : isOverflow
                     ? "#f3c462"
-                    : "#826df0"
+                    : themeRgb("primary-strong")
                 }
                 stroke={isOverflow ? "#fff" : "none"}
                 strokeWidth={isOverflow ? 1.5 : 0}

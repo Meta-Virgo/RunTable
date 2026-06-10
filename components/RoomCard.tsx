@@ -119,6 +119,7 @@ export const RoomCard: React.FC<RoomCardProps> = ({
           gradient={gradient}
           typeLabel={typeLabel}
           TypeIcon={TypeIcon}
+          description={room.description || "暂无简介，等待 KP 补充房间介绍。"}
           compact
         />
 
@@ -162,6 +163,7 @@ export const RoomCard: React.FC<RoomCardProps> = ({
                 gradient={gradient}
                 typeLabel={typeLabel}
                 TypeIcon={TypeIcon}
+                description={room.description || "暂无简介，等待 KP 补充房间介绍。"}
               />
             </div>
 
@@ -281,8 +283,17 @@ const RoomCover: React.FC<{
   gradient: string;
   typeLabel: string;
   TypeIcon: React.ElementType;
+  description?: string;
   compact?: boolean;
-}> = ({ room, coverImageUrl, gradient, typeLabel, TypeIcon, compact }) => (
+}> = ({
+  room,
+  coverImageUrl,
+  gradient,
+  typeLabel,
+  TypeIcon,
+  description,
+  compact,
+}) => (
   <div
     className={cn(
       "relative isolate aspect-[3/4] overflow-hidden rounded-lg",
@@ -315,6 +326,14 @@ const RoomCover: React.FC<{
       aria-label={typeLabel}
     >
       <TypeIcon size={14} />
+    </div>
+    <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/75 via-black/45 to-transparent px-3 pb-3 pt-10">
+      <h3 className="truncate text-base font-bold leading-6 text-white drop-shadow">
+        {room.title || `房间 #${room.room_number || "???"}`}
+      </h3>
+      <p className="mt-1 line-clamp-2 min-h-[2.5rem] text-sm leading-5 text-white/78 drop-shadow">
+        {description || "暂无简介，等待 KP 补充房间介绍。"}
+      </p>
     </div>
   </div>
 );

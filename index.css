@@ -3,9 +3,22 @@
 @tailwind utilities;
 
 @layer base {
+  :root {
+    --theme-bg: 58 61 80;
+    --theme-panel: 49 59 74;
+    --theme-card: 49 59 74;
+    --theme-raised: 79 82 101;
+    --theme-border: 79 82 101;
+    --theme-primary: 147 150 247;
+    --theme-primary-strong: 126 129 232;
+    --theme-accent: 102 177 133;
+    --theme-rating: 102 177 133;
+    --theme-muted: 176 188 204;
+  }
+
   body {
     font-family: "Inter", "Noto Sans SC", sans-serif;
-    background-color: #384154;
+    background-color: rgb(var(--theme-bg));
     color: #e4e5eb;
     overflow: hidden;
   }
@@ -37,11 +50,11 @@
     background: transparent;
   }
   ::-webkit-scrollbar-thumb {
-    background-color: rgba(126, 135, 156, 0.45);
+    background-color: rgb(var(--theme-border) / 0.45);
     border-radius: 10px;
   }
   ::-webkit-scrollbar-thumb:hover {
-    background-color: rgba(155, 134, 246, 0.6);
+    background-color: rgb(var(--theme-primary) / 0.6);
     border-radius: 10px;
   }
 
@@ -60,17 +73,21 @@
   }
   
   .glass-panel {
-    background: rgba(49, 57, 76, 0.9);
+    background: rgb(var(--theme-panel) / 0.9);
     backdrop-filter: blur(16px);
     -webkit-backdrop-filter: blur(16px);
-    border: 1px solid rgba(126, 135, 156, 0.35);
+    border: 1px solid rgb(var(--theme-border) / 0.35);
     box-shadow: 0 0.125rem 0.5rem rgba(0, 0, 0, 0.22);
   }
 
   .dicecho-page-bg {
     background:
-      linear-gradient(180deg, rgba(56, 65, 84, 0.98), rgba(47, 55, 74, 1)),
-      #384154;
+      linear-gradient(
+        180deg,
+        rgb(var(--theme-bg) / 0.98),
+        rgb(var(--theme-panel) / 1)
+      ),
+      rgb(var(--theme-bg));
   }
 
   .dicecho-card-shadow {
@@ -132,21 +149,21 @@
   }
 
   .square-markdown blockquote {
-    border-left: 3px solid rgba(155, 134, 246, 0.7);
+    border-left: 3px solid rgb(var(--theme-primary) / 0.7);
     padding-left: 0.75rem;
-    color: #a9afbd;
+    color: rgb(var(--theme-muted));
   }
 
   .square-markdown a {
-    color: #9b86f6;
+    color: rgb(var(--theme-primary));
     text-decoration: underline;
     text-underline-offset: 2px;
   }
 
   .square-markdown code {
-    border: 1px solid rgba(86, 96, 120, 0.5);
+    border: 1px solid rgb(var(--theme-border) / 0.5);
     border-radius: 0.35rem;
-    background: rgba(49, 57, 76, 0.85);
+    background: rgb(var(--theme-panel) / 0.85);
     padding: 0.05rem 0.3rem;
     color: rgb(226 232 240);
     font-size: 0.9em;
@@ -155,9 +172,9 @@
   .square-markdown pre {
     max-width: 100%;
     overflow-x: auto;
-    border: 1px solid rgba(86, 96, 120, 0.5);
+    border: 1px solid rgb(var(--theme-border) / 0.5);
     border-radius: 0.5rem;
-    background: rgba(49, 57, 76, 0.72);
+    background: rgb(var(--theme-panel) / 0.72);
     padding: 0.75rem;
   }
 
