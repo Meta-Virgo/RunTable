@@ -397,6 +397,7 @@ const App: React.FC = () => {
     return (
       <Suspense fallback={<LoadingScreen />}>
         <Home
+          key={session?.user?.id ?? "guest"}
           onJoinRoom={handleJoinRoom}
           isAuthenticated={Boolean(session?.user)}
           onAuthAction={session?.user ? handleSignOut : handleLoginRequest}
