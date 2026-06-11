@@ -3,7 +3,7 @@ import React, {
   useState,
   useEffect,
 } from "react";
-import { Login } from "./components/Login";
+import { LoginModal } from "./components/Login";
 import { Welcome } from "./components/Welcome";
 import { LoadingScreen } from "./components/LoadingScreen";
 import { Button } from "./components/UI";
@@ -172,6 +172,7 @@ const App: React.FC = () => {
   const [storyContent, setStoryContent] = useState("");
   const [isGeneratingStory, setIsGeneratingStory] = useState(false);
   const [showConclusionModal, setShowConclusionModal] = useState(false);
+  const [showLoginModal, setShowLoginModal] = useState(false);
 
   const { rollDice, handleSend } = useTabletopCommands({
     characters,
@@ -207,6 +208,12 @@ const App: React.FC = () => {
       restoreRoomFromUrl();
     }
   }, [session, authLoading, currentRoomId, restoreRoomFromUrl]);
+
+  useEffect(() => {
+    if (!authLoading && !session?.user && currentRoomId) {
+      clearRoomSession();
+    }
+  }, [authLoading, clearRoomSession, currentRoomId, session]);
 
   // Responsive Check
   useEffect(() => {
@@ -365,6 +372,10 @@ const App: React.FC = () => {
     await leaveCurrentRoom();
   };
 
+  const handleLoginRequest = () => {
+    setShowLoginModal(true);
+  };
+
 
   if (isWelcome) {
     return (
@@ -382,22 +393,30 @@ const App: React.FC = () => {
     return <LoadingScreen />;
   }
 
-  if (!session) {
-    return <Login />;
-  }
-
   if (!currentRoomId) {
     return (
       <Suspense fallback={<LoadingScreen />}>
         <Home
           onJoinRoom={handleJoinRoom}
-          onLogout={handleSignOut}
+          isAuthenticated={Boolean(session?.user)}
+          onAuthAction={session?.user ? handleSignOut : handleLoginRequest}
+          onLoginRequest={handleLoginRequest}
           onlineUsers={globalOnlineUsers}
           levelInfo={levelInfo}
+        />
+        <LoginModal
+          open={!session?.user && showLoginModal}
+          onClose={() => setShowLoginModal(false)}
         />
       </Suspense>
     );
   }
+
+  if (!session?.user) {
+    return <LoadingScreen />;
+  }
+
+  const currentUserId = session.user.id;
 
   const voiceStatusText: Record<VoiceConnectionStatus, string> = {
     idle: "",
@@ -557,7 +576,7 @@ const App: React.FC = () => {
           <RoomTools
             roomId={currentRoomId}
             isKP={isKP}
-            userId={session.user.id}
+            userId={currentUserId}
             logs={logs}
             onDeleteRoom={handleDeleteRoom}
             onClearChat={handleClearChat}
@@ -621,7 +640,7 @@ const App: React.FC = () => {
           onDelete={isKP ? handleDeleteCharacter : undefined} // 仅 KP 可删除档案
           onRemove={isKP ? handleRemoveCharacter : undefined} // KP 可以移出 PC
           onClose={() => setShowCharModal(false)}
-          readOnly={!isKP && editingChar?.user_id !== session.user.id} // 增加只读保护
+          readOnly={!isKP && editingChar?.user_id !== currentUserId} // 增加只读保护
         />
       )}
 

@@ -25,6 +25,7 @@ const ROOM_FILTERS: { id: RoomFilter; label: string; description: string }[] = [
 ];
 
 interface HomeLobbyViewProps {
+  isAuthenticated: boolean;
   currentUserId: string | null;
   filteredRooms: Room[];
   isLoadingRooms: boolean;
@@ -55,9 +56,11 @@ interface HomeLobbyViewProps {
   setNewRoomType: (type: "text" | "voice") => void;
   loading: boolean;
   onCreateRoom: () => void;
+  onLoginRequest: () => void;
 }
 
 export const HomeLobbyView: React.FC<HomeLobbyViewProps> = ({
+  isAuthenticated,
   currentUserId,
   filteredRooms,
   isLoadingRooms,
@@ -84,29 +87,16 @@ export const HomeLobbyView: React.FC<HomeLobbyViewProps> = ({
   setNewRoomType,
   loading,
   onCreateRoom,
+  onLoginRequest,
 }) => {
   const nextSortMode: LobbySortMode =
     sortMode === "activity" ? "room_number" : "activity";
   const SortIcon = sortMode === "activity" ? Clock3 : Hash;
+  const toolbarButtonClass =
+    "inline-flex h-10 items-center justify-center gap-1.5 rounded-lg border px-3 text-xs font-semibold leading-none transition-colors";
 
   return (
     <div className="space-y-6">
-      <section className="rounded-lg border border-dicecho-border/40 bg-dicecho-panel/75 p-4 shadow-sm md:p-5">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <div>
-            <h2 className="text-2xl font-bold tracking-normal text-white">
-              跑团大厅
-            </h2>
-            <p className="mt-1 max-w-2xl text-sm text-dicecho-muted">
-              欢迎来到我的酒馆~
-            </p>
-          </div>
-          <Button icon={Plus} onClick={() => setShowCreateRoom(!showCreateRoom)}>
-            {showCreateRoom ? "收起创建" : "创建房间"}
-          </Button>
-        </div>
-      </section>
-
       <div className="grid gap-6 md:grid-cols-[16rem_minmax(0,1fr)]">
         <aside className="space-y-4">
           <div className="rounded-lg border border-dicecho-border/40 bg-dicecho-panel/75 p-4 shadow-sm">
@@ -167,14 +157,34 @@ export const HomeLobbyView: React.FC<HomeLobbyViewProps> = ({
                   onChange={(event) => setSearchQuery(event.target.value)}
                 />
               </div>
-              <div className="hidden items-center justify-end gap-3 text-sm text-dicecho-muted md:flex">
+              <div className="flex items-center justify-end gap-2 text-sm text-dicecho-muted">
                 <button
                   type="button"
                   onClick={() => setSortMode(nextSortMode)}
-                  className="inline-flex items-center gap-1 rounded-lg border border-dicecho-border/40 px-2.5 py-1.5 text-xs transition-colors hover:border-dicecho-primary/50 hover:text-white"
+                  className={cn(
+                    toolbarButtonClass,
+                    "border-dicecho-border/40 bg-dicecho-panel/55 text-dicecho-muted hover:border-dicecho-primary/50 hover:bg-dicecho-raised/60 hover:text-white"
+                  )}
                 >
                   <SortIcon size={13} />
                   {sortMode === "activity" ? "默认排序" : "按房间号排序"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!isAuthenticated) {
+                      onLoginRequest();
+                      return;
+                    }
+                    setShowCreateRoom(!showCreateRoom);
+                  }}
+                  className={cn(
+                    toolbarButtonClass,
+                    "shrink-0 border-transparent bg-dicecho-primary-strong text-white shadow-none hover:bg-dicecho-primary hover:border-transparent"
+                  )}
+                >
+                  <Plus size={13} />
+                  {showCreateRoom ? "收起创建" : "创建房间"}
                 </button>
               </div>
             </div>
@@ -204,15 +214,17 @@ export const HomeLobbyView: React.FC<HomeLobbyViewProps> = ({
               <p className="text-sm font-medium">正在加载房间...</p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 gap-5 animate-fade-in md:grid-cols-2 xl:grid-cols-3">
+            <div className="grid grid-cols-1 gap-5 animate-fade-in md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
               {filteredRooms.map((room) => (
                 <RoomCard
                   key={room.id}
                   room={room}
+                  isAuthenticated={isAuthenticated}
                   currentUserId={currentUserId}
                   myCharacters={myCharacters}
                   onlineUsers={onlineUsers}
                   onJoinRoom={onJoinRoom}
+                  onLoginRequest={onLoginRequest}
                 />
               ))}
               {filteredRooms.length === 0 && (

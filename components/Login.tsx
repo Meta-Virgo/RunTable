@@ -1,10 +1,22 @@
 import React, { useState, useEffect } from "react";
 import { supabase } from "../supabase";
-import { Button, Input } from "./UI";
+import { Button, Input, Modal, cn } from "./UI";
 import { LogIn, UserPlus, AlertCircle, ArrowLeft } from "lucide-react";
 
-export const Login: React.FC = () => {
-  const [mode, setMode] = useState<"login" | "signup" | "forgot">("login");
+type LoginMode = "login" | "signup" | "forgot";
+
+interface LoginPanelProps {
+  onLoginSuccess?: () => void;
+  className?: string;
+  compact?: boolean;
+}
+
+export const LoginPanel: React.FC<LoginPanelProps> = ({
+  onLoginSuccess,
+  className,
+  compact = false,
+}) => {
+  const [mode, setMode] = useState<LoginMode>("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -57,6 +69,7 @@ export const Login: React.FC = () => {
         password,
       });
       if (error) throw error;
+      onLoginSuccess?.();
     } catch (err: any) {
       console.error("Login error:", err);
       if (err.message === "Email not confirmed") {
@@ -164,7 +177,7 @@ export const Login: React.FC = () => {
     }
   };
 
-  const switchMode = (newMode: "login" | "signup" | "forgot") => {
+  const switchMode = (newMode: LoginMode) => {
     setMode(newMode);
     setError(null);
     setSuccessMsg(null);
@@ -173,155 +186,185 @@ export const Login: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center dicecho-page-bg p-4">
-      <div className="max-w-md w-full bg-dicecho-panel border border-dicecho-border/50 rounded-lg p-8 shadow-lg shadow-black/25 relative overflow-hidden">
-        <div className="relative z-10">
-          <div className="text-center mb-8">
-            <h1 className="text-3xl font-bold text-white mb-2 tracking-tight">
-              RunTable Pro
-            </h1>
-            <p className="text-slate-400">沉浸式跑团终端</p>
-          </div>
-
-          <form
-            onSubmit={
-              mode === "login"
-                ? handleLogin
-                : mode === "signup"
-                ? handleSignUp
-                : handleResetPassword
-            }
-            className="space-y-6"
+    <div
+      className={cn(
+        "w-full bg-dicecho-panel border border-dicecho-border/50 rounded-lg p-8 shadow-lg shadow-black/25 relative overflow-hidden",
+        compact ? "p-6 shadow-none border-0 bg-transparent" : "max-w-md",
+        className
+      )}
+    >
+      <div className="relative z-10">
+        <div className={cn("text-center", compact ? "mb-6" : "mb-8")}>
+          <h1
+            className={cn(
+              "font-bold text-white mb-2 tracking-tight",
+              compact ? "text-2xl" : "text-3xl"
+            )}
           >
+            RunTable Pro
+          </h1>
+          <p className="text-slate-400">沉浸式跑团终端</p>
+        </div>
+
+        <form
+          onSubmit={
+            mode === "login"
+              ? handleLogin
+              : mode === "signup"
+              ? handleSignUp
+              : handleResetPassword
+          }
+          className="space-y-6"
+        >
+          <Input
+            label="邮箱"
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="your@email.com"
+            required
+          />
+
+          {mode !== "forgot" && (
             <Input
-              label="邮箱"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="your@email.com"
+              label="密码"
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="••••••••"
               required
             />
+          )}
 
-            {mode !== "forgot" && (
-              <Input
-                label="密码"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
-                required
-              />
-            )}
+          {mode === "signup" && (
+            <Input
+              label="确认密码"
+              type="password"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              placeholder="••••••••"
+              required
+            />
+          )}
 
-            {mode === "signup" && (
-              <Input
-                label="确认密码"
-                type="password"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                placeholder="••••••••"
-                required
-              />
-            )}
-
-            {mode === "login" && (
-              <div className="flex justify-end -mt-4">
-                <button
-                  type="button"
-                  onClick={() => switchMode("forgot")}
-                  className="text-xs text-dicecho-primary hover:text-white transition-colors"
-                >
-                  忘记密码?
-                </button>
-              </div>
-            )}
-
-            {error && (
-              <div className="flex flex-col gap-2 text-red-400 bg-red-500/10 p-3 rounded-lg text-sm border border-red-500/20">
-                <div className="flex items-start gap-2">
-                  <AlertCircle size={16} className="mt-0.5 shrink-0" />
-                  <span>{error}</span>
-                </div>
-                {showResend && (
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="ghost"
-                    className="self-end text-red-400 hover:bg-red-500/10 h-8 mt-1"
-                    onClick={handleResend}
-                    disabled={cooldown > 0 || loading}
-                  >
-                    {cooldown > 0
-                      ? `重新发送 (${cooldown}s)`
-                      : "重新发送验证邮件"}
-                  </Button>
-                )}
-              </div>
-            )}
-
-            {successMsg && (
-              <div className="flex items-start gap-2 text-emerald-400 bg-emerald-500/10 p-3 rounded-lg text-sm border border-emerald-500/20">
-                <AlertCircle size={16} className="mt-0.5 shrink-0" />
-                <span>{successMsg}</span>
-              </div>
-            )}
-
-            <div className="flex flex-col gap-3 pt-2">
-              <Button
-                type="submit"
-                disabled={
-                  loading ||
-                  ((mode === "signup" || mode === "forgot") && cooldown > 0)
-                }
-                className="w-full"
-                icon={
-                  mode === "login"
-                    ? LogIn
-                    : mode === "signup"
-                    ? UserPlus
-                    : AlertCircle
-                }
+          {mode === "login" && (
+            <div className="flex justify-end -mt-4">
+              <button
+                type="button"
+                onClick={() => switchMode("forgot")}
+                className="text-xs text-dicecho-primary hover:text-white transition-colors"
               >
-                {loading
-                  ? "处理中..."
-                  : mode === "login"
-                  ? "登录"
-                  : mode === "signup"
-                  ? cooldown > 0
-                    ? `重新发送 (${cooldown}s)`
-                    : "注册"
-                  : cooldown > 0
-                  ? `重新发送 (${cooldown}s)`
-                  : "发送重置邮件"}
-              </Button>
+                忘记密码?
+              </button>
+            </div>
+          )}
 
-              {mode === "login" ? (
+          {error && (
+            <div className="flex flex-col gap-2 text-red-400 bg-red-500/10 p-3 rounded-lg text-sm border border-red-500/20">
+              <div className="flex items-start gap-2">
+                <AlertCircle size={16} className="mt-0.5 shrink-0" />
+                <span>{error}</span>
+              </div>
+              {showResend && (
                 <Button
                   type="button"
+                  size="sm"
                   variant="ghost"
-                  disabled={loading}
-                  className="w-full"
-                  onClick={() => switchMode("signup")}
-                  icon={UserPlus}
+                  className="self-end text-red-400 hover:bg-red-500/10 h-8 mt-1"
+                  onClick={handleResend}
+                  disabled={cooldown > 0 || loading}
                 >
-                  注册新账号
-                </Button>
-              ) : (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  disabled={loading}
-                  className="w-full"
-                  onClick={() => switchMode("login")}
-                  icon={ArrowLeft}
-                >
-                  返回登录
+                  {cooldown > 0
+                    ? `重新发送 (${cooldown}s)`
+                    : "重新发送验证邮件"}
                 </Button>
               )}
             </div>
-          </form>
-        </div>
+          )}
+
+          {successMsg && (
+            <div className="flex items-start gap-2 text-emerald-400 bg-emerald-500/10 p-3 rounded-lg text-sm border border-emerald-500/20">
+              <AlertCircle size={16} className="mt-0.5 shrink-0" />
+              <span>{successMsg}</span>
+            </div>
+          )}
+
+          <div className="flex flex-col gap-3 pt-2">
+            <Button
+              type="submit"
+              disabled={
+                loading ||
+                ((mode === "signup" || mode === "forgot") && cooldown > 0)
+              }
+              className="w-full"
+              icon={
+                mode === "login"
+                  ? LogIn
+                  : mode === "signup"
+                  ? UserPlus
+                  : AlertCircle
+              }
+            >
+              {loading
+                ? "处理中..."
+                : mode === "login"
+                ? "登录"
+                : mode === "signup"
+                ? cooldown > 0
+                  ? `重新发送 (${cooldown}s)`
+                  : "注册"
+                : cooldown > 0
+                ? `重新发送 (${cooldown}s)`
+                : "发送重置邮件"}
+            </Button>
+
+            {mode === "login" ? (
+              <Button
+                type="button"
+                variant="ghost"
+                disabled={loading}
+                className="w-full"
+                onClick={() => switchMode("signup")}
+                icon={UserPlus}
+              >
+                注册新账号
+              </Button>
+            ) : (
+              <Button
+                type="button"
+                variant="ghost"
+                disabled={loading}
+                className="w-full"
+                onClick={() => switchMode("login")}
+                icon={ArrowLeft}
+              >
+                返回登录
+              </Button>
+            )}
+          </div>
+        </form>
       </div>
     </div>
   );
 };
+
+interface LoginModalProps {
+  open: boolean;
+  onClose: () => void;
+}
+
+export const LoginModal: React.FC<LoginModalProps> = ({ open, onClose }) => {
+  if (!open) return null;
+
+  return (
+    <Modal onClose={onClose} title={null} className="max-w-md">
+      <LoginPanel compact onLoginSuccess={onClose} />
+    </Modal>
+  );
+};
+
+export const Login: React.FC = () => (
+  <div className="min-h-screen flex items-center justify-center dicecho-page-bg p-4">
+    <LoginPanel />
+  </div>
+);

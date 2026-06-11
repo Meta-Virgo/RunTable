@@ -7,7 +7,6 @@ import {
   Loader2,
   Edit2,
   BookOpen,
-  Lock,
   ArrowUp,
 } from "lucide-react";
 import { CharacterModal } from "./modals/CharacterModal";
@@ -24,12 +23,14 @@ import {
 } from "./home/HomeNavigation";
 import { HomeHistoryModal } from "./home/HomeHistoryModal";
 import { HomeLobbyView } from "./home/HomeLobbyView";
+import { HomeAccountViews } from "./home/HomeAccountViews";
 import {
   createRoom,
   setRoomPassword,
   updateRoomDetails,
 } from "../services/rooms";
 import { getCurrentUser } from "../services/auth";
+import { useSquareNotifications } from "../hooks/useSquareNotifications";
 
 const Square = React.lazy(() =>
   import("./Square").then((module) => ({ default: module.Square }))
@@ -41,7 +42,9 @@ interface HomeProps {
     charId: string | "pc",
     password?: string | null
   ) => void;
-  onLogout: () => void;
+  isAuthenticated: boolean;
+  onAuthAction: () => void;
+  onLoginRequest: () => void;
   onlineUsers: Set<string>;
   levelInfo?: {
     level: number;
@@ -81,7 +84,9 @@ const INITIAL_CHAR_STATE: Character = {
 
 export const Home: React.FC<HomeProps> = ({
   onJoinRoom,
-  onLogout,
+  isAuthenticated,
+  onAuthAction,
+  onLoginRequest,
   onlineUsers = new Set(),
   levelInfo,
 }) => {
@@ -103,14 +108,14 @@ export const Home: React.FC<HomeProps> = ({
   const [editingChar, setEditingChar] = useState<Character | null>(null);
 
   // Profile Edit State
-  const [isEditingProfile, setIsEditingProfile] = useState(false);
+  const [settingsSection, setSettingsSection] = useState<
+    "profile" | "security"
+  >("profile");
   const [editNickname, setEditNickname] = useState("");
   const [editBio, setEditBio] = useState("");
   const [editAvatar, setEditAvatar] = useState<string | null>(null);
 
   // Change Password State
-  const [showChangePwdModal, setShowChangePwdModal] = useState(false);
-  const [oldPassword, setOldPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmNewPassword, setConfirmNewPassword] = useState("");
 
@@ -124,6 +129,7 @@ export const Home: React.FC<HomeProps> = ({
   const {
     currentUserId,
     userCode,
+    userEmail,
     userNickname,
     userBio,
     userAvatar,
@@ -152,6 +158,42 @@ export const Home: React.FC<HomeProps> = ({
     characters: myCharacters,
     onlineUsers,
   });
+  const {
+    notifications,
+    unreadCount,
+    refreshNotifications,
+    markAsRead,
+    deleteNotification,
+  } = useSquareNotifications(
+    currentUserId ? { id: currentUserId } : null,
+    activeTab === "notifications"
+  );
+
+  useEffect(() => {
+    setEditNickname(userNickname || "");
+    setEditBio(
+      userBio && userBio !== "NaN" && userBio !== "null" ? userBio : ""
+    );
+    setEditAvatar(userAvatar);
+  }, [userAvatar, userBio, userNickname]);
+
+  const requestLogin = React.useCallback(() => {
+    onLoginRequest();
+  }, [onLoginRequest]);
+
+  const handleSelectTab = React.useCallback(
+    (tab: HomeTab) => {
+      if (!isAuthenticated && tab !== "rooms") {
+        requestLogin();
+        return;
+      }
+      if (tab === "settings") {
+        setSettingsSection("profile");
+      }
+      setActiveTab(tab);
+    },
+    [isAuthenticated, requestLogin]
+  );
 
   useElasticScroll(mainRef, mainContentRef, {
     disabled: activeTab === "square",
@@ -160,6 +202,12 @@ export const Home: React.FC<HomeProps> = ({
   useEffect(() => {
     setShowBackToTop(false);
   }, [activeTab]);
+
+  useEffect(() => {
+    if (!isAuthenticated && activeTab !== "rooms") {
+      setActiveTab("rooms");
+    }
+  }, [activeTab, isAuthenticated]);
 
   // Handle scroll for non-square tabs
   useEffect(() => {
@@ -191,13 +239,22 @@ export const Home: React.FC<HomeProps> = ({
   };
 
   const handleCreateRoom = async () => {
+    if (!isAuthenticated) {
+      requestLogin();
+      return;
+    }
+
     if (!newRoomTitle.trim()) return;
     setLoading(true);
 
     const {
       data: { user },
     } = await getCurrentUser();
-    if (!user) return;
+    if (!user) {
+      setLoading(false);
+      requestLogin();
+      return;
+    }
 
     const { data, error } = await createRoom({
       title: newRoomTitle,
@@ -269,7 +326,7 @@ export const Home: React.FC<HomeProps> = ({
     });
 
     if (result.ok) {
-      setIsEditingProfile(false);
+      alert("个人资料已保存");
     } else if (result.message) {
       alert(result.message);
     }
@@ -286,13 +343,27 @@ export const Home: React.FC<HomeProps> = ({
 
     if (result.ok) {
       alert("密码修改成功");
-      setShowChangePwdModal(false);
       setNewPassword("");
       setConfirmNewPassword("");
     } else if (result.message) {
       alert(result.message);
     }
     setLoading(false);
+  };
+
+  const handleResetProfileForm = () => {
+    setEditNickname(userNickname || "");
+    setEditBio(
+      userBio && userBio !== "NaN" && userBio !== "null" ? userBio : ""
+    );
+    setEditAvatar(userAvatar);
+  };
+
+  const handleDeleteNotification = async (notificationId: string) => {
+    const result = await deleteNotification(notificationId);
+    if (!result.ok && result.message) {
+      alert(result.message);
+    }
   };
 
   const handleSaveCharacter = async (char: Character) => {
@@ -318,8 +389,13 @@ export const Home: React.FC<HomeProps> = ({
       <HomeHeader
         activeTab={activeTab}
         friendRequestCount={friendRequestCount}
-        onSelectTab={setActiveTab}
-        onLogout={onLogout}
+        notificationUnreadCount={unreadCount}
+        onSelectTab={handleSelectTab}
+        isAuthenticated={isAuthenticated}
+        userAvatar={userAvatar}
+        userNickname={userNickname}
+        onAuthAction={onAuthAction}
+        onLoginRequest={requestLogin}
       />
 
       <main
@@ -335,7 +411,9 @@ export const Home: React.FC<HomeProps> = ({
             <HomeMobileNav
               activeTab={activeTab}
               friendRequestCount={friendRequestCount}
-              onSelectTab={setActiveTab}
+              onSelectTab={handleSelectTab}
+              isAuthenticated={isAuthenticated}
+              onLoginRequest={requestLogin}
               mode="square"
             />
             <div className="flex-1 min-h-0 relative">
@@ -353,18 +431,21 @@ export const Home: React.FC<HomeProps> = ({
         ) : (
           <div
             ref={mainContentRef}
-            className="container mx-auto p-4 md:p-8 max-w-7xl"
+            className="container mx-auto max-w-screen-2xl p-4 md:p-8"
           >
             {/* Mobile Nav */}
             <HomeMobileNav
               activeTab={activeTab}
               friendRequestCount={friendRequestCount}
-              onSelectTab={setActiveTab}
+              onSelectTab={handleSelectTab}
+              isAuthenticated={isAuthenticated}
+              onLoginRequest={requestLogin}
               mode="default"
             />
 
             {activeTab === "rooms" ? (
               <HomeLobbyView
+                isAuthenticated={isAuthenticated}
                 currentUserId={currentUserId}
                 filteredRooms={filteredRooms}
                 isLoadingRooms={isLoadingRooms}
@@ -391,6 +472,7 @@ export const Home: React.FC<HomeProps> = ({
                 setNewRoomType={setNewRoomType}
                 loading={loading}
                 onCreateRoom={handleCreateRoom}
+                onLoginRequest={requestLogin}
               />
             ) : activeTab === "characters" ? (
               <div className="space-y-6">
@@ -493,210 +575,46 @@ export const Home: React.FC<HomeProps> = ({
                 }
               />
             ) : (
-              <div className="max-w-2xl mx-auto space-y-8">
-                <div className="bg-dicecho-card/80 border border-dicecho-border/40 rounded-lg p-8 text-center relative overflow-hidden shadow-sm">
-                  {!isEditingProfile ? (
-                    <>
-                      <div className="absolute top-4 right-4">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          icon={Edit2}
-                          onClick={() => {
-                            setEditNickname(userNickname || "");
-                            setEditBio(
-                              userBio && userBio !== "NaN" && userBio !== "null"
-                                ? userBio
-                                : ""
-                            );
-                            setIsEditingProfile(true);
-                          }}
-                        >
-                          编辑
-                        </Button>
-                      </div>
-                      {isVip && (
-                        <div className="absolute top-4 left-4">
-                          <span className="bg-dicecho-primary-strong text-white text-xs font-bold px-2 py-1 rounded-full shadow-sm border border-dicecho-primary/40">
-                            VIP
-                          </span>
-                        </div>
-                      )}
-                      <div className="mx-auto mb-4 flex justify-center relative">
-                        <div className="relative">
-                          {/* Circular Progress */}
-                          {levelInfo && (
-                            <svg
-                              className="absolute -top-1 -left-1 w-[104px] h-[104px] rotate-[-90deg]"
-                              viewBox="0 0 100 100"
-                            >
-                              <circle
-                                cx="50"
-                                cy="50"
-                                r="48"
-                                fill="none"
-                                stroke="#1e293b"
-                                strokeWidth="3"
-                              />
-                              <circle
-                                cx="50"
-                                cy="50"
-                                r="48"
-                                fill="none"
-                                stroke="#6366f1"
-                                strokeWidth="3"
-                                strokeDasharray="301.59"
-                                strokeDashoffset={
-                                  301.59 -
-                                  Math.min(
-                                    levelInfo.experience /
-                                      levelInfo.nextLevelExp,
-                                    1
-                                  ) *
-                                    301.59
-                                }
-                                strokeLinecap="round"
-                                className="transition-all duration-1000 ease-out"
-                              />
-                            </svg>
-                          )}
-
-                          <AvatarUpload
-                            url={userAvatar}
-                            onUpload={() => {}}
-                            editable={false}
-                            size={96}
-                          />
-                        </div>
-                      </div>
-                      <div className="relative inline-flex items-center gap-2">
-                        <h2
-                          className={`text-2xl font-bold mb-1 transition-colors ${
-                            isVip ? "text-dicecho-primary" : "text-white"
-                          }`}
-                        >
-                          {userNickname || "未命名用户"}
-                        </h2>
-                        {levelInfo && (
-                          <span className="bg-dicecho-primary/20 text-dicecho-primary text-[10px] font-bold px-1.5 py-0.5 rounded border border-dicecho-primary/30">
-                            LV.{levelInfo.level}
-                          </span>
-                        )}
-                      </div>
-                      <div className="flex justify-center items-center gap-2 mb-4">
-                        <span className="text-sm text-dicecho-muted font-mono bg-dicecho-panel/70 px-2 py-1 rounded">
-                          UID: {userCode || "---"}
-                        </span>
-                      </div>
-                      <p className="text-slate-300 mb-6 max-w-md mx-auto italic">
-                        {userBio && userBio !== "NaN" && userBio !== "null"
-                          ? `"${userBio}"`
-                          : "这个人很神秘，什么都没有写..."}
-                      </p>
-
-                      <div className="grid grid-cols-2 gap-4 text-left mt-6">
-                        <div
-                          className="bg-dicecho-panel/70 p-4 rounded-lg border border-dicecho-border/30 cursor-pointer hover:bg-dicecho-raised hover:border-dicecho-primary/50 transition-all group"
-                          onClick={() => setShowHistoryModal(true)}
-                        >
-                          <div className="text-xs text-dicecho-muted uppercase font-bold mb-1 group-hover:text-dicecho-primary transition-colors">
-                            个人履历
-                          </div>
-                          <div className="text-2xl font-mono font-bold text-dicecho-primary">
-                            {playerHistory.length + kpHistory.length}
-                          </div>
-                        </div>
-                        <div className="bg-dicecho-panel/70 p-4 rounded-lg border border-dicecho-border/30">
-                          <div className="text-xs text-dicecho-muted uppercase font-bold mb-1">
-                            注册时间
-                          </div>
-                          <div className="text-sm text-slate-300">
-                            {userCreatedAt
-                              ? new Date(userCreatedAt).toLocaleDateString()
-                              : "---"}
-                          </div>
-                        </div>
-                      </div>
-                    </>
-                  ) : (
-                    <div className="max-w-md mx-auto space-y-4 text-left">
-                      <h3 className="text-lg font-bold text-white mb-4 text-center">
-                        编辑个人资料
-                      </h3>
-                      <div className="flex justify-center mb-4">
-                        <AvatarUpload
-                          url={editAvatar || userAvatar}
-                          onUpload={(url) => setEditAvatar(url)}
-                          editable={true}
-                          size={96}
-                        />
-                      </div>
-                      <Input
-                        label="昵称"
-                        value={editNickname}
-                        onChange={(e) => setEditNickname(e.target.value)}
-                      />
-                      <Textarea
-                        label="个人简介"
-                        value={editBio}
-                        onChange={(e) => setEditBio(e.target.value)}
-                      />
-                      <div className="flex justify-center gap-3 pt-2">
-                        <Button
-                          variant="ghost"
-                          onClick={() => setIsEditingProfile(false)}
-                        >
-                          取消
-                        </Button>
-                        <Button
-                          onClick={handleUpdateProfile}
-                          disabled={loading}
-                        >
-                          {loading ? (
-                            <Loader2 className="animate-spin" />
-                          ) : (
-                            "保存更改"
-                          )}
-                        </Button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {!isEditingProfile && (
-                  <div className="bg-dicecho-card/80 border border-dicecho-border/40 rounded-lg p-6 text-center shadow-sm">
-                    <h3 className="text-sm font-bold text-slate-400 mb-4 uppercase tracking-wider">
-                      账户安全
-                    </h3>
-                    <Button
-                      variant="secondary"
-                      className="w-full md:w-auto min-w-[120px]"
-                      icon={Lock}
-                      onClick={() => {
-                        setOldPassword("");
-                        setNewPassword("");
-                        setConfirmNewPassword("");
-                        setShowChangePwdModal(true);
-                      }}
-                    >
-                      修改密码
-                    </Button>
-                  </div>
-                )}
-
-                {/* Suggestion Section */}
-                <div className="bg-dicecho-card/80 border border-dicecho-border/40 rounded-lg p-6 text-center shadow-sm">
-                  <h3 className="text-sm font-bold text-slate-400 mb-2 uppercase tracking-wider">
-                    由衷期待您建议和反馈!
-                  </h3>
-                  <a
-                    href="mailto:may331@foxmail.com"
-                    className="text-dicecho-primary hover:text-white font-mono transition-colors text-lg"
-                  >
-                    may331@foxmail.com
-                  </a>
-                </div>
-              </div>
+              <HomeAccountViews
+                activeTab={
+                  activeTab === "notifications" || activeTab === "settings"
+                    ? activeTab
+                    : "profile"
+                }
+                onSelectTab={(tab) => setActiveTab(tab)}
+                settingsSection={settingsSection}
+                setSettingsSection={setSettingsSection}
+                userCode={userCode}
+                userNickname={userNickname || userEmail || null}
+                userBio={userBio}
+                userAvatar={userAvatar}
+                userCreatedAt={userCreatedAt}
+                isVip={isVip}
+                levelInfo={levelInfo}
+                kpHistory={kpHistory}
+                playerHistory={playerHistory}
+                editNickname={editNickname}
+                setEditNickname={setEditNickname}
+                editBio={editBio}
+                setEditBio={setEditBio}
+                editAvatar={editAvatar}
+                setEditAvatar={setEditAvatar}
+                newPassword={newPassword}
+                setNewPassword={setNewPassword}
+                confirmNewPassword={confirmNewPassword}
+                setConfirmNewPassword={setConfirmNewPassword}
+                loading={loading}
+                notifications={notifications}
+                unreadCount={unreadCount}
+                onMarkNotificationRead={markAsRead}
+                onDeleteNotification={handleDeleteNotification}
+                onRefreshNotifications={refreshNotifications}
+                onSaveProfile={handleUpdateProfile}
+                onResetProfile={handleResetProfileForm}
+                onChangePassword={handleChangePassword}
+                onShowHistory={() => setShowHistoryModal(true)}
+                onLogout={onAuthAction}
+              />
             )}
           </div>
         )}
@@ -798,54 +716,6 @@ export const Home: React.FC<HomeProps> = ({
         onClose={() => setShowHistoryModal(false)}
       />
 
-      {/* Change Password Modal */}
-      {showChangePwdModal && (
-        <Modal
-          onClose={() => setShowChangePwdModal(false)}
-          title="修改密码"
-          icon={Lock}
-          className="max-w-md"
-        >
-          <div className="p-6 space-y-4">
-            <Input
-              label="旧密码"
-              type="password"
-              value={oldPassword}
-              onChange={(e) => setOldPassword(e.target.value)}
-              placeholder="请输入旧密码"
-            />
-            <Input
-              label="新密码"
-              type="password"
-              value={newPassword}
-              onChange={(e) => setNewPassword(e.target.value)}
-              placeholder="请输入新密码"
-            />
-            <Input
-              label="确认新密码"
-              type="password"
-              value={confirmNewPassword}
-              onChange={(e) => setConfirmNewPassword(e.target.value)}
-              placeholder="请再次输入新密码"
-            />
-          </div>
-          <div className="px-6 py-4 border-t border-white/10 bg-white/5 flex justify-end gap-3">
-            <Button
-              variant="ghost"
-              onClick={() => setShowChangePwdModal(false)}
-            >
-              取消
-            </Button>
-            <Button
-              onClick={handleChangePassword}
-              disabled={!newPassword || loading}
-              icon={loading ? Loader2 : Lock}
-            >
-              {loading ? "修改中..." : "确认修改"}
-            </Button>
-          </div>
-        </Modal>
-      )}
     </div>
   );
 };

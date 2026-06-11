@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Notification } from "../types";
 import {
   deleteNotification as deleteSquareNotification,
@@ -8,17 +8,23 @@ import {
 
 export function useSquareNotifications(currentUser: any, shouldRefresh: boolean) {
   const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [unreadCount, setUnreadCount] = useState(0);
+  const currentUserId = currentUser?.id;
+  const unreadCount = useMemo(
+    () => notifications.filter((notification) => !notification.is_read).length,
+    [notifications]
+  );
 
   const refreshNotifications = useCallback(async () => {
-    if (!currentUser) return;
+    if (!currentUserId) {
+      setNotifications([]);
+      return;
+    }
 
-    const { data } = await fetchNotifications(currentUser.id);
+    const { data } = await fetchNotifications(currentUserId);
     if (data) {
       setNotifications(data as any);
-      setUnreadCount(data.filter((notification: any) => !notification.is_read).length);
     }
-  }, [currentUser]);
+  }, [currentUserId]);
 
   useEffect(() => {
     refreshNotifications();
@@ -33,7 +39,6 @@ export function useSquareNotifications(currentUser: any, shouldRefresh: boolean)
           : notification
       )
     );
-    setUnreadCount((prev) => Math.max(0, prev - 1));
   }, []);
 
   const deleteNotification = useCallback(async (notificationId: string) => {
@@ -46,10 +51,6 @@ export function useSquareNotifications(currentUser: any, shouldRefresh: boolean)
       }
 
       setNotifications((prev) => {
-        const target = prev.find((notification) => notification.id === notificationId);
-        if (target && !target.is_read) {
-          setUnreadCount((count) => Math.max(0, count - 1));
-        }
         return prev.filter((notification) => notification.id !== notificationId);
       });
 

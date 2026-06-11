@@ -7,11 +7,6 @@ export function useGlobalPresence(userId?: string) {
   );
 
   useEffect(() => {
-    if (!userId) {
-      setGlobalOnlineUsers(new Set());
-      return;
-    }
-
     const channel = supabase
       .channel("global_presence")
       .on("presence", { event: "sync" }, () => {
@@ -25,7 +20,7 @@ export function useGlobalPresence(userId?: string) {
         setGlobalOnlineUsers(userIds);
       })
       .subscribe(async (status) => {
-        if (status === "SUBSCRIBED") {
+        if (status === "SUBSCRIBED" && userId) {
           await channel.track({
             user_id: userId,
             online_at: new Date().toISOString(),

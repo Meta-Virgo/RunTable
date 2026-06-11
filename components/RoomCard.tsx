@@ -18,6 +18,7 @@ import type { LobbyRoom } from "../services/lobbyCatalogModel";
 
 interface RoomCardProps {
   room: Room;
+  isAuthenticated: boolean;
   currentUserId: string | null;
   myCharacters: Character[];
   onlineUsers: Set<string>;
@@ -26,6 +27,7 @@ interface RoomCardProps {
     charId: string,
     password?: string | null
   ) => void;
+  onLoginRequest?: () => void;
 }
 
 const COVER_GRADIENTS = [
@@ -41,12 +43,14 @@ const hashText = (value: string) =>
 
 export const RoomCard: React.FC<RoomCardProps> = ({
   room,
+  isAuthenticated,
   currentUserId,
   myCharacters,
   onlineUsers,
   onJoinRoom,
+  onLoginRequest,
 }) => {
-  const isKP = currentUserId === room.kp_id;
+  const isKP = isAuthenticated && currentUserId === room.kp_id;
   const [selectedCharId, setSelectedCharId] = useState<string>("");
   const [passwordInput, setPasswordInput] = useState("");
   const [showDetails, setShowDetails] = useState(false);
@@ -81,11 +85,17 @@ export const RoomCard: React.FC<RoomCardProps> = ({
   const TypeIcon = room.type === "voice" ? Mic : MessageSquare;
   const requiresPassword = Boolean(room.has_password && !isKP);
   const canJoin =
-    isKP ||
-    (Boolean(selectedCharId) &&
-      (!requiresPassword || Boolean(passwordInput.trim())));
+    isAuthenticated &&
+    (isKP ||
+      (Boolean(selectedCharId) &&
+        (!requiresPassword || Boolean(passwordInput.trim()))));
 
   const onJoinClick = () => {
+    if (!isAuthenticated) {
+      onLoginRequest?.();
+      return;
+    }
+
     if (!canJoin) return;
 
     onJoinRoom(
@@ -213,35 +223,37 @@ export const RoomCard: React.FC<RoomCardProps> = ({
               </div>
 
               <div className="flex min-h-0 flex-1 flex-col gap-4 border-t border-dicecho-border/40 pt-5">
-                <div className="flex min-h-0 flex-1 flex-col">
-                  <div className="mb-2 ml-1 text-xs font-medium text-dicecho-muted">
-                    选择角色
+                {isAuthenticated && (
+                  <div className="flex min-h-0 flex-1 flex-col">
+                    <div className="mb-2 ml-1 text-xs font-medium text-dicecho-muted">
+                      选择角色
+                    </div>
+                    <div className="grid flex-1 content-start gap-2 overflow-y-auto pr-1 custom-scrollbar">
+                      {isKP && (
+                        <RoleChoiceCard
+                          id="pc"
+                          selected={selectedCharId === "pc"}
+                          title="我是 KP"
+                          subtitle="主持人"
+                          icon={Crown}
+                          onSelect={setSelectedCharId}
+                        />
+                      )}
+                      {myCharacters.map((character) => (
+                        <RoleChoiceCard
+                          key={character.id}
+                          id={character.id}
+                          selected={selectedCharId === character.id}
+                          title={character.name}
+                          subtitle={character.job || "调查员"}
+                          avatarUrl={character.avatar_url}
+                          icon={User}
+                          onSelect={setSelectedCharId}
+                        />
+                      ))}
+                    </div>
                   </div>
-                  <div className="grid flex-1 content-start gap-2 overflow-y-auto pr-1 custom-scrollbar">
-                    {isKP && (
-                      <RoleChoiceCard
-                        id="pc"
-                        selected={selectedCharId === "pc"}
-                        title="我是 KP"
-                        subtitle="主持人"
-                        icon={Crown}
-                        onSelect={setSelectedCharId}
-                      />
-                    )}
-                    {myCharacters.map((character) => (
-                      <RoleChoiceCard
-                        key={character.id}
-                        id={character.id}
-                        selected={selectedCharId === character.id}
-                        title={character.name}
-                        subtitle={character.job || "调查员"}
-                        avatarUrl={character.avatar_url}
-                        icon={User}
-                        onSelect={setSelectedCharId}
-                      />
-                    ))}
-                  </div>
-                </div>
+                )}
 
                 {requiresPassword && (
                   <Input
@@ -254,7 +266,13 @@ export const RoomCard: React.FC<RoomCardProps> = ({
                   />
                 )}
 
-                {!isKP && myCharacters.length === 0 && (
+                {!isAuthenticated && (
+                  <p className="rounded-lg border border-amber-300/20 bg-amber-300/10 px-3 py-2 text-xs text-amber-200">
+                    登录后即可选择角色并加入房间。
+                  </p>
+                )}
+
+                {isAuthenticated && !isKP && myCharacters.length === 0 && (
                   <p className="text-xs text-amber-300/90">
                     请先创建一个角色，再加入房间。
                   </p>
@@ -264,9 +282,9 @@ export const RoomCard: React.FC<RoomCardProps> = ({
                   className="w-full"
                   icon={Play}
                   onClick={onJoinClick}
-                  disabled={!canJoin}
+                  disabled={isAuthenticated && !canJoin}
                 >
-                  进入房间
+                  {isAuthenticated ? "进入房间" : "登录后进入"}
                 </Button>
               </div>
             </div>
