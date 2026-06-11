@@ -18,6 +18,14 @@
 
   body {
     font-family: "Inter", "Noto Sans SC", sans-serif;
+    background:
+      linear-gradient(
+        180deg,
+        rgb(var(--theme-bg)) 0%,
+        rgb(var(--theme-bg)) 46%,
+        rgb(var(--theme-panel)) 100%
+      )
+      fixed;
     background-color: rgb(var(--theme-bg));
     color: #e4e5eb;
     overflow: hidden;
@@ -84,10 +92,13 @@
     background:
       linear-gradient(
         180deg,
-        rgb(var(--theme-bg) / 0.98),
-        rgb(var(--theme-panel) / 1)
+        rgb(var(--theme-bg)) 0%,
+        rgb(var(--theme-bg)) 46%,
+        rgb(var(--theme-panel)) 100%
       ),
       rgb(var(--theme-bg));
+    background-attachment: fixed;
+    background-repeat: no-repeat;
   }
 
   .dicecho-card-shadow {
