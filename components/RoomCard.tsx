@@ -2,7 +2,6 @@ import React, { useEffect, useMemo, useState } from "react";
 import {
   Check,
   Crown,
-  ImageIcon,
   Lock,
   MessageSquare,
   Mic,
@@ -329,12 +328,6 @@ const RoomCover: React.FC<{
       <div className={cn("absolute inset-0 bg-gradient-to-br", gradient)} />
     )}
     <div className="absolute inset-0 bg-[radial-gradient(circle_at_28%_22%,rgba(255,255,255,0.18),transparent_24%),linear-gradient(180deg,rgba(15,20,32,0.04)_0%,rgba(15,20,32,0.18)_48%,rgba(15,20,32,0.46)_100%)]" />
-    {!coverImageUrl && (
-      <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 px-6 text-center text-white/70">
-        <ImageIcon size={34} className="opacity-70" />
-        <span className="text-xs font-medium">未设置封面</span>
-      </div>
-    )}
     <div className="absolute left-2 top-2 inline-flex items-center gap-1 rounded-full border border-white/10 bg-black/35 px-2 py-0.5 text-[11px] font-semibold text-white backdrop-blur-sm">
       #{room.room_number || "???"}
     </div>
