@@ -10,21 +10,26 @@ import {
   Trash2,
   User,
 } from "lucide-react";
-import type { GameHistory, Notification } from "../../types";
+import type { Character, GameHistory, Notification } from "../../types";
 import type { HomePlayerHistoryItem } from "../../services/homeProfileModel";
 import { summarizeMarkdown } from "../../services/squareMarkdown";
 import { AvatarUpload } from "../AvatarUpload";
+import { Messages } from "../Messages";
 import { Button, Input, Textarea, cn } from "../UI";
 import type { HomeTab } from "./HomeNavigation";
 
 type AccountTab = Extract<HomeTab, "profile" | "notifications" | "settings">;
 type SettingsSection = "profile" | "security";
+type MessageCenterPane = "social" | "square";
 
 interface HomeAccountViewsProps {
   activeTab: AccountTab;
   onSelectTab: (tab: AccountTab) => void;
+  messageCenterPane: MessageCenterPane;
+  onSelectMessageCenterPane: (pane: MessageCenterPane) => void;
   settingsSection: SettingsSection;
   setSettingsSection: (section: SettingsSection) => void;
+  currentUserId: string | null;
   userCode: number | null;
   userNickname: string | null;
   userBio: string | null;
@@ -51,9 +56,21 @@ interface HomeAccountViewsProps {
   loading: boolean;
   notifications: Notification[];
   unreadCount: number;
+  socialMessageCount: number;
+  myCharacters: Character[];
+  initialInviteToken?: string | null;
   onMarkNotificationRead: (notificationId: string) => void | Promise<void>;
   onDeleteNotification: (notificationId: string) => void | Promise<void>;
   onRefreshNotifications: () => void | Promise<void>;
+  onLoginRequest: () => void;
+  onJoinRoom: (
+    roomId: string,
+    charId: string,
+    password?: string | null,
+    isRestoring?: boolean,
+    invitation?: { invitationId?: string; inviteToken?: string }
+  ) => Promise<void> | void;
+  onInviteTokenHandled?: () => void;
   onSaveProfile: () => void | Promise<void>;
   onResetProfile: () => void;
   onChangePassword: () => void | Promise<void>;
@@ -64,8 +81,11 @@ interface HomeAccountViewsProps {
 export const HomeAccountViews: React.FC<HomeAccountViewsProps> = ({
   activeTab,
   onSelectTab,
+  messageCenterPane,
+  onSelectMessageCenterPane,
   settingsSection,
   setSettingsSection,
+  currentUserId,
   userCode,
   userNickname,
   userBio,
@@ -88,9 +108,15 @@ export const HomeAccountViews: React.FC<HomeAccountViewsProps> = ({
   loading,
   notifications,
   unreadCount,
+  socialMessageCount,
+  myCharacters,
+  initialInviteToken,
   onMarkNotificationRead,
   onDeleteNotification,
   onRefreshNotifications,
+  onLoginRequest,
+  onJoinRoom,
+  onInviteTokenHandled,
   onSaveProfile,
   onResetProfile,
   onChangePassword,
@@ -146,7 +172,7 @@ export const HomeAccountViews: React.FC<HomeAccountViewsProps> = ({
             icon={Bell}
             label="消息中心"
             active={activeTab === "notifications"}
-            badge={unreadCount}
+            badge={unreadCount + socialMessageCount}
             onClick={() => onSelectTab("notifications")}
           />
           <AccountNavButton
@@ -200,12 +226,21 @@ export const HomeAccountViews: React.FC<HomeAccountViewsProps> = ({
           />
         )}
         {activeTab === "notifications" && (
-          <NotificationsCenter
+          <UnifiedMessagesCenter
+            currentUserId={currentUserId}
+            myCharacters={myCharacters}
+            initialInviteToken={initialInviteToken}
+            activePane={messageCenterPane}
+            socialMessageCount={socialMessageCount}
             notifications={notifications}
             unreadCount={unreadCount}
+            onSelectPane={onSelectMessageCenterPane}
             onMarkNotificationRead={onMarkNotificationRead}
             onDeleteNotification={onDeleteNotification}
             onRefreshNotifications={onRefreshNotifications}
+            onLoginRequest={onLoginRequest}
+            onJoinRoom={onJoinRoom}
+            onInviteTokenHandled={onInviteTokenHandled}
           />
         )}
         {activeTab === "settings" && (
@@ -401,6 +436,105 @@ const NotificationsCenter: React.FC<{
     </div>
   );
 };
+
+const UnifiedMessagesCenter: React.FC<{
+  currentUserId: string | null;
+  myCharacters: Character[];
+  initialInviteToken?: string | null;
+  activePane: MessageCenterPane;
+  socialMessageCount: number;
+  notifications: Notification[];
+  unreadCount: number;
+  onSelectPane: (pane: MessageCenterPane) => void;
+  onMarkNotificationRead: (notificationId: string) => void | Promise<void>;
+  onDeleteNotification: (notificationId: string) => void | Promise<void>;
+  onRefreshNotifications: () => void | Promise<void>;
+  onLoginRequest: () => void;
+  onJoinRoom: (
+    roomId: string,
+    charId: string,
+    password?: string | null,
+    isRestoring?: boolean,
+    invitation?: { invitationId?: string; inviteToken?: string }
+  ) => Promise<void> | void;
+  onInviteTokenHandled?: () => void;
+}> = ({
+  currentUserId,
+  myCharacters,
+  initialInviteToken,
+  activePane,
+  socialMessageCount,
+  notifications,
+  unreadCount,
+  onSelectPane,
+  onMarkNotificationRead,
+  onDeleteNotification,
+  onRefreshNotifications,
+  onLoginRequest,
+  onJoinRoom,
+  onInviteTokenHandled,
+}) => (
+  <div className="space-y-4">
+    <div className="flex flex-wrap gap-2 rounded-lg border border-dicecho-border/40 bg-dicecho-panel/75 p-2">
+      <MessageCenterTabButton
+        label="私信与邀请"
+        active={activePane === "social"}
+        badge={socialMessageCount}
+        onClick={() => onSelectPane("social")}
+      />
+      <MessageCenterTabButton
+        label="广场通知"
+        active={activePane === "square"}
+        badge={unreadCount}
+        onClick={() => onSelectPane("square")}
+      />
+    </div>
+
+    {activePane === "social" ? (
+      <Messages
+        currentUserId={currentUserId}
+        myCharacters={myCharacters}
+        initialInviteToken={initialInviteToken}
+        onLoginRequest={onLoginRequest}
+        onJoinRoom={onJoinRoom}
+        onInviteTokenHandled={onInviteTokenHandled}
+      />
+    ) : (
+      <NotificationsCenter
+        notifications={notifications}
+        unreadCount={unreadCount}
+        onMarkNotificationRead={onMarkNotificationRead}
+        onDeleteNotification={onDeleteNotification}
+        onRefreshNotifications={onRefreshNotifications}
+      />
+    )}
+  </div>
+);
+
+const MessageCenterTabButton: React.FC<{
+  label: string;
+  active: boolean;
+  badge?: number;
+  onClick: () => void;
+}> = ({ label, active, badge = 0, onClick }) => (
+  <button
+    type="button"
+    onClick={onClick}
+    className={cn(
+      "inline-flex min-h-9 items-center gap-2 rounded-md px-3 text-sm font-semibold transition-colors",
+      active
+        ? "bg-dicecho-primary/25 text-white"
+        : "text-dicecho-muted hover:bg-white/10 hover:text-white"
+    )}
+  >
+    <span>{label}</span>
+    {badge > 0 && (
+      <span className="rounded-full bg-dicecho-primary px-1.5 py-0.5 text-[10px] font-bold leading-none text-white">
+        {badge > 99 ? "99+" : badge}
+      </span>
+    )}
+  </button>
+);
 
 const SettingsCenter: React.FC<{
   section: SettingsSection;

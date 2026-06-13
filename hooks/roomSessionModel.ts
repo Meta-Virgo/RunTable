@@ -35,6 +35,8 @@ export interface JoinRoomSessionInput {
   charId: string;
   password?: string | null;
   isRestoring?: boolean;
+  invitationId?: string;
+  inviteToken?: string;
 }
 
 export interface RoomSessionActionResult {

@@ -232,13 +232,16 @@ const App: React.FC = () => {
     roomId: string,
     charId: string,
     password?: string | null,
-    isRestoring = false
+    isRestoring = false,
+    invitation?: { invitationId?: string; inviteToken?: string }
   ) => {
     const result = await joinRoomSession({
       roomId,
       charId,
       password,
       isRestoring,
+      invitationId: invitation?.invitationId,
+      inviteToken: invitation?.inviteToken,
     });
 
     if (!result.ok && result.message) {

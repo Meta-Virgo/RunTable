@@ -264,7 +264,23 @@ export async function joinRoom(input: {
   roomId: string;
   characterId: string | null;
   password?: string | null;
+  invitationId?: string | null;
+  inviteToken?: string | null;
 }) {
+  if (input.invitationId) {
+    return supabase.rpc("accept_room_invitation", {
+      p_invitation_id: input.invitationId,
+      p_character_id: input.characterId,
+    });
+  }
+
+  if (input.inviteToken) {
+    return supabase.rpc("accept_room_invite_link", {
+      p_token: input.inviteToken,
+      p_character_id: input.characterId,
+    });
+  }
+
   return supabase.rpc("join_room", {
     p_room_id: input.roomId,
     p_character_id: input.characterId,

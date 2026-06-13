@@ -15,6 +15,7 @@ import { Friends } from "./Friends";
 import { useElasticScroll } from "../hooks/useElasticScroll";
 import { useLobbyCatalog } from "../hooks/useLobbyCatalog";
 import { useHomeProfileData } from "../hooks/useHomeProfileData";
+import { useSocialMessageBadges } from "../hooks/useSocialMessages";
 import { useInvestigatorLibrary } from "../hooks/useInvestigatorLibrary";
 import {
   HomeHeader,
@@ -40,7 +41,9 @@ interface HomeProps {
   onJoinRoom: (
     roomId: string,
     charId: string | "pc",
-    password?: string | null
+    password?: string | null,
+    isRestoring?: boolean,
+    invitation?: { invitationId?: string; inviteToken?: string }
   ) => void;
   isAuthenticated: boolean;
   onAuthAction: () => void;
@@ -121,6 +124,12 @@ export const Home: React.FC<HomeProps> = ({
 
   const [historyTab, setHistoryTab] = useState<"kp" | "player">("player");
   const [showHistoryModal, setShowHistoryModal] = useState(false);
+  const [messageCenterPane, setMessageCenterPane] = useState<
+    "social" | "square"
+  >("social");
+  const [pendingInviteToken, setPendingInviteToken] = useState<string | null>(
+    () => new URLSearchParams(window.location.search).get("room_invite")
+  );
 
   // Friend Requests Count
   const [showBackToTop, setShowBackToTop] = useState(false);
@@ -168,6 +177,7 @@ export const Home: React.FC<HomeProps> = ({
     currentUserId ? { id: currentUserId } : null,
     activeTab === "notifications"
   );
+  const socialBadges = useSocialMessageBadges(currentUserId);
 
   useEffect(() => {
     setEditNickname(userNickname || "");
@@ -208,6 +218,16 @@ export const Home: React.FC<HomeProps> = ({
       setActiveTab("rooms");
     }
   }, [activeTab, isAuthenticated]);
+
+  useEffect(() => {
+    if (!pendingInviteToken) return;
+    if (!isAuthenticated) {
+      requestLogin();
+      return;
+    }
+    setMessageCenterPane("social");
+    setActiveTab("notifications");
+  }, [isAuthenticated, pendingInviteToken, requestLogin]);
 
   // Handle scroll for non-square tabs
   useEffect(() => {
@@ -389,7 +409,8 @@ export const Home: React.FC<HomeProps> = ({
       <HomeHeader
         activeTab={activeTab}
         friendRequestCount={friendRequestCount}
-        notificationUnreadCount={unreadCount}
+        socialMessageCount={socialBadges.total}
+        notificationUnreadCount={unreadCount + socialBadges.total}
         onSelectTab={handleSelectTab}
         isAuthenticated={isAuthenticated}
         userAvatar={userAvatar}
@@ -411,6 +432,7 @@ export const Home: React.FC<HomeProps> = ({
             <HomeMobileNav
               activeTab={activeTab}
               friendRequestCount={friendRequestCount}
+              socialMessageCount={socialBadges.total}
               onSelectTab={handleSelectTab}
               isAuthenticated={isAuthenticated}
               onLoginRequest={requestLogin}
@@ -437,6 +459,7 @@ export const Home: React.FC<HomeProps> = ({
             <HomeMobileNav
               activeTab={activeTab}
               friendRequestCount={friendRequestCount}
+              socialMessageCount={socialBadges.total}
               onSelectTab={handleSelectTab}
               isAuthenticated={isAuthenticated}
               onLoginRequest={requestLogin}
@@ -573,17 +596,33 @@ export const Home: React.FC<HomeProps> = ({
                       }
                     : null
                 }
+                onOpenDirectMessage={(profile) => {
+                  setMessageCenterPane("social");
+                  setActiveTab("notifications");
+                  window.setTimeout(() => {
+                    window.dispatchEvent(
+                      new CustomEvent("runtable:open-direct-message", {
+                        detail: { userId: profile.id },
+                      })
+                    );
+                  }, 0);
+                }}
               />
             ) : (
               <HomeAccountViews
                 activeTab={
-                  activeTab === "notifications" || activeTab === "settings"
-                    ? activeTab
-                    : "profile"
+                  activeTab === "settings"
+                    ? "settings"
+                    : activeTab === "notifications" || activeTab === "messages"
+                      ? "notifications"
+                      : "profile"
                 }
                 onSelectTab={(tab) => setActiveTab(tab)}
+                messageCenterPane={messageCenterPane}
+                onSelectMessageCenterPane={setMessageCenterPane}
                 settingsSection={settingsSection}
                 setSettingsSection={setSettingsSection}
+                currentUserId={currentUserId}
                 userCode={userCode}
                 userNickname={userNickname || userEmail || null}
                 userBio={userBio}
@@ -606,9 +645,21 @@ export const Home: React.FC<HomeProps> = ({
                 loading={loading}
                 notifications={notifications}
                 unreadCount={unreadCount}
+                socialMessageCount={socialBadges.total}
+                myCharacters={myCharacters}
+                initialInviteToken={pendingInviteToken}
                 onMarkNotificationRead={markAsRead}
                 onDeleteNotification={handleDeleteNotification}
                 onRefreshNotifications={refreshNotifications}
+                onLoginRequest={requestLogin}
+                onJoinRoom={onJoinRoom}
+                onInviteTokenHandled={() => {
+                  setPendingInviteToken(null);
+                  const url = new URL(window.location.href);
+                  url.searchParams.delete("room_invite");
+                  window.history.replaceState(null, "", url);
+                  void socialBadges.refresh();
+                }}
                 onSaveProfile={handleUpdateProfile}
                 onResetProfile={handleResetProfileForm}
                 onChangePassword={handleChangePassword}

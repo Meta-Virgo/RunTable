@@ -1,9 +1,10 @@
-import React, { useMemo } from "react";
+﻿import React, { useMemo } from "react";
 import {
   AlertTriangle,
   CalendarClock,
   Check,
   ClipboardList,
+  Copy,
   FileText,
   Link,
   Lock,
@@ -13,7 +14,7 @@ import {
   Sparkles,
   Tags,
 } from "lucide-react";
-import type { Log } from "../types";
+import type { Friendship, Log, RoomInvitationOutboxItem } from "../types";
 import { Button, Input, Textarea, cn } from "./UI";
 import {
   createClue,
@@ -23,10 +24,14 @@ import {
   updateClue,
 } from "../services/clueWall";
 import {
-  createRoomInvite,
-  createRoomSchedule,
-  getVisibleInviteSummary,
-} from "../services/invitations";
+  createRoomFriendInvitation,
+  createRoomLinkInvitation,
+  fetchRoomInvitationOutbox,
+  getSocialMessageErrorMessage,
+  revokeRoomInvitation,
+  buildRoomInviteUrl,
+} from "../services/socialMessages";
+import { fetchAcceptedFriendships } from "../services/friendsRepository";
 import { buildSessionReport } from "../utils/storyReport";
 import { nowIso, parseTags, useRoomToolsState } from "../hooks/useRoomToolsState";
 
@@ -71,10 +76,6 @@ export const RoomTools: React.FC<RoomToolsProps> = ({
     setClueTags,
     keeperNote,
     setKeeperNote,
-    invite,
-    setInvite,
-    schedule,
-    setSchedule,
     startsAt,
     setStartsAt,
     scheduleNote,
@@ -87,11 +88,29 @@ export const RoomTools: React.FC<RoomToolsProps> = ({
     role: viewerRole,
     status: "active",
   });
-  const inviteSummary =
-    invite && userId ? getVisibleInviteSummary(invite, schedule, userId) : null;
   const latestPublicLog = [...logs]
     .reverse()
     .find((log: Log) => !log.recipientId && log.type !== "dice_secret");
+  const [friends, setFriends] = React.useState<Friendship[]>([]);
+  const [selectedFriendId, setSelectedFriendId] = React.useState("");
+  const [outbox, setOutbox] = React.useState<RoomInvitationOutboxItem[]>([]);
+  const [latestLinkUrl, setLatestLinkUrl] = React.useState("");
+  const [inviteBusy, setInviteBusy] = React.useState(false);
+
+  const refreshInvitations = React.useCallback(async () => {
+    if (!isKP || !userId) return;
+    const [{ data: friendRows }, { data: invitationRows }] = await Promise.all([
+      fetchAcceptedFriendships(userId),
+      fetchRoomInvitationOutbox(roomId),
+    ]);
+
+    setFriends((friendRows || []) as Friendship[]);
+    setOutbox(invitationRows || []);
+  }, [isKP, roomId, userId]);
+
+  React.useEffect(() => {
+    refreshInvitations();
+  }, [refreshInvitations]);
 
   const handleCreateClue = () => {
     if (!clueTitle.trim()) return;
@@ -114,22 +133,55 @@ export const RoomTools: React.FC<RoomToolsProps> = ({
     setKeeperNote("");
   };
 
-  const handleCreateInvite = () => {
-    const inviteModel = createRoomInvite({
-      id: `invite-${Date.now()}`,
+  const getInviteStartsAt = () =>
+    startsAt ? new Date(startsAt).toISOString() : null;
+
+  const handleSendFriendInvite = async () => {
+    if (!selectedFriendId) return;
+    setInviteBusy(true);
+    const { error } = await createRoomFriendInvitation({
       roomId,
-      createdByUserId: userId || "unknown",
-      visibility: "link",
-      now: nowIso(),
+      recipientUserId: selectedFriendId,
+      startsAt: getInviteStartsAt(),
+      note: scheduleNote.trim() || null,
     });
-    setInvite(inviteModel);
-    setSchedule(
-      createRoomSchedule({
-        roomId,
-        startsAt: new Date(startsAt).toISOString(),
-        note: scheduleNote.trim() || null,
-      })
-    );
+    setInviteBusy(false);
+
+    if (error) {
+      alert(getSocialMessageErrorMessage(error, "发送邀请失败"));
+      return;
+    }
+
+    await refreshInvitations();
+  };
+
+  const handleCreateLinkInvite = async () => {
+    setInviteBusy(true);
+    const { data, error } = await createRoomLinkInvitation({
+      roomId,
+      startsAt: getInviteStartsAt(),
+      note: scheduleNote.trim() || null,
+    });
+    setInviteBusy(false);
+
+    if (error || !data) {
+      alert(getSocialMessageErrorMessage(error, "生成邀请链接失败"));
+      return;
+    }
+
+    const url = buildRoomInviteUrl(window.location.origin, data.token);
+    setLatestLinkUrl(url);
+    await navigator.clipboard?.writeText(url).catch(() => undefined);
+    await refreshInvitations();
+  };
+
+  const handleRevokeInvite = async (invitationId: string) => {
+    const { error } = await revokeRoomInvitation(invitationId);
+    if (error) {
+      alert(getSocialMessageErrorMessage(error, "撤销邀请失败"));
+      return;
+    }
+    await refreshInvitations();
   };
 
   return (
@@ -164,7 +216,7 @@ export const RoomTools: React.FC<RoomToolsProps> = ({
               <div className="rounded-lg border border-dicecho-border/45 bg-dicecho-card/70 p-4 shadow-sm">
                 <h2 className="text-white font-bold flex items-center gap-2">
                   <FileText size={18} className="text-dicecho-primary" />
-                  公开战报
+                  鍏紑鎴樻姤
                 </h2>
                 <pre className="mt-3 whitespace-pre-wrap text-sm text-slate-300 leading-6 max-h-[55vh] overflow-y-auto custom-scrollbar">
                   {report.publicMarkdown}
@@ -174,7 +226,7 @@ export const RoomTools: React.FC<RoomToolsProps> = ({
                 <div className="rounded-lg border border-dicecho-border/45 bg-dicecho-card/70 p-4 shadow-sm">
                   <h2 className="text-white font-bold flex items-center gap-2">
                     <Shield size={18} className="text-amber-300" />
-                    Keeper 私密段落
+                    Keeper 绉佸瘑娈佃惤
                   </h2>
                   <pre className="mt-3 whitespace-pre-wrap text-sm text-slate-300 leading-6 max-h-[55vh] overflow-y-auto custom-scrollbar">
                     {report.keeperOnlyMarkdown}
@@ -191,21 +243,20 @@ export const RoomTools: React.FC<RoomToolsProps> = ({
               <div className="rounded-lg border border-dicecho-border/45 bg-dicecho-card/70 p-4 shadow-sm space-y-3">
                 <h2 className="text-white font-bold flex items-center gap-2">
                   <ClipboardList size={18} className="text-dicecho-primary" />
-                  新线索
-                </h2>
-                <Input label="标题" value={clueTitle} onChange={(e) => setClueTitle(e.target.value)} />
-                <Textarea label="内容" rows={4} value={clueBody} onChange={(e) => setClueBody(e.target.value)} />
-                <Input label="标签" value={clueTags} onChange={(e) => setClueTags(e.target.value)} placeholder="person item mansion" />
+                  鏂扮嚎绱?                </h2>
+                <Input label="鏍囬" value={clueTitle} onChange={(e) => setClueTitle(e.target.value)} />
+                <Textarea label="鍐呭" rows={4} value={clueBody} onChange={(e) => setClueBody(e.target.value)} />
+                <Input label="鏍囩" value={clueTags} onChange={(e) => setClueTags(e.target.value)} placeholder="person item mansion" />
                 <Textarea label="Keeper note" rows={3} value={keeperNote} onChange={(e) => setKeeperNote(e.target.value)} />
                 <Button icon={Sparkles} onClick={handleCreateClue} disabled={!clueTitle.trim()}>
-                  创建隐藏线索
+                  鍒涘缓闅愯棌绾跨储
                 </Button>
               </div>
             )}
             <div className="space-y-3">
               {visibleClues.length === 0 && (
                 <div className="rounded-lg border border-dicecho-border/45 bg-dicecho-card/55 p-6 text-dicecho-muted">
-                  暂无线索
+                  鏆傛棤绾跨储
                 </div>
               )}
               {visibleClues.map((clue) => (
@@ -269,7 +320,7 @@ export const RoomTools: React.FC<RoomToolsProps> = ({
                           )
                         }
                       >
-                        {clue.visibility === "hidden" ? "揭示" : "隐藏"}
+                        {clue.visibility === "hidden" ? "鎻ず" : "闅愯棌"}
                       </Button>
                       <Button
                         size="xs"
@@ -295,8 +346,7 @@ export const RoomTools: React.FC<RoomToolsProps> = ({
                           )
                         }
                       >
-                        关联最新日志
-                      </Button>
+                        鍏宠仈鏈€鏂版棩蹇?                      </Button>
                       <Button
                         size="xs"
                         variant="danger"
@@ -308,7 +358,7 @@ export const RoomTools: React.FC<RoomToolsProps> = ({
                           )
                         }
                       >
-                        删除
+                        鍒犻櫎
                       </Button>
                     </div>
                   )}
@@ -319,54 +369,34 @@ export const RoomTools: React.FC<RoomToolsProps> = ({
         )}
 
         {activeTab === "invite" && (
-          <section className="grid lg:grid-cols-[360px_1fr] gap-4">
-            {isKP && (
-              <div className="rounded-lg border border-dicecho-border/45 bg-dicecho-card/70 p-4 shadow-sm space-y-3">
-                <h2 className="text-white font-bold flex items-center gap-2">
-                  <CalendarClock size={18} className="text-dicecho-primary" />
-                  开团时间
-                </h2>
-                <Input
-                  label="开始时间"
-                  type="datetime-local"
-                  value={startsAt}
-                  onChange={(e) => setStartsAt(e.target.value)}
-                />
-                <Textarea
-                  label="备注"
-                  rows={4}
-                  value={scheduleNote}
-                  onChange={(e) => setScheduleNote(e.target.value)}
-                />
-                <Button icon={Send} onClick={handleCreateInvite}>
-                  保存邀请
-                </Button>
-              </div>
-            )}
-            <div className="rounded-lg border border-dicecho-border/45 bg-dicecho-card/70 p-4 shadow-sm">
-              <h2 className="text-white font-bold">当前邀请</h2>
-              <p className="mt-3 text-sm text-slate-300">
-                {inviteSummary || "暂无可见邀请"}
-              </p>
-              {invite && (
-                <div className="mt-4 text-xs text-dicecho-muted space-y-1">
-                  <div>Invite ID: {invite.id}</div>
-                  <div>Visibility: {invite.visibility}</div>
-                  {schedule && <div>Starts at: {schedule.startsAt}</div>}
-                </div>
-              )}
-            </div>
-          </section>
+          <RoomInvitationsPanel
+            roomId={roomId}
+            isKP={isKP}
+            userId={userId}
+            friends={friends}
+            selectedFriendId={selectedFriendId}
+            setSelectedFriendId={setSelectedFriendId}
+            startsAt={startsAt}
+            setStartsAt={setStartsAt}
+            scheduleNote={scheduleNote}
+            setScheduleNote={setScheduleNote}
+            outbox={outbox}
+            latestLinkUrl={latestLinkUrl}
+            inviteBusy={inviteBusy}
+            refreshInvitations={refreshInvitations}
+            handleSendFriendInvite={handleSendFriendInvite}
+            handleCreateLinkInvite={handleCreateLinkInvite}
+            handleRevokeInvite={handleRevokeInvite}
+          />
         )}
 
         {activeTab === "management" && isKP && (
           <section className="space-y-4">
             <div className="rounded-lg border border-dicecho-accent/30 bg-dicecho-accent/12 p-6 md:p-8 flex flex-col md:flex-row justify-between items-center gap-6 shadow-sm">
               <div className="flex-1">
-                <h3 className="text-lg font-bold text-white mb-2">完结跑团</h3>
+                <h3 className="text-lg font-bold text-white mb-2">瀹岀粨璺戝洟</h3>
                 <p className="text-slate-400 text-sm leading-relaxed">
-                  当跑团结束时使用此功能。系统将生成跑团履历，记录所有玩家的最终状态，并将房间标记为“已完成”。
-                </p>
+                  褰撹窇鍥㈢粨鏉熸椂浣跨敤姝ゅ姛鑳姐€傜郴缁熷皢鐢熸垚璺戝洟灞ュ巻锛岃褰曟墍鏈夌帺瀹剁殑鏈€缁堢姸鎬侊紝骞跺皢鎴块棿鏍囪涓衡€滃凡瀹屾垚鈥濄€?                </p>
               </div>
               <Button
                 onClick={onConcludeGame}
@@ -375,18 +405,17 @@ export const RoomTools: React.FC<RoomToolsProps> = ({
                 icon={Check}
                 className="border border-dicecho-accent/70 bg-dicecho-accent/15 text-[#bff1d5] hover:bg-dicecho-accent/25 hover:text-white hover:border-dicecho-accent"
               >
-                结团结算
+                缁撳洟缁撶畻
               </Button>
             </div>
 
             <div className="rounded-lg border border-red-500/20 bg-red-900/10 p-6 md:p-8 flex flex-col md:flex-row justify-between items-center gap-6 shadow-sm">
               <div className="flex-1">
                 <h3 className="text-lg font-bold text-white mb-2">
-                  清空聊天记录
+                  娓呯┖鑱婂ぉ璁板綍
                 </h3>
                 <p className="text-slate-400 text-sm leading-relaxed">
-                  删除当前房间的所有聊天记录（包括骰子和图片）。此操作不可恢复。
-                </p>
+                  鍒犻櫎褰撳墠鎴块棿鐨勬墍鏈夎亰澶╄褰曪紙鍖呮嫭楠板瓙鍜屽浘鐗囷級銆傛鎿嶄綔涓嶅彲鎭㈠銆?                </p>
               </div>
               <div className="flex items-center gap-4 shrink-0">
                 {clearChatConfirm ? (
@@ -401,17 +430,17 @@ export const RoomTools: React.FC<RoomToolsProps> = ({
                         icon={AlertTriangle}
                         size="lg"
                       >
-                        确认清空
+                        纭娓呯┖
                       </Button>
                       <span className="text-[10px] text-red-400 font-bold uppercase tracking-wider animate-pulse">
-                        此操作不可撤销
+                        姝ゆ搷浣滀笉鍙挙閿€
                       </span>
                     </div>
                     <Button
                       onClick={() => setClearChatConfirm(false)}
                       variant="ghost"
                     >
-                      取消
+                      鍙栨秷
                     </Button>
                   </>
                 ) : (
@@ -421,7 +450,7 @@ export const RoomTools: React.FC<RoomToolsProps> = ({
                     icon={AlertTriangle}
                     size="lg"
                   >
-                    清空记录
+                    娓呯┖璁板綍
                   </Button>
                 )}
               </div>
@@ -429,10 +458,9 @@ export const RoomTools: React.FC<RoomToolsProps> = ({
 
             <div className="rounded-lg border border-red-500/20 bg-red-900/10 p-6 md:p-8 flex flex-col md:flex-row justify-between items-center gap-6 shadow-sm">
               <div className="flex-1">
-                <h3 className="text-lg font-bold text-white mb-2">删除房间</h3>
+                <h3 className="text-lg font-bold text-white mb-2">鍒犻櫎鎴块棿</h3>
                 <p className="text-slate-400 text-sm leading-relaxed">
-                  这将永久删除该房间及其所有数据。此操作不可恢复。
-                </p>
+                  杩欏皢姘镐箙鍒犻櫎璇ユ埧闂村強鍏舵墍鏈夋暟鎹€傛鎿嶄綔涓嶅彲鎭㈠銆?                </p>
               </div>
               <div className="flex items-center gap-4 shrink-0">
                 {deleteConfirm ? (
@@ -447,17 +475,17 @@ export const RoomTools: React.FC<RoomToolsProps> = ({
                         icon={AlertTriangle}
                         size="lg"
                       >
-                        确认删除
+                        纭鍒犻櫎
                       </Button>
                       <span className="text-[10px] text-red-400 font-bold uppercase tracking-wider animate-pulse">
-                        此操作不可撤销
+                        姝ゆ搷浣滀笉鍙挙閿€
                       </span>
                     </div>
                     <Button
                       onClick={() => setDeleteConfirm(false)}
                       variant="ghost"
                     >
-                      取消
+                      鍙栨秷
                     </Button>
                   </>
                 ) : (
@@ -467,7 +495,7 @@ export const RoomTools: React.FC<RoomToolsProps> = ({
                     icon={AlertTriangle}
                     size="lg"
                   >
-                    删除房间
+                    鍒犻櫎鎴块棿
                   </Button>
                 )}
               </div>
@@ -478,3 +506,176 @@ export const RoomTools: React.FC<RoomToolsProps> = ({
     </div>
   );
 };
+
+const RoomInvitationsPanel: React.FC<{
+  roomId: string;
+  isKP: boolean;
+  userId?: string;
+  friends: Friendship[];
+  selectedFriendId: string;
+  setSelectedFriendId: (value: string) => void;
+  startsAt: string;
+  setStartsAt: (value: string) => void;
+  scheduleNote: string;
+  setScheduleNote: (value: string) => void;
+  outbox: RoomInvitationOutboxItem[];
+  latestLinkUrl: string;
+  inviteBusy: boolean;
+  refreshInvitations: () => Promise<void>;
+  handleSendFriendInvite: () => Promise<void>;
+  handleCreateLinkInvite: () => Promise<void>;
+  handleRevokeInvite: (invitationId: string) => Promise<void>;
+}> = ({
+  isKP,
+  userId,
+  friends,
+  selectedFriendId,
+  setSelectedFriendId,
+  startsAt,
+  setStartsAt,
+  scheduleNote,
+  setScheduleNote,
+  outbox,
+  latestLinkUrl,
+  inviteBusy,
+  refreshInvitations,
+  handleSendFriendInvite,
+  handleCreateLinkInvite,
+  handleRevokeInvite,
+}) => (
+  <section className="grid lg:grid-cols-[360px_1fr] gap-4">
+    {isKP && (
+      <div className="rounded-lg border border-dicecho-border/45 bg-dicecho-card/70 p-4 shadow-sm space-y-3">
+        <h2 className="text-white font-bold flex items-center gap-2">
+          <CalendarClock size={18} className="text-dicecho-primary" />
+          房间邀请
+        </h2>
+        <Input
+          label="开团时间"
+          type="datetime-local"
+          value={startsAt}
+          onChange={(event) => setStartsAt(event.target.value)}
+        />
+        <Textarea
+          label="邀请备注"
+          rows={4}
+          value={scheduleNote}
+          onChange={(event) => setScheduleNote(event.target.value)}
+        />
+        <label className="text-xs text-dicecho-muted mb-1.5 font-medium ml-1">
+          选择好友
+        </label>
+        <select
+          value={selectedFriendId}
+          onChange={(event) => setSelectedFriendId(event.target.value)}
+          className="w-full bg-dicecho-panel/70 border border-dicecho-border/50 text-slate-100 rounded-lg px-4 py-2.5 focus:outline-none focus:border-dicecho-primary/70 transition-colors text-sm"
+        >
+          <option value="">选择要邀请的好友</option>
+          {friends.map((friendship) => {
+            const isSender = friendship.user_id === userId;
+            const profile = isSender
+              ? friendship.friend_profile
+              : (friendship as any).user_profile;
+            return (
+              <option key={friendship.id} value={profile?.id || ""}>
+                {profile?.nickname || profile?.user_code || "未命名用户"}
+              </option>
+            );
+          })}
+        </select>
+        <div className="flex flex-col gap-2">
+          <Button
+            icon={Send}
+            onClick={() => void handleSendFriendInvite()}
+            disabled={!selectedFriendId || inviteBusy}
+          >
+            发送好友邀请
+          </Button>
+          <Button
+            variant="secondary"
+            icon={Link}
+            onClick={() => void handleCreateLinkInvite()}
+            disabled={inviteBusy}
+          >
+            生成邀请链接
+          </Button>
+        </div>
+        {latestLinkUrl && (
+          <div className="rounded-lg border border-dicecho-primary/25 bg-dicecho-primary/10 p-3 text-xs text-slate-200">
+            <div className="mb-2 font-semibold text-white">
+              链接已生成并尝试复制
+            </div>
+            <div className="break-all text-dicecho-muted">{latestLinkUrl}</div>
+            <Button
+              className="mt-2"
+              size="xs"
+              variant="ghost"
+              icon={Copy}
+              onClick={() => void navigator.clipboard?.writeText(latestLinkUrl)}
+            >
+              复制
+            </Button>
+          </div>
+        )}
+      </div>
+    )}
+    <div className="rounded-lg border border-dicecho-border/45 bg-dicecho-card/70 p-4 shadow-sm space-y-3">
+      <div className="flex items-center justify-between gap-3">
+        <h2 className="text-white font-bold">已发邀请</h2>
+        {isKP && (
+          <Button
+            size="xs"
+            variant="ghost"
+            onClick={() => void refreshInvitations()}
+          >
+            刷新
+          </Button>
+        )}
+      </div>
+      {!isKP && (
+        <p className="text-sm text-dicecho-muted">
+          只有 Keeper 可以创建和管理房间邀请。
+        </p>
+      )}
+      {isKP && outbox.length === 0 && (
+        <p className="text-sm text-dicecho-muted">暂无已发邀请。</p>
+      )}
+      {isKP &&
+        outbox.map((item) => (
+          <article
+            key={`${item.invitation_id}-${item.recipient_user_id || "link"}`}
+            className="rounded-lg border border-dicecho-border/35 bg-dicecho-panel/55 p-3"
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <div className="text-sm font-semibold text-white">
+                  {item.invite_type === "link"
+                    ? "邀请链接"
+                    : item.recipient_nickname || "未命名好友"}
+                </div>
+                <div className="mt-1 text-xs text-dicecho-muted">
+                  {item.invitation_status}
+                  {item.recipient_status ? ` / ${item.recipient_status}` : ""}
+                  {item.expires_at
+                    ? ` · ${new Date(item.expires_at).toLocaleString()} 过期`
+                    : ""}
+                </div>
+              </div>
+              {item.invitation_status === "pending" && (
+                <Button
+                  size="xs"
+                  variant="danger"
+                  onClick={() => void handleRevokeInvite(item.invitation_id)}
+                >
+                  撤销
+                </Button>
+              )}
+            </div>
+            {item.note && (
+              <p className="mt-2 text-xs text-slate-300">{item.note}</p>
+            )}
+          </article>
+        ))}
+    </div>
+  </section>
+);

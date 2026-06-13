@@ -7,6 +7,7 @@ import {
   UserCheck,
   UserX,
   History,
+  MessageCircle,
   Crown,
   Loader2,
   User,
@@ -31,9 +32,13 @@ import * as friendsRepository from "../services/friendsRepository";
 
 interface FriendsProps {
   currentUser: Profile | null;
+  onOpenDirectMessage?: (profile: Profile) => void;
 }
 
-export const Friends: React.FC<FriendsProps> = ({ currentUser }) => {
+export const Friends: React.FC<FriendsProps> = ({
+  currentUser,
+  onOpenDirectMessage,
+}) => {
   const [activeTab, setActiveTab] = useState<"list" | "requests">("list");
   const [friends, setFriends] = useState<Friendship[]>([]);
   const [requests, setRequests] = useState<Friendship[]>([]);
@@ -325,12 +330,12 @@ export const Friends: React.FC<FriendsProps> = ({ currentUser }) => {
                         <Button
                           variant="ghost"
                           size="icon"
-                          icon={History}
+                          icon={MessageCircle}
                           onClick={(e) => {
                             e.stopPropagation();
-                            openHistory(profile);
+                            onOpenDirectMessage?.(profile);
                           }}
-                          title="查看履历"
+                          title="发送私信"
                         />
                         <Button
                           variant="ghost"

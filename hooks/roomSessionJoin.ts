@@ -26,6 +26,8 @@ interface JoinRoomAdapters {
     roomId: string;
     characterId: string | null;
     password?: string | null;
+    invitationId?: string;
+    inviteToken?: string;
   }) => Promise<{ data?: RoomMembership | null; error?: { message?: string } | null }>;
   fetchRoomCharacters: (roomId: string) => Promise<{ data?: any[] | null }>;
   fetchRoomMembers: (roomId: string) => Promise<{ data?: RoomMembership[] | null }>;
@@ -89,6 +91,8 @@ export async function joinRoomSessionAction({
     roomId,
     characterId: charId === "pc" ? null : charId,
     password,
+    invitationId: input.invitationId,
+    inviteToken: input.inviteToken,
   });
   const staleAfterJoin = cancelIfStale();
   if (staleAfterJoin) return staleAfterJoin;

@@ -5,6 +5,7 @@ import {
   Dices,
   LogIn,
   LogOut,
+  Mail,
   MessageSquare,
   Settings,
   User,
@@ -16,6 +17,7 @@ export type HomeTab =
   | "rooms"
   | "characters"
   | "friends"
+  | "messages"
   | "profile"
   | "notifications"
   | "settings"
@@ -23,14 +25,18 @@ export type HomeTab =
 
 const HOME_TABS: { id: HomeTab; label: string; icon: React.ElementType }[] = [
   { id: "rooms", label: "大厅", icon: BookOpen },
-  { id: "square", label: "广场", icon: MessageSquare },
   { id: "characters", label: "车卡", icon: Dices },
+  { id: "square", label: "广场", icon: MessageSquare },
   { id: "friends", label: "好友", icon: Users },
+  { id: "messages", label: "消息", icon: Mail },
 ];
+
+const PRIMARY_HOME_TABS = HOME_TABS.filter((tab) => tab.id !== "messages");
 
 interface HomeHeaderProps {
   activeTab: HomeTab;
   friendRequestCount: number;
+  socialMessageCount?: number;
   notificationUnreadCount?: number;
   onSelectTab: (tab: HomeTab) => void;
   isAuthenticated: boolean;
@@ -43,6 +49,7 @@ interface HomeHeaderProps {
 export const HomeHeader: React.FC<HomeHeaderProps> = ({
   activeTab,
   friendRequestCount,
+  socialMessageCount = 0,
   notificationUnreadCount = 0,
   onSelectTab,
   isAuthenticated,
@@ -114,7 +121,7 @@ export const HomeHeader: React.FC<HomeHeaderProps> = ({
             </h1>
           </div>
           <nav className="hidden items-center gap-1 md:flex">
-            {HOME_TABS.map((tab) => {
+            {PRIMARY_HOME_TABS.map((tab) => {
               const Icon = tab.icon;
               return (
                 <button
@@ -132,6 +139,11 @@ export const HomeHeader: React.FC<HomeHeaderProps> = ({
                   {tab.label}
                   {tab.id === "friends" && friendRequestCount > 0 && (
                     <span className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full border-2 border-dicecho-panel bg-red-500 animate-pulse" />
+                  )}
+                  {tab.id === "messages" && socialMessageCount > 0 && (
+                    <span className="absolute -right-1 -top-1 rounded-full border-2 border-dicecho-panel bg-dicecho-primary px-1 text-[10px] leading-4 text-white">
+                      {socialMessageCount > 99 ? "99+" : socialMessageCount}
+                    </span>
                   )}
                 </button>
               );
@@ -223,6 +235,7 @@ const UserMenuItem: React.FC<{
 interface HomeMobileNavProps {
   activeTab: HomeTab;
   friendRequestCount: number;
+  socialMessageCount?: number;
   onSelectTab: (tab: HomeTab) => void;
   isAuthenticated: boolean;
   onLoginRequest: () => void;
@@ -232,6 +245,7 @@ interface HomeMobileNavProps {
 export const HomeMobileNav: React.FC<HomeMobileNavProps> = ({
   activeTab,
   friendRequestCount,
+  socialMessageCount = 0,
   onSelectTab,
   isAuthenticated,
   onLoginRequest,
@@ -253,7 +267,7 @@ export const HomeMobileNav: React.FC<HomeMobileNavProps> = ({
         mode === "square" && "m-4 shrink-0 overflow-hidden"
       )}
     >
-      {HOME_TABS.map((tab) => {
+      {PRIMARY_HOME_TABS.map((tab) => {
         const Icon = tab.icon;
         return (
           <button
@@ -271,6 +285,11 @@ export const HomeMobileNav: React.FC<HomeMobileNavProps> = ({
             <span className="block text-[11px] leading-none">{tab.label}</span>
             {tab.id === "friends" && friendRequestCount > 0 && (
               <span className="absolute top-1 right-2 w-2 h-2 bg-red-500 rounded-full animate-pulse" />
+            )}
+            {tab.id === "messages" && socialMessageCount > 0 && (
+              <span className="absolute top-1 right-2 rounded-full bg-dicecho-primary px-1 text-[10px] leading-4 text-white">
+                {socialMessageCount > 99 ? "99+" : socialMessageCount}
+              </span>
             )}
           </button>
         );

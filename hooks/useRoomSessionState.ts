@@ -142,10 +142,19 @@ export function useRoomSessionState({
       charId,
       password,
       isRestoring = false,
+      invitationId,
+      inviteToken,
     }: JoinRoomSessionInput): Promise<JoinRoomSessionResult> => {
       const joinSequence = joinSequenceRef.current.begin();
       const result = await joinRoomSessionAction({
-        input: { roomId, charId, password, isRestoring },
+        input: {
+          roomId,
+          charId,
+          password,
+          isRestoring,
+          invitationId,
+          inviteToken,
+        },
         isCurrent: () => joinSequenceRef.current.isCurrent(joinSequence),
         adapters: remoteAdapters.join,
       });

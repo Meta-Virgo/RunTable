@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { fetchCurrentRoomMembership, kickRoomMember } from "./rooms";
+import { fetchCurrentRoomMembership, joinRoom, kickRoomMember } from "./rooms";
 import { supabase } from "../supabase";
 
 vi.mock("../supabase", () => ({
@@ -44,6 +44,36 @@ describe("rooms service", () => {
     expect(supabase.rpc).toHaveBeenCalledWith("kick_room_member", {
       p_room_id: "room-1",
       p_user_id: "player-1",
+    });
+  });
+
+  it("accepts a friend invitation through the invitation rpc", async () => {
+    vi.mocked(supabase.rpc).mockResolvedValue({ data: {}, error: null } as any);
+
+    await joinRoom({
+      roomId: "room-1",
+      characterId: "char-1",
+      invitationId: "invite-1",
+    });
+
+    expect(supabase.rpc).toHaveBeenCalledWith("accept_room_invitation", {
+      p_invitation_id: "invite-1",
+      p_character_id: "char-1",
+    });
+  });
+
+  it("accepts a link invitation through the link rpc", async () => {
+    vi.mocked(supabase.rpc).mockResolvedValue({ data: {}, error: null } as any);
+
+    await joinRoom({
+      roomId: "room-1",
+      characterId: "char-1",
+      inviteToken: "token-1",
+    });
+
+    expect(supabase.rpc).toHaveBeenCalledWith("accept_room_invite_link", {
+      p_token: "token-1",
+      p_character_id: "char-1",
     });
   });
 

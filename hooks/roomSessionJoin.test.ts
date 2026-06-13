@@ -94,6 +94,29 @@ describe("room session join action", () => {
     );
   });
 
+  it("passes invitation context to the join adapter", async () => {
+    const testAdapters = adapters();
+
+    await joinRoomSessionAction({
+      input: {
+        roomId: "room-1",
+        charId: "char-1",
+        invitationId: "invite-1",
+        inviteToken: "token-1",
+      },
+      adapters: testAdapters,
+      isCurrent: () => true,
+    });
+
+    expect(testAdapters.joinRoom).toHaveBeenCalledWith({
+      roomId: "room-1",
+      characterId: "char-1",
+      password: undefined,
+      invitationId: "invite-1",
+      inviteToken: "token-1",
+    });
+  });
+
   it("blocks a kicked membership before calling join", async () => {
     const testAdapters = {
       ...adapters(),

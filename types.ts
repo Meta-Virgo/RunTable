@@ -255,3 +255,92 @@ export interface Notification {
     content: string;
   };
 }
+
+export interface DirectConversationSummary {
+  conversation_id: string;
+  friend_user_id: string;
+  friend_nickname: string | null;
+  friend_avatar_url: string | null;
+  friend_user_code: number | null;
+  last_message_id: string | null;
+  last_message_content: string | null;
+  last_message_sender_id: string | null;
+  last_message_created_at: string | null;
+  unread_count: number;
+}
+
+export interface DirectMessage {
+  id: string;
+  conversation_id: string;
+  sender_id: string;
+  content: string;
+  created_at: string;
+  sender?: {
+    nickname: string | null;
+    avatar_url: string | null;
+  } | null;
+}
+
+export interface SocialMessageBadgeCounts {
+  unread_direct_count: number;
+  pending_room_invitation_count: number;
+}
+
+export type RoomInvitationStatus =
+  | "pending"
+  | "accepted"
+  | "declined"
+  | "revoked";
+
+export interface RoomInvitationInboxItem {
+  invitation_id: string;
+  recipient_id: string | null;
+  room_id: string;
+  room_title: string;
+  room_description: string | null;
+  room_cover_image_url: string | null;
+  room_type: Room["type"];
+  room_has_password: boolean | null;
+  keeper_user_id: string;
+  keeper_nickname: string | null;
+  keeper_avatar_url: string | null;
+  invite_type: "friend" | "link";
+  invitation_status: RoomInvitationStatus;
+  recipient_status: RoomInvitationStatus;
+  starts_at: string | null;
+  note: string | null;
+  expires_at: string | null;
+  created_at: string;
+}
+
+export interface RoomInvitationOutboxItem {
+  invitation_id: string;
+  room_id: string;
+  room_title: string;
+  invite_type: "friend" | "link";
+  invitation_status: RoomInvitationStatus;
+  recipient_user_id: string | null;
+  recipient_nickname: string | null;
+  recipient_avatar_url: string | null;
+  recipient_status: RoomInvitationStatus | null;
+  starts_at: string | null;
+  note: string | null;
+  expires_at: string | null;
+  created_at: string;
+}
+
+export interface RoomInviteLinkPreview {
+  invitation_id: string;
+  room_id: string;
+  room_title: string;
+  room_description: string | null;
+  room_cover_image_url: string | null;
+  room_type: Room["type"];
+  room_has_password: boolean | null;
+  keeper_user_id: string;
+  keeper_nickname: string | null;
+  keeper_avatar_url: string | null;
+  starts_at: string | null;
+  note: string | null;
+  expires_at: string | null;
+}
