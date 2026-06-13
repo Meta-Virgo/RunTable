@@ -11,6 +11,7 @@ import {
   ChevronRight,
   Activity,
   ClipboardList,
+  Map,
   Music,
   Mic,
   MicOff,
@@ -395,6 +396,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               icon: Users,
               label: isKP ? "角色 & 模组" : "调查员名册",
             },
+            { id: "scene", icon: Map, label: "场景概览" },
             { id: "tools", icon: ClipboardList, label: "房间工具" },
             { id: "music", icon: Music, label: "背景音乐" },
           ]

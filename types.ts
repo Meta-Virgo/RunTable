@@ -408,3 +408,60 @@ export interface RoomInviteLinkPreview {
   note: string | null;
   expires_at: string | null;
 }
+
+export interface RoomScene {
+  id: string;
+  room_id: string;
+  title: string;
+  description: string | null;
+  background_color: string;
+  background_pattern: "plain" | "grid" | "dots" | "mist";
+  is_active: boolean;
+  created_by_user_id: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface RoomSceneMarker {
+  id: string;
+  room_id: string;
+  scene_id: string;
+  character_id: string;
+  x: number;
+  y: number;
+  is_hidden: boolean;
+  label: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreateRoomSceneInput {
+  roomId: string;
+  title: string;
+  description?: string | null;
+  backgroundColor?: string;
+  backgroundPattern?: RoomScene["background_pattern"];
+}
+
+export interface UpdateRoomSceneInput {
+  sceneId: string;
+  title: string;
+  description?: string | null;
+  backgroundColor?: string;
+  backgroundPattern?: RoomScene["background_pattern"];
+}
+
+export interface UpsertRoomSceneMarkerInput {
+  sceneId: string;
+  characterId: string;
+  x: number;
+  y: number;
+  isHidden?: boolean;
+  label?: string | null;
+}
+
+export interface MoveOwnSceneMarkerInput {
+  markerId: string;
+  x: number;
+  y: number;
+}

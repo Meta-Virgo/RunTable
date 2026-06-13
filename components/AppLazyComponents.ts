@@ -24,6 +24,12 @@ export const RoomTools = lazy(() =>
   import("./RoomTools").then((module) => ({ default: module.RoomTools }))
 );
 
+export const RoomSceneView = lazy(() =>
+  import("./RoomSceneView").then((module) => ({
+    default: module.RoomSceneView,
+  }))
+);
+
 export const ModuleModal = lazy(() =>
   import("./modals/ModuleModal").then((module) => ({
     default: module.ModuleModal,

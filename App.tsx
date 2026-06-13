@@ -20,6 +20,7 @@ import {
   ModuleModal,
   MusicPlayer,
   RoomAudioRenderer,
+  RoomSceneView,
   RoomTools,
   Sidebar,
   StartAudio,
@@ -523,7 +524,10 @@ const App: React.FC = () => {
           </div>
         )}
 
-        {view !== "setup" && view !== "music" && view !== "tools" ? (
+        {view !== "setup" &&
+        view !== "music" &&
+        view !== "tools" &&
+        view !== "scene" ? (
           <>
             <ChatArea
               logs={logs}
@@ -586,6 +590,13 @@ const App: React.FC = () => {
             onDeleteRoom={handleDeleteRoom}
             onClearChat={handleClearChat}
             onConcludeGame={() => setShowConclusionModal(true)}
+          />
+        ) : view === "scene" ? (
+          <RoomSceneView
+            roomId={currentRoomId}
+            isKP={isKP}
+            currentUserId={currentUserId}
+            characters={derivedCharacters}
           />
         ) : null}
 
