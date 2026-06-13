@@ -1,5 +1,9 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type { ClipboardEvent, DragEvent, MouseEvent } from "react";
+import type { Character, CreateSquarePostModuleInput } from "../types";
+import { fetchUserInvestigators } from "../services/characters";
+import { createCharacterSummaryModule } from "../services/squarePostModules";
+import { mapCharacterRow } from "../utils/characterMapper";
 import { useSquareComments } from "./useSquareComments";
 import { useSquareFeed } from "./useSquareFeed";
 import { useSquareNotifications } from "./useSquareNotifications";
@@ -25,6 +29,12 @@ export function useSquareExperience() {
   const [posting, setPosting] = useState(false);
   const [pendingImage, setPendingImage] =
     useState<PendingSquareImage | null>(null);
+  const [pendingModules, setPendingModules] = useState<
+    CreateSquarePostModuleInput[]
+  >([]);
+  const [shareableCharacters, setShareableCharacters] = useState<Character[]>(
+    []
+  );
   const [showNotifications, setShowNotifications] = useState(false);
   const [showMobileSidebar, setShowMobileSidebar] = useState(false);
   const [confirmDelete, setConfirmDelete] =
@@ -62,6 +72,24 @@ export function useSquareExperience() {
   const selectedPostLoading = comments.selectedPostId
     ? Boolean(comments.loadingComments[comments.selectedPostId])
     : false;
+
+  useEffect(() => {
+    if (!feed.currentUser?.id) {
+      setShareableCharacters([]);
+      return;
+    }
+
+    let cancelled = false;
+    fetchUserInvestigators(feed.currentUser.id).then(({ data }) => {
+      if (!cancelled) {
+        setShareableCharacters((data || []).map((row: any) => mapCharacterRow(row)));
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [feed.currentUser?.id]);
 
   const processFile = useCallback((file: File) => {
     if (!file.type.startsWith("image/")) return;
@@ -106,19 +134,37 @@ export function useSquareExperience() {
   const handlePost = useCallback(async () => {
     setPosting(true);
     try {
-      const result = await feed.publishPost(newPostContent, pendingImage?.file);
+      const result = await feed.publishPost(
+        newPostContent,
+        pendingImage?.file,
+        pendingModules
+      );
       if (!result.ok && result.message) {
         alert(result.message);
       } else if (result.ok) {
         setNewPostContent("");
         setPendingImage(null);
+        setPendingModules([]);
       }
     } catch (error: any) {
       alert("图片上传失败: " + error.message);
     } finally {
       setPosting(false);
     }
-  }, [feed.publishPost, newPostContent, pendingImage?.file]);
+  }, [feed.publishPost, newPostContent, pendingImage?.file, pendingModules]);
+
+  const addCharacterModule = useCallback((character: Character) => {
+    setPendingModules((previous) => [
+      ...previous,
+      createCharacterSummaryModule(character),
+    ]);
+  }, []);
+
+  const removeModule = useCallback((index: number) => {
+    setPendingModules((previous) =>
+      previous.filter((_module, moduleIndex) => moduleIndex !== index)
+    );
+  }, []);
 
   const openPost = useCallback(
     (postId: string) => {
@@ -235,6 +281,10 @@ export function useSquareExperience() {
       setNewPostContent,
       posting,
       pendingImage,
+      pendingModules,
+      shareableCharacters,
+      addCharacterModule,
+      removeModule,
       clearPendingImage: () => setPendingImage(null),
       processFile,
       handlePaste,

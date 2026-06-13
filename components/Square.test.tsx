@@ -58,6 +58,10 @@ vi.mock("../hooks/useSquareFeed", () => ({
     publishPost: vi.fn(),
     togglePostLike: vi.fn(),
     deleteFeedPost: vi.fn(),
+    shareableCharacters: [],
+    pendingModules: [],
+    addCharacterModule: vi.fn(),
+    removeModule: vi.fn(),
   }),
 }));
 

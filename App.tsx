@@ -579,6 +579,7 @@ const App: React.FC = () => {
         ) : view === "tools" ? (
           <RoomTools
             roomId={currentRoomId}
+            roomTitle={moduleInfo.title}
             isKP={isKP}
             userId={currentUserId}
             logs={logs}

@@ -16,6 +16,7 @@ export type RoomToolsTab =
   | "report"
   | "clues"
   | "invite"
+  | "share"
   | "management";
 
 export function useRoomToolsState(roomId: string) {

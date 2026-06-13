@@ -1,4 +1,5 @@
-import type { Post, PostComment } from "../types";
+import type { CreateSquarePostModuleInput, Post, PostComment } from "../types";
+import { normalizeSquarePostModules } from "./squarePostModules";
 
 export const unknownSquareProfile = {
   nickname: "未知用户",
@@ -13,6 +14,7 @@ export function assembleSquarePosts(input: {
 }) {
   return input.postsData.map((post: any) => ({
     ...post,
+    modules: normalizeSquarePostModules(post),
     profiles: input.profileMap.get(post.user_id) || unknownSquareProfile,
     like_count: post.post_likes?.length || 0,
     comment_count: post.post_comments?.[0]?.count || 0,
@@ -82,6 +84,7 @@ export function formatRealtimeSquarePost(input: {
 }) {
   return {
     ...input.postData,
+    modules: normalizeSquarePostModules(input.postData),
     profiles: input.profileData || unknownSquareProfile,
     like_count: input.postData.post_likes?.[0]?.count || 0,
     comment_count: input.postData.post_comments?.[0]?.count || 0,
@@ -210,7 +213,11 @@ export interface SquareFeedRepository {
     user_id: string;
     content: string;
     image_url?: string;
-  }) => Promise<{ error?: any | null }>;
+  }) => Promise<{ data?: { id: string } | null; error?: any | null }>;
+  createPostModules: (
+    postId: string,
+    modules: CreateSquarePostModuleInput[]
+  ) => Promise<{ error?: any | null }>;
   createNotification: (payload: {
     user_id: string;
     actor_id: string;
@@ -293,10 +300,15 @@ export function createSquareFeedExecutor(input: {
 
   const publishPost = async (
     content: string,
-    imageFile?: File
+    imageFile?: File,
+    modules: CreateSquarePostModuleInput[] = []
   ): Promise<SquareFeedActionResult> => {
     const { activeChannelId, currentUser } = input.getContext();
-    if ((!content.trim() && !imageFile) || !activeChannelId || !currentUser) {
+    if (
+      (!content.trim() && !imageFile && modules.length === 0) ||
+      !activeChannelId ||
+      !currentUser
+    ) {
       return { ok: false };
     }
 
@@ -318,8 +330,20 @@ export function createSquareFeedExecutor(input: {
       );
     }
 
-    const { error } = await input.repository.createPost(postData);
+    const { data, error } = await input.repository.createPost(postData);
     if (error) return { ok: false, message: "发布失败: " + error.message };
+
+    if (modules.length > 0) {
+      if (!data?.id) return { ok: false, message: "发布失败: 未返回帖子 ID" };
+
+      const { error: moduleError } = await input.repository.createPostModules(
+        data.id,
+        modules
+      );
+      if (moduleError) {
+        return { ok: false, message: "发布模块失败: " + moduleError.message };
+      }
+    }
 
     return { ok: true };
   };

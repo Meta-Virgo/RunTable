@@ -7,6 +7,7 @@ describe("RoomTools", () => {
     const html = renderToStaticMarkup(
       <RoomTools
         roomId="room-1"
+        roomTitle="The House"
         isKP
         userId="keeper-1"
         logs={[]}
@@ -19,6 +20,7 @@ describe("RoomTools", () => {
     expect(html).toContain("战报");
     expect(html).toContain("线索墙");
     expect(html).toContain("邀请排期");
+    expect(html).toContain("广场分享");
     expect(html).toContain("跑团管理");
     expect(html).not.toContain("角色快照");
     expect(html).not.toContain("KP工具");
@@ -28,6 +30,7 @@ describe("RoomTools", () => {
     const html = renderToStaticMarkup(
       <RoomTools
         roomId="room-1"
+        roomTitle="The House"
         isKP={false}
         userId="player-1"
         logs={[]}
@@ -38,6 +41,7 @@ describe("RoomTools", () => {
     );
 
     expect(html).toContain("线索墙");
+    expect(html).toContain("广场分享");
     expect(html).not.toContain("角色快照");
     expect(html).not.toContain("跑团管理");
     expect(html).not.toContain("KP工具");

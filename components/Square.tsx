@@ -47,6 +47,10 @@ export const Square: React.FC = () => {
     setNewPostContent,
     posting,
     pendingImage,
+    pendingModules,
+    shareableCharacters,
+    addCharacterModule,
+    removeModule,
     clearPendingImage,
     processFile,
     handlePaste,
@@ -190,6 +194,10 @@ export const Square: React.FC = () => {
           >
             <SquareComposer
               activeChannelName={activeChannel?.name}
+              shareableCharacters={shareableCharacters}
+              pendingModules={pendingModules}
+              addCharacterModule={addCharacterModule}
+              removeModule={removeModule}
               newPostContent={newPostContent}
               setNewPostContent={setNewPostContent}
               posting={posting}

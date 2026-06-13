@@ -189,6 +189,8 @@ export interface Post {
   content: string;
   image_url?: string | null;
   tags?: string[];
+  square_post_modules?: SquarePostModule[];
+  modules?: SquarePostModule[];
   created_at: string;
   updated_at: string;
 
@@ -208,6 +210,68 @@ export interface Post {
   is_liked?: boolean; // If current user liked it
   liked_by?: { nickname: string }[];
 }
+
+export type SquarePostModuleType = "character_summary" | "room_log_excerpt";
+
+export interface SquareCharacterSummaryPayload {
+  title: string;
+  avatar_url?: string | null;
+  name: string;
+  role: string;
+  type: Character["type"];
+  theme_color?: string | null;
+  job?: string | null;
+  age?: string | null;
+  sex?: string | null;
+  stats: {
+    str: number;
+    con: number;
+    siz: number;
+    dex: number;
+    app: number;
+    int: number;
+    pow: number;
+    edu: number;
+    luck: number;
+    hp: number;
+    san: number;
+    mp: number;
+  };
+  top_skills: Array<{ name: string; value: number }>;
+}
+
+export interface SquareRoomLogExcerptEntry {
+  id: string;
+  at: string;
+  actor: string;
+  role: string;
+  type: Log["type"];
+  text: string;
+  image_url?: string | null;
+}
+
+export interface SquareRoomLogExcerptPayload {
+  title: string;
+  room_title?: string | null;
+  entries: SquareRoomLogExcerptEntry[];
+}
+
+export interface SquarePostModule {
+  id?: string;
+  post_id?: string;
+  module_type: SquarePostModuleType;
+  payload: SquareCharacterSummaryPayload | SquareRoomLogExcerptPayload;
+  source_character_id?: string | null;
+  source_room_id?: string | null;
+  source_message_ids?: string[];
+  display_order?: number;
+  created_at?: string;
+}
+
+export type CreateSquarePostModuleInput = Omit<
+  SquarePostModule,
+  "id" | "post_id" | "created_at"
+>;
 
 export interface PostComment {
   id: string;

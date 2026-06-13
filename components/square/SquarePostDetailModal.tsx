@@ -5,6 +5,7 @@ import { summarizeMarkdown } from "../../services/squareMarkdown";
 import { Button, cn, Modal } from "../UI";
 import { SquareMarkdown } from "../SquareMarkdown";
 import { SquareMarkdownEditor } from "../SquareMarkdownEditor";
+import { SquarePostModules } from "./SquarePostModules";
 import { formatSquareDetailTime, formatSquareTime } from "./squareTime";
 
 interface SquarePostDetailModalProps {
@@ -96,6 +97,10 @@ export const SquarePostDetailModal: React.FC<SquarePostDetailModalProps> = ({
               />
             </div>
           )}
+
+          <div className="mb-4">
+            <SquarePostModules modules={post.modules} />
+          </div>
 
           <div className="flex items-center gap-2 text-xs text-dicecho-muted mb-2">
             {post.tags && post.tags.length > 0 && (

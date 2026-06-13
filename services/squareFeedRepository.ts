@@ -1,4 +1,5 @@
 import { supabase } from "../supabase";
+import type { CreateSquarePostModuleInput } from "../types";
 
 export async function fetchSquareUser() {
   const {
@@ -30,6 +31,7 @@ export async function fetchPostsForChannel(channelId: string) {
     .select(
       `
       *,
+      square_post_modules (*),
       post_likes (user_id),
       post_comments (count)
     `
@@ -44,6 +46,7 @@ export async function fetchPostWithCounts(postId: string) {
     .select(
       `
       *,
+      square_post_modules (*),
       post_likes (count),
       post_comments (count)
     `
@@ -112,7 +115,26 @@ export async function createPost(postData: {
   content: string;
   image_url?: string;
 }) {
-  return supabase.from("posts").insert(postData);
+  return supabase.from("posts").insert(postData).select("id").single();
+}
+
+export async function createPostModules(
+  postId: string,
+  modules: CreateSquarePostModuleInput[]
+) {
+  if (modules.length === 0) return { error: null };
+
+  return supabase.from("square_post_modules").insert(
+    modules.map((module, index) => ({
+      post_id: postId,
+      module_type: module.module_type,
+      payload: module.payload,
+      source_character_id: module.source_character_id || null,
+      source_room_id: module.source_room_id || null,
+      source_message_ids: module.source_message_ids || [],
+      display_order: module.display_order ?? index,
+    }))
+  );
 }
 
 export async function createNotification(payload: {

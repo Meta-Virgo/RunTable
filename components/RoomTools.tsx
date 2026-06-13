@@ -7,6 +7,7 @@ import {
   Copy,
   FileText,
   Link,
+  Share2,
   Lock,
   Send,
   Settings,
@@ -14,7 +15,7 @@ import {
   Sparkles,
   Tags,
 } from "lucide-react";
-import type { Friendship, Log, RoomInvitationOutboxItem } from "../types";
+import type { Channel, Friendship, Log, RoomInvitationOutboxItem } from "../types";
 import { Button, Input, Textarea, cn } from "./UI";
 import {
   createClue,
@@ -31,12 +32,22 @@ import {
   revokeRoomInvitation,
   buildRoomInviteUrl,
 } from "../services/socialMessages";
+import {
+  createPost,
+  createPostModules,
+  fetchChannels,
+} from "../services/squareFeedRepository";
+import {
+  createRoomLogExcerptModule,
+  isPublicRoomLog,
+} from "../services/squarePostModules";
 import { fetchAcceptedFriendships } from "../services/friendsRepository";
 import { buildSessionReport } from "../utils/storyReport";
 import { nowIso, parseTags, useRoomToolsState } from "../hooks/useRoomToolsState";
 
 interface RoomToolsProps {
   roomId: string;
+  roomTitle?: string | null;
   isKP: boolean;
   userId?: string;
   logs: Log[];
@@ -49,11 +60,13 @@ const tabs = [
   { id: "report", label: "战报", icon: FileText },
   { id: "clues", label: "线索墙", icon: ClipboardList },
   { id: "invite", label: "邀请排期", icon: CalendarClock },
+  { id: "share", label: "广场分享", icon: Share2 },
   { id: "management", label: "跑团管理", icon: Settings },
 ] as const;
 
 export const RoomTools: React.FC<RoomToolsProps> = ({
   roomId,
+  roomTitle,
   isKP,
   userId,
   logs,
@@ -96,6 +109,20 @@ export const RoomTools: React.FC<RoomToolsProps> = ({
   const [outbox, setOutbox] = React.useState<RoomInvitationOutboxItem[]>([]);
   const [latestLinkUrl, setLatestLinkUrl] = React.useState("");
   const [inviteBusy, setInviteBusy] = React.useState(false);
+  const [squareChannels, setSquareChannels] = React.useState<Channel[]>([]);
+  const [shareChannelId, setShareChannelId] = React.useState("");
+  const [shareContent, setShareContent] = React.useState("");
+  const [shareTitle, setShareTitle] = React.useState("");
+  const [selectedLogIds, setSelectedLogIds] = React.useState<string[]>([]);
+  const [shareBusy, setShareBusy] = React.useState(false);
+
+  const publicShareLogs = React.useMemo(
+    () =>
+      logs
+        .filter(isPublicRoomLog)
+        .sort((left, right) => left.createdAt.localeCompare(right.createdAt)),
+    [logs]
+  );
 
   const refreshInvitations = React.useCallback(async () => {
     if (!isKP || !userId) return;
@@ -111,6 +138,18 @@ export const RoomTools: React.FC<RoomToolsProps> = ({
   React.useEffect(() => {
     refreshInvitations();
   }, [refreshInvitations]);
+
+  React.useEffect(() => {
+    fetchChannels().then(({ data }) => {
+      const channels = (data || []) as Channel[];
+      setSquareChannels(channels);
+      const preferred =
+        channels.find((channel) => channel.name.includes("战报")) ||
+        channels.find((channel) => channel.name.includes("鎴樻姤")) ||
+        channels[0];
+      if (preferred) setShareChannelId((previous) => previous || preferred.id);
+    });
+  }, []);
 
   const handleCreateClue = () => {
     if (!clueTitle.trim()) return;
@@ -182,6 +221,57 @@ export const RoomTools: React.FC<RoomToolsProps> = ({
       return;
     }
     await refreshInvitations();
+  };
+
+  const toggleSelectedLog = (logId: string) => {
+    setSelectedLogIds((previous) =>
+      previous.includes(logId)
+        ? previous.filter((id) => id !== logId)
+        : [...previous, logId]
+    );
+  };
+
+  const handleShareExcerpt = async () => {
+    if (!userId || !shareChannelId) return;
+    const selectedLogs = publicShareLogs.filter((log) =>
+      selectedLogIds.includes(log.id)
+    );
+    const module = createRoomLogExcerptModule({
+      roomId,
+      roomTitle,
+      logs: selectedLogs,
+      title: shareTitle,
+    });
+    if (!module) {
+      alert("请选择至少一条公开日志");
+      return;
+    }
+
+    setShareBusy(true);
+    const postResult = await createPost({
+      channel_id: shareChannelId,
+      user_id: userId,
+      content: shareContent.trim() || `分享跑团片段：${roomTitle || "未命名房间"}`,
+    });
+
+    if (postResult.error || !postResult.data?.id) {
+      setShareBusy(false);
+      alert("发布失败: " + (postResult.error?.message || "未返回帖子 ID"));
+      return;
+    }
+
+    const moduleResult = await createPostModules(postResult.data.id, [module]);
+    setShareBusy(false);
+
+    if (moduleResult.error) {
+      alert("发布模块失败: " + moduleResult.error.message);
+      return;
+    }
+
+    setShareContent("");
+    setShareTitle("");
+    setSelectedLogIds([]);
+    alert("已分享到广场");
   };
 
   return (
@@ -387,6 +477,23 @@ export const RoomTools: React.FC<RoomToolsProps> = ({
             handleSendFriendInvite={handleSendFriendInvite}
             handleCreateLinkInvite={handleCreateLinkInvite}
             handleRevokeInvite={handleRevokeInvite}
+          />
+        )}
+
+        {activeTab === "share" && (
+          <RoomSquareSharePanel
+            channels={squareChannels}
+            shareChannelId={shareChannelId}
+            setShareChannelId={setShareChannelId}
+            shareContent={shareContent}
+            setShareContent={setShareContent}
+            shareTitle={shareTitle}
+            setShareTitle={setShareTitle}
+            publicLogs={publicShareLogs}
+            selectedLogIds={selectedLogIds}
+            toggleSelectedLog={toggleSelectedLog}
+            shareBusy={shareBusy}
+            onShareExcerpt={handleShareExcerpt}
           />
         )}
 
@@ -617,6 +724,7 @@ const RoomInvitationsPanel: React.FC<{
             </Button>
           </div>
         )}
+
       </div>
     )}
     <div className="rounded-lg border border-dicecho-border/45 bg-dicecho-card/70 p-4 shadow-sm space-y-3">
@@ -676,6 +784,130 @@ const RoomInvitationsPanel: React.FC<{
             )}
           </article>
         ))}
+    </div>
+  </section>
+);
+
+const RoomSquareSharePanel: React.FC<{
+  channels: Channel[];
+  shareChannelId: string;
+  setShareChannelId: (value: string) => void;
+  shareContent: string;
+  setShareContent: (value: string) => void;
+  shareTitle: string;
+  setShareTitle: (value: string) => void;
+  publicLogs: Log[];
+  selectedLogIds: string[];
+  toggleSelectedLog: (logId: string) => void;
+  shareBusy: boolean;
+  onShareExcerpt: () => Promise<void>;
+}> = ({
+  channels,
+  shareChannelId,
+  setShareChannelId,
+  shareContent,
+  setShareContent,
+  shareTitle,
+  setShareTitle,
+  publicLogs,
+  selectedLogIds,
+  toggleSelectedLog,
+  shareBusy,
+  onShareExcerpt,
+}) => (
+  <section className="grid lg:grid-cols-[360px_1fr] gap-4">
+    <div className="rounded-lg border border-dicecho-border/45 bg-dicecho-card/70 p-4 shadow-sm space-y-3">
+      <h2 className="text-white font-bold flex items-center gap-2">
+        <Share2 size={18} className="text-dicecho-primary" />
+        分享跑团片段
+      </h2>
+      <label className="text-xs text-dicecho-muted mb-1.5 font-medium ml-1">
+        目标频道
+      </label>
+      <select
+        value={shareChannelId}
+        onChange={(event) => setShareChannelId(event.target.value)}
+        className="w-full bg-dicecho-panel/70 border border-dicecho-border/50 text-slate-100 rounded-lg px-4 py-2.5 focus:outline-none focus:border-dicecho-primary/70 transition-colors text-sm"
+      >
+        <option value="">选择频道</option>
+        {channels.map((channel) => (
+          <option key={channel.id} value={channel.id}>
+            {channel.name}
+          </option>
+        ))}
+      </select>
+      <Input
+        label="片段标题"
+        value={shareTitle}
+        onChange={(event) => setShareTitle(event.target.value)}
+        placeholder="例如：古宅门口的一次侦查"
+      />
+      <Textarea
+        label="帖子正文"
+        rows={4}
+        value={shareContent}
+        onChange={(event) => setShareContent(event.target.value)}
+        placeholder="补充这段跑团发生了什么..."
+      />
+      <Button
+        icon={Send}
+        onClick={() => void onShareExcerpt()}
+        disabled={!shareChannelId || selectedLogIds.length === 0 || shareBusy}
+      >
+        {shareBusy ? "发布中..." : "分享到广场"}
+      </Button>
+      <p className="text-xs text-dicecho-muted leading-5">
+        只会发布公开聊天、公开骰点、公开系统日志和公开图片；私聊与暗骰不会进入片段。
+      </p>
+    </div>
+
+    <div className="rounded-lg border border-dicecho-border/45 bg-dicecho-card/70 p-4 shadow-sm space-y-3">
+      <div className="flex items-center justify-between gap-3">
+        <h2 className="text-white font-bold">选择公开日志</h2>
+        <span className="text-xs text-dicecho-muted">
+          已选 {selectedLogIds.length}
+        </span>
+      </div>
+      {publicLogs.length === 0 ? (
+        <p className="text-sm text-dicecho-muted">暂无可分享的公开日志。</p>
+      ) : (
+        <div className="max-h-[58vh] space-y-2 overflow-y-auto pr-1 custom-scrollbar">
+          {publicLogs.map((log) => {
+            const checked = selectedLogIds.includes(log.id);
+            return (
+              <label
+                key={log.id}
+                className={cn(
+                  "flex cursor-pointer items-start gap-3 rounded-lg border p-3 transition-colors",
+                  checked
+                    ? "border-dicecho-primary/50 bg-dicecho-primary/10"
+                    : "border-dicecho-border/35 bg-dicecho-panel/45 hover:border-dicecho-primary/30"
+                )}
+              >
+                <input
+                  type="checkbox"
+                  checked={checked}
+                  onChange={() => toggleSelectedLog(log.id)}
+                  className="mt-1 accent-dicecho-primary"
+                />
+                <div className="min-w-0 flex-1">
+                  <div className="mb-1 flex flex-wrap items-center gap-2 text-xs text-dicecho-muted">
+                    <span>{log.timestamp}</span>
+                    <span className="font-semibold text-slate-300">
+                      {log.charName}
+                    </span>
+                    <span>{log.charRole}</span>
+                    <span>{log.type}</span>
+                  </div>
+                  <p className="line-clamp-3 whitespace-pre-wrap break-words text-sm leading-5 text-slate-200">
+                    {log.type === "image" ? "展示图片" : log.content}
+                  </p>
+                </div>
+              </label>
+            );
+          })}
+        </div>
+      )}
     </div>
   </section>
 );

@@ -213,6 +213,7 @@ describe("square feed model", () => {
   it("runs feed loading, realtime, publishing, liking, and deletion through one executor", async () => {
     let posts: Post[] = [post];
     const createdPosts: any[] = [];
+    const createdModules: any[] = [];
     const notifications: any[] = [];
     const liked: Array<{ postId: string; userId: string }> = [];
     const unliked: Array<{ postId: string; userId: string }> = [];
@@ -249,6 +250,10 @@ describe("square feed model", () => {
         uploadPostImage: async () => "https://image.test/post.png",
         createPost: async (payload) => {
           createdPosts.push(payload);
+          return { data: { id: "created-post-1" }, error: null };
+        },
+        createPostModules: async (postId, modules) => {
+          createdModules.push({ postId, modules });
           return { error: null };
         },
         createNotification: async (payload) => {
@@ -308,6 +313,21 @@ describe("square feed model", () => {
       user_id: "user-1",
       content: "hello",
       image_url: "https://image.test/post.png",
+    });
+
+    const modulePublishResult = await executor.publishPost("", undefined, [
+      {
+        module_type: "character_summary",
+        payload: { title: "Lin" } as any,
+        source_character_id: "char-1",
+        source_room_id: null,
+        source_message_ids: [],
+      },
+    ]);
+    expect(modulePublishResult).toEqual({ ok: true });
+    expect(createdModules[0]).toMatchObject({
+      postId: "created-post-1",
+      modules: [{ module_type: "character_summary" }],
     });
 
     posts = [{ ...post, is_liked: false }];

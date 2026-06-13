@@ -1,9 +1,11 @@
 import React, { useState } from "react";
 import { CornerDownRight, Heart, Loader2, MessageSquare, Trash2 } from "lucide-react";
 import type { Post } from "../../types";
+import { getSquareModuleSearchText } from "../../services/squarePostModules";
 import { summarizeMarkdown } from "../../services/squareMarkdown";
 import { cn } from "../UI";
 import { SquareMarkdown } from "../SquareMarkdown";
+import { SquarePostModules } from "./SquarePostModules";
 import { formatSquareTime } from "./squareTime";
 
 const MAX_POST_LENGTH = 140;
@@ -65,6 +67,11 @@ export const SquarePostList: React.FC<SquarePostListProps> = ({
       post.content.toLowerCase().includes(searchQuery.toLowerCase()) ||
       post.tags?.some((tag) =>
         tag.toLowerCase().includes(searchQuery.toLowerCase())
+      ) ||
+      post.modules?.some((module) =>
+        getSquareModuleSearchText(module)
+          .toLowerCase()
+          .includes(searchQuery.toLowerCase())
       )
   );
 
@@ -138,6 +145,8 @@ export const SquarePostList: React.FC<SquarePostListProps> = ({
                   />
                 </div>
               )}
+
+              <SquarePostModules modules={post.modules} compact />
             </div>
 
             {post.tags && post.tags.length > 0 && (

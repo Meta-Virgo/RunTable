@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "../supabase";
-import { Channel, Post } from "../types";
+import type { Channel, CreateSquarePostModuleInput, Post } from "../types";
 import {
   createNotification,
   createPost,
+  createPostModules,
   deletePost,
   fetchChannels,
   fetchLatestComments,
@@ -52,6 +53,7 @@ export function useSquareFeed() {
           fetchProfileById,
           uploadPostImage,
           createPost,
+          createPostModules,
           createNotification,
           likePost,
           unlikePost,
@@ -140,8 +142,11 @@ export function useSquareFeed() {
   }, [activeChannelId, feedExecutor]);
 
   const publishPost = useCallback(
-    async (content: string, imageFile?: File) =>
-      feedExecutor.publishPost(content, imageFile),
+    async (
+      content: string,
+      imageFile?: File,
+      modules?: CreateSquarePostModuleInput[]
+    ) => feedExecutor.publishPost(content, imageFile, modules),
     [feedExecutor]
   );
 
