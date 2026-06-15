@@ -47,13 +47,6 @@ export const SquareProfileModal: React.FC<SquareProfileModalProps> = ({
       className="max-w-md overflow-visible !bg-transparent !border-none !shadow-none !p-0"
     >
       <div className="bg-dicecho-card/95 border border-dicecho-border/50 rounded-lg relative overflow-hidden shadow-lg shadow-black/25 backdrop-blur-xl">
-        {profile.is_vip && (
-          <div className="absolute top-4 left-4 z-10">
-            <span className="bg-dicecho-primary-strong text-white text-xs font-bold px-2 py-1 rounded-full shadow-sm border border-dicecho-primary/40">
-              VIP
-            </span>
-          </div>
-        )}
         <div className="p-8 pb-0 text-center relative">
           <div className="mx-auto mb-4 flex justify-center relative">
             <div className="relative">
