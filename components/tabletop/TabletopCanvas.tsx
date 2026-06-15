@@ -1,0 +1,970 @@
+import React from "react";
+import { Circle, Group, Image, Layer, Line, Rect, Stage, Text } from "react-konva";
+import type Konva from "konva";
+import { MousePointer2, Plus } from "lucide-react";
+import type {
+  Character,
+  TabletopScene,
+  TabletopShape,
+  TabletopState,
+  TabletopToken,
+} from "../../types";
+import {
+  clampTabletopCoordinate,
+  clampTabletopScale,
+} from "../../services/tabletopModel";
+import type { TabletopMapBrush, TabletopTool } from "../RoomSceneView";
+import { Button, cn } from "../UI";
+
+const MIN_SHAPE_SIZE = 16;
+const MAJOR_GRID_INTERVAL = 5;
+const TOKEN_NODE_NAME = "tabletop-token";
+const SHAPE_NODE_NAME = "tabletop-shape";
+
+interface TabletopCanvasProps {
+  state: TabletopState;
+  scene: TabletopScene | null;
+  characters: Map<string, Character>;
+  isKeeper: boolean;
+  selectedTokenId: string | null;
+  tool: TabletopTool;
+  mapBrush: TabletopMapBrush;
+  onToolChange: (tool: TabletopTool) => void;
+  onSelectedTokenChange: (tokenId: string | null) => void;
+  canMoveToken: (token: TabletopToken) => boolean;
+  onTokenMove: (
+    token: TabletopToken,
+    position: { x: number; y: number }
+  ) => Promise<void>;
+  onCreateShape: (shape: {
+    kind: TabletopShape["kind"];
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+    text?: string;
+  }) => Promise<void>;
+  onUpdateShape: (shape: TabletopShape) => Promise<void>;
+  onDeleteShape: (shapeId: string) => Promise<void>;
+  onUpdateMapTile: (tile: { x: number; y: number; kind: TabletopMapBrush }) => Promise<void>;
+  onDeleteToken: (tokenId: string) => Promise<void>;
+  onToggleTokenHidden: (token: TabletopToken) => Promise<void>;
+  onRevealRect: (rect: { x: number; y: number; width: number; height: number }) => Promise<void>;
+  onHideRect: (rect: { x: number; y: number; width: number; height: number }) => Promise<void>;
+  canCreateScene?: boolean;
+  onCreateScene?: () => Promise<void>;
+  onScaleChange: (scale: number) => void;
+  fitRequest: number;
+}
+
+export const TabletopCanvas: React.FC<TabletopCanvasProps> = ({
+  state,
+  scene,
+  characters,
+  isKeeper,
+  selectedTokenId,
+  tool,
+  mapBrush,
+  onToolChange,
+  onSelectedTokenChange,
+  canMoveToken,
+  onTokenMove,
+  onCreateShape,
+  onUpdateShape,
+  onDeleteShape,
+  onUpdateMapTile,
+  onDeleteToken,
+  onToggleTokenHidden,
+  onRevealRect,
+  onHideRect,
+  canCreateScene = false,
+  onCreateScene,
+  onScaleChange,
+  fitRequest,
+}) => {
+  const containerRef = React.useRef<HTMLDivElement>(null);
+  const stageRef = React.useRef<Konva.Stage>(null);
+  const textInputRef = React.useRef<HTMLInputElement>(null);
+  const [size, setSize] = React.useState({ width: 0, height: 0 });
+  const [stageState, setStageState] = React.useState({
+    scale: 1,
+    x: 0,
+    y: 0,
+  });
+  const [drawStart, setDrawStart] = React.useState<{ x: number; y: number } | null>(
+    null
+  );
+  const [drawEnd, setDrawEnd] = React.useState<{ x: number; y: number } | null>(
+    null
+  );
+  const [selectedShapeId, setSelectedShapeId] = React.useState<string | null>(
+    null
+  );
+  const [textDraft, setTextDraft] = React.useState("文本");
+  const [isPaintingMap, setIsPaintingMap] = React.useState(false);
+  const lastPaintedTileRef = React.useRef<string | null>(null);
+
+  const gridSize = scene?.map.config.gridSize || 48;
+  const tokens = React.useMemo(
+    () =>
+      state.tokens
+        .filter((token) => token.sceneId === scene?.id)
+        .sort((left, right) => left.zIndex - right.zIndex),
+    [scene?.id, state.tokens]
+  );
+  const shapes = React.useMemo(
+    () =>
+      (state.shapes || [])
+        .filter((shape) => shape.sceneId === scene?.id)
+        .sort((left, right) => left.zIndex - right.zIndex),
+    [scene?.id, state.shapes]
+  );
+  const selectedToken = React.useMemo(
+    () => tokens.find((token) => token.id === selectedTokenId) || null,
+    [selectedTokenId, tokens]
+  );
+
+  const fitCanvas = React.useCallback(() => {
+    const width = containerRef.current?.clientWidth || size.width;
+    const height = containerRef.current?.clientHeight || size.height;
+    if (!width || !height) return;
+    const next = {
+      scale: 1,
+      x: width / 2,
+      y: height / 2,
+    };
+    setStageState(next);
+    onScaleChange(next.scale);
+  }, [onScaleChange, size.height, size.width]);
+
+  React.useEffect(() => {
+    const element = containerRef.current;
+    if (!element) return;
+    const measure = () => {
+      const rect = element.getBoundingClientRect();
+      setSize({
+        width: Math.max(0, Math.floor(rect.width)),
+        height: Math.max(0, Math.floor(rect.height)),
+      });
+    };
+    measure();
+
+    if (typeof ResizeObserver === "undefined") {
+      const animationFrame = window.requestAnimationFrame(measure);
+      window.addEventListener("resize", measure);
+      return () => {
+        window.cancelAnimationFrame(animationFrame);
+        window.removeEventListener("resize", measure);
+      };
+    }
+
+    const observer = new ResizeObserver(([entry]) => {
+      setSize({
+        width: Math.max(0, Math.floor(entry.contentRect.width)),
+        height: Math.max(0, Math.floor(entry.contentRect.height)),
+      });
+    });
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [scene?.id]);
+
+  React.useEffect(() => {
+    fitCanvas();
+  }, [fitCanvas, fitRequest, scene?.id]);
+
+  React.useEffect(() => {
+    const key = `tabletop-viewport:${state.roomId}:${scene?.id || "none"}`;
+    const saved = window.localStorage.getItem(key);
+    if (!saved) return;
+    try {
+      const parsed = JSON.parse(saved) as typeof stageState;
+      if (
+        Number.isFinite(parsed.x) &&
+        Number.isFinite(parsed.y) &&
+        Number.isFinite(parsed.scale)
+      ) {
+        const next = { ...parsed, scale: clampTabletopScale(parsed.scale) };
+        setStageState(next);
+        onScaleChange(next.scale);
+      }
+    } catch {
+      // Ignore stale viewport cache.
+    }
+  }, [onScaleChange, scene?.id, state.roomId]);
+
+  React.useEffect(() => {
+    if (!scene) return;
+    window.localStorage.setItem(
+      `tabletop-viewport:${state.roomId}:${scene.id}`,
+      JSON.stringify(stageState)
+    );
+  }, [scene, stageState, state.roomId]);
+
+  const getWorldPointer = React.useCallback(() => {
+    const stage = stageRef.current;
+    const pointer = stage?.getPointerPosition();
+    if (!pointer) return null;
+    return {
+      x: (pointer.x - stageState.x) / stageState.scale,
+      y: (pointer.y - stageState.y) / stageState.scale,
+    };
+  }, [stageState.scale, stageState.x, stageState.y]);
+
+  const createTextAtPoint = React.useCallback(
+    (point: { x: number; y: number }) => {
+      const text = textDraft.trim() || "文本";
+      const length = Array.from(text).length;
+      void onCreateShape({
+        kind: "text",
+        x: point.x,
+        y: point.y,
+        width: Math.min(480, Math.max(96, length * 18)),
+        height: Math.max(34, Math.ceil(length / 22) * 30),
+        text,
+      });
+      onToolChange("select");
+    },
+    [onCreateShape, onToolChange, textDraft]
+  );
+
+  const createTextAtViewportCenter = React.useCallback(() => {
+    if (!size.width || !size.height) return;
+    createTextAtPoint({
+      x: (size.width / 2 - stageState.x) / stageState.scale,
+      y: (size.height / 2 - stageState.y) / stageState.scale,
+    });
+  }, [
+    createTextAtPoint,
+    size.height,
+    size.width,
+    stageState.scale,
+    stageState.x,
+    stageState.y,
+  ]);
+
+  const handleWheel = (event: Konva.KonvaEventObject<WheelEvent>) => {
+    event.evt.preventDefault();
+    const pointer = stageRef.current?.getPointerPosition();
+    if (!pointer) return;
+    const oldScale = stageState.scale;
+    const mousePointTo = {
+      x: (pointer.x - stageState.x) / oldScale,
+      y: (pointer.y - stageState.y) / oldScale,
+    };
+    const scaleBy = 1.08;
+    const nextScale = clampTabletopScale(
+      event.evt.deltaY > 0 ? oldScale / scaleBy : oldScale * scaleBy
+    );
+    const next = {
+      scale: nextScale,
+      x: pointer.x - mousePointTo.x * nextScale,
+      y: pointer.y - mousePointTo.y * nextScale,
+    };
+    setStageState(next);
+    onScaleChange(next.scale);
+  };
+
+  const isShapeDraftTool = tool === "rect" || tool === "circle";
+  const isFogDraftTool = tool === "reveal" || tool === "hide";
+  const isMapEditTool = isKeeper && tool === "map";
+
+  const paintMapTileAtPointer = React.useCallback(() => {
+    if (!scene || !isMapEditTool) return;
+    const point = getWorldPointer();
+    if (!point) return;
+    const tileX = Math.floor(point.x / gridSize);
+    const tileY = Math.floor(point.y / gridSize);
+    if (
+      tileX < 0 ||
+      tileY < 0 ||
+      tileX >= scene.map.config.width ||
+      tileY >= scene.map.config.height
+    ) {
+      return;
+    }
+    const key = `${tileX}:${tileY}:${mapBrush}`;
+    if (lastPaintedTileRef.current === key) return;
+    lastPaintedTileRef.current = key;
+    void onUpdateMapTile({ x: tileX, y: tileY, kind: mapBrush });
+  }, [getWorldPointer, gridSize, isMapEditTool, mapBrush, onUpdateMapTile, scene]);
+
+  const draftShape = React.useMemo(() => {
+    if (!drawStart || !drawEnd || (!isShapeDraftTool && !isFogDraftTool)) {
+      return null;
+    }
+    return {
+      kind: isShapeDraftTool ? tool : "rect",
+      mode: isFogDraftTool ? tool : "shape",
+      x: Math.min(drawStart.x, drawEnd.x),
+      y: Math.min(drawStart.y, drawEnd.y),
+      width: Math.abs(drawEnd.x - drawStart.x),
+      height: Math.abs(drawEnd.y - drawStart.y),
+    };
+  }, [drawEnd, drawStart, isFogDraftTool, isShapeDraftTool, tool]);
+
+  const deleteSelectedToken = React.useCallback(() => {
+    if (!isKeeper || !selectedTokenId) return;
+    void onDeleteToken(selectedTokenId);
+    onSelectedTokenChange(null);
+  }, [isKeeper, onDeleteToken, onSelectedTokenChange, selectedTokenId]);
+
+  React.useEffect(() => {
+    if (!selectedShapeId && !selectedTokenId) return;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (!isKeeper) return;
+      if (event.key !== "Delete" && event.key !== "Backspace") return;
+      event.preventDefault();
+      if (selectedShapeId) {
+        void onDeleteShape(selectedShapeId);
+        setSelectedShapeId(null);
+        return;
+      }
+      if (selectedTokenId) {
+        deleteSelectedToken();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [
+    deleteSelectedToken,
+    isKeeper,
+    onDeleteShape,
+    selectedShapeId,
+    selectedTokenId,
+  ]);
+
+  React.useEffect(() => {
+    if (!isKeeper || tool !== "text") return;
+    const frame = window.requestAnimationFrame(() => {
+      textInputRef.current?.focus();
+      textInputRef.current?.select();
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [isKeeper, tool]);
+
+  const finishDrawing = React.useCallback(() => {
+    if (!drawStart) return;
+    if (
+      draftShape &&
+      draftShape.width >= MIN_SHAPE_SIZE &&
+      draftShape.height >= MIN_SHAPE_SIZE
+    ) {
+      if (draftShape.mode === "reveal") {
+        void onRevealRect(draftShape);
+      } else if (draftShape.mode === "hide") {
+        void onHideRect(draftShape);
+      } else {
+        void onCreateShape(draftShape);
+      }
+    }
+    setDrawStart(null);
+    setDrawEnd(null);
+    onToolChange("select");
+  }, [draftShape, drawStart, onCreateShape, onHideRect, onRevealRect, onToolChange]);
+
+  if (!scene) {
+    return (
+      <div className="flex min-h-0 flex-1 items-center justify-center bg-[#101827] text-center">
+        <div className="max-w-sm px-6">
+          <MousePointer2 size={42} className="mx-auto mb-3 text-dicecho-primary" />
+          <p className="font-bold text-white">还没有可用场景</p>
+          <p className="mt-2 text-sm leading-6 text-dicecho-muted">
+            创建场景后，这里会显示一张可缩放、可平移、可放置角色点位的网格桌面。
+          </p>
+          {canCreateScene && onCreateScene && (
+            <Button
+              className="mx-auto mt-4"
+              icon={Plus}
+              onClick={() => void onCreateScene()}
+            >
+              创建新场景
+            </Button>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  const isDrawingTool = isKeeper && (isShapeDraftTool || isFogDraftTool);
+  const isTextTool = isKeeper && tool === "text";
+
+  return (
+    <div
+      ref={containerRef}
+      className={cn(
+        "relative min-h-[360px] flex-1 overflow-hidden bg-[#101827]",
+        (isDrawingTool || isTextTool || isMapEditTool) && "cursor-crosshair"
+      )}
+    >
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(148,163,184,0.16)_0,transparent_45%)]" />
+      {isDrawingTool && (
+        <div className="pointer-events-none absolute left-3 top-20 z-20 rounded-lg border border-dicecho-primary/35 bg-dicecho-panel/90 px-3 py-2 text-xs font-bold text-white shadow-lg">
+          {tool === "reveal"
+            ? "按住画布拖动，松开后揭示玩家可见范围"
+            : tool === "hide"
+              ? "按住画布拖动，松开后遮蔽玩家可见范围"
+              : `按住画布拖动，松开创建${tool === "rect" ? "矩形" : "圆形"}`}
+        </div>
+      )}
+      {isTextTool && (
+        <div
+          className="absolute left-3 top-20 z-20 flex max-w-[calc(100%-1.5rem)] items-center gap-2 rounded-lg border border-dicecho-primary/35 bg-dicecho-panel/95 px-3 py-2 shadow-lg"
+          onMouseDown={(event) => event.stopPropagation()}
+          onPointerDown={(event) => event.stopPropagation()}
+        >
+          <input
+            ref={textInputRef}
+            value={textDraft}
+            onChange={(event) => setTextDraft(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") {
+                event.preventDefault();
+                createTextAtViewportCenter();
+              }
+              if (event.key === "Escape") {
+                onToolChange("select");
+              }
+            }}
+            placeholder="Text"
+            className="h-8 w-44 rounded-md border border-dicecho-border/45 bg-[#101827] px-2 text-sm font-semibold text-white outline-none transition-colors placeholder:text-dicecho-muted focus:border-dicecho-primary/75"
+          />
+          <button
+            type="button"
+            onClick={createTextAtViewportCenter}
+            className="h-8 rounded-md border border-dicecho-primary/40 bg-dicecho-primary/20 px-3 text-xs font-bold text-white transition-colors hover:bg-dicecho-primary/30"
+          >
+            Place
+          </button>
+        </div>
+      )}
+      {isKeeper && selectedShapeId && (
+        <button
+          type="button"
+          className="absolute right-3 top-20 z-20 rounded-lg border border-red-400/35 bg-red-500/15 px-3 py-2 text-xs font-bold text-red-100 shadow-lg transition-colors hover:bg-red-500/25"
+          onClick={() => {
+            void onDeleteShape(selectedShapeId);
+            setSelectedShapeId(null);
+          }}
+        >
+          删除选中形状
+        </button>
+      )}
+      {isKeeper && selectedToken && (
+        <div className="absolute right-3 top-20 z-20 flex items-center gap-2 rounded-lg border border-dicecho-border/45 bg-dicecho-panel/92 px-2 py-2 shadow-lg backdrop-blur">
+          <button
+            type="button"
+            className="rounded-md border border-amber-300/35 bg-amber-400/12 px-3 py-2 text-xs font-bold text-amber-100 transition-colors hover:bg-amber-400/22"
+            onClick={() => void onToggleTokenHidden(selectedToken)}
+          >
+            {selectedToken.isHidden ? "设为可见" : "设为隐藏"}
+          </button>
+          <button
+            type="button"
+            className="rounded-md border border-red-400/35 bg-red-500/15 px-3 py-2 text-xs font-bold text-red-100 transition-colors hover:bg-red-500/25"
+            onClick={deleteSelectedToken}
+          >
+            移除点位
+          </button>
+        </div>
+      )}
+      {size.width > 0 && size.height > 0 && (
+        <Stage
+          ref={stageRef}
+          width={size.width}
+          height={size.height}
+          x={stageState.x}
+          y={stageState.y}
+          scaleX={stageState.scale}
+          scaleY={stageState.scale}
+          draggable={!isDrawingTool && !isTextTool && !isMapEditTool}
+          onWheel={handleWheel}
+          onDragEnd={(event) => {
+            if (event.target !== event.target.getStage()) return;
+            setStageState((previous) => ({
+              ...previous,
+              x: event.target.x(),
+              y: event.target.y(),
+            }));
+          }}
+          onMouseDown={(event) => {
+            onSelectedTokenChange(null);
+            if (isMapEditTool) {
+              event.cancelBubble = true;
+              lastPaintedTileRef.current = null;
+              setIsPaintingMap(true);
+              paintMapTileAtPointer();
+              return;
+            }
+            if (event.target.hasName(SHAPE_NODE_NAME)) return;
+            if (isTextTool) {
+              const point = getWorldPointer();
+              if (!point) return;
+              createTextAtPoint(point);
+              return;
+            }
+            setSelectedShapeId(null);
+            if (!isDrawingTool) return;
+            if (event.target.hasName(TOKEN_NODE_NAME)) return;
+            const point = getWorldPointer();
+            if (!point) return;
+            event.cancelBubble = true;
+            setDrawStart(point);
+            setDrawEnd(point);
+          }}
+          onMouseMove={() => {
+            if (isPaintingMap) {
+              paintMapTileAtPointer();
+              return;
+            }
+            if (!drawStart) return;
+            const point = getWorldPointer();
+            if (point) setDrawEnd(point);
+          }}
+          onMouseUp={() => {
+            setIsPaintingMap(false);
+            lastPaintedTileRef.current = null;
+            finishDrawing();
+          }}
+          onMouseLeave={() => {
+            setIsPaintingMap(false);
+            lastPaintedTileRef.current = null;
+            finishDrawing();
+          }}
+        >
+          <Layer>
+            <Rect
+              x={(0 - stageState.x) / stageState.scale}
+              y={(0 - stageState.y) / stageState.scale}
+              width={size.width / stageState.scale}
+              height={size.height / stageState.scale}
+              fill="rgba(16,24,39,0.02)"
+              listening={false}
+            />
+            <TabletopMapTiles scene={scene} isKeeper={isKeeper} />
+            <InfiniteGrid
+              viewport={size}
+              stageState={stageState}
+              gridSize={gridSize}
+            />
+            {shapes.map((shape) => (
+              <ShapeNode
+                key={shape.id}
+                shape={shape}
+                canEdit={isKeeper}
+                selected={selectedShapeId === shape.id}
+                onSelect={() => {
+                  onSelectedTokenChange(null);
+                  setSelectedShapeId(shape.id);
+                }}
+                onMoveEnd={(position) =>
+                  onUpdateShape({
+                    ...shape,
+                    x: position.x,
+                    y: position.y,
+                  })
+                }
+              />
+            ))}
+            {draftShape && (
+              <ShapeNode
+                shape={{
+                  id: "draft",
+                  sceneId: scene.id,
+                  kind: draftShape.kind,
+                  x: draftShape.x,
+                  y: draftShape.y,
+                  width: draftShape.width,
+                  height: draftShape.height,
+                  fill:
+                    draftShape.mode === "reveal"
+                      ? "rgba(34,197,94,0.12)"
+                      : draftShape.mode === "hide"
+                        ? "rgba(245,158,11,0.16)"
+                        : "rgba(250,204,21,0.12)",
+                  stroke:
+                    draftShape.mode === "reveal"
+                      ? "#4ade80"
+                      : draftShape.mode === "hide"
+                        ? "#f59e0b"
+                        : "#facc15",
+                  strokeWidth: 2,
+                  zIndex: 999,
+                  createdAt: "",
+                  updatedAt: "",
+                }}
+                dashed
+              />
+            )}
+            {tokens.map((token) => (
+              <TabletopTokenNode
+                key={token.id}
+                token={token}
+                character={characters.get(token.characterId)}
+                canMove={canMoveToken(token)}
+                selected={selectedTokenId === token.id}
+                onSelect={() => {
+                  setSelectedShapeId(null);
+                  onSelectedTokenChange(token.id);
+                }}
+                onMoveEnd={(position) => onTokenMove(token, position)}
+              />
+            ))}
+          </Layer>
+        </Stage>
+      )}
+    </div>
+  );
+};
+
+const TabletopMapTiles: React.FC<{
+  scene: TabletopScene;
+  isKeeper: boolean;
+}> = ({ scene, isKeeper }) => {
+  const gridSize = scene.map.config.gridSize;
+
+  return (
+    <>
+      {scene.map.tiles.map((tile) => (
+        <Rect
+          key={`${tile.x}:${tile.y}`}
+          x={tile.x * gridSize}
+          y={tile.y * gridSize}
+          width={gridSize}
+          height={gridSize}
+          fill={getMapTileFill(tile.kind, tile.revealed, isKeeper)}
+          stroke={tile.revealed ? "rgba(148,163,184,0.13)" : "rgba(15,23,42,0.32)"}
+          strokeWidth={1}
+          listening={false}
+        />
+      ))}
+    </>
+  );
+};
+
+function getMapTileFill(
+  kind: TabletopScene["map"]["tiles"][number]["kind"],
+  revealed: boolean,
+  isKeeper: boolean
+) {
+  if (!revealed && !isKeeper) return "rgba(2,6,23,0.96)";
+
+  const alpha = revealed ? 0.72 : 0.25;
+  if (kind === "floor") return `rgba(51,65,85,${alpha})`;
+  if (kind === "door") return `rgba(217,119,6,${revealed ? 0.68 : 0.24})`;
+  if (kind === "void") return "rgba(2,6,23,0.98)";
+  return `rgba(15,23,42,${revealed ? 0.88 : 0.42})`;
+}
+
+const InfiniteGrid: React.FC<{
+  viewport: { width: number; height: number };
+  stageState: { scale: number; x: number; y: number };
+  gridSize: number;
+}> = ({ viewport, stageState, gridSize }) => {
+  const lines: React.ReactNode[] = [];
+  const worldLeft = (0 - stageState.x) / stageState.scale;
+  const worldTop = (0 - stageState.y) / stageState.scale;
+  const worldRight = (viewport.width - stageState.x) / stageState.scale;
+  const worldBottom = (viewport.height - stageState.y) / stageState.scale;
+  const startX = Math.floor(worldLeft / gridSize) * gridSize;
+  const endX = Math.ceil(worldRight / gridSize) * gridSize;
+  const startY = Math.floor(worldTop / gridSize) * gridSize;
+  const endY = Math.ceil(worldBottom / gridSize) * gridSize;
+
+  for (let x = startX; x <= endX; x += gridSize) {
+    const isMajor = Math.round(x / gridSize) % MAJOR_GRID_INTERVAL === 0;
+    lines.push(
+      <Line
+        key={`v-${x}`}
+        points={[x, worldTop, x, worldBottom]}
+        stroke={
+          x === 0
+            ? "rgba(248,250,252,0.62)"
+            : isMajor
+              ? "rgba(125,211,252,0.34)"
+              : "rgba(226,232,240,0.20)"
+        }
+        strokeWidth={isMajor ? 1.5 / stageState.scale : 1 / stageState.scale}
+        listening={false}
+      />
+    );
+  }
+
+  for (let y = startY; y <= endY; y += gridSize) {
+    const isMajor = Math.round(y / gridSize) % MAJOR_GRID_INTERVAL === 0;
+    lines.push(
+      <Line
+        key={`h-${y}`}
+        points={[worldLeft, y, worldRight, y]}
+        stroke={
+          y === 0
+            ? "rgba(248,250,252,0.62)"
+            : isMajor
+              ? "rgba(125,211,252,0.34)"
+              : "rgba(226,232,240,0.20)"
+        }
+        strokeWidth={isMajor ? 1.5 / stageState.scale : 1 / stageState.scale}
+        listening={false}
+      />
+    );
+  }
+
+  return <>{lines}</>;
+};
+
+const ShapeNode: React.FC<{
+  shape: TabletopShape;
+  dashed?: boolean;
+  canEdit?: boolean;
+  selected?: boolean;
+  onSelect?: () => void;
+  onMoveEnd?: (position: { x: number; y: number }) => Promise<void>;
+}> = ({ shape, dashed, canEdit = false, selected = false, onSelect, onMoveEnd }) => {
+  const handleSelect = (event: Konva.KonvaEventObject<MouseEvent | TouchEvent>) => {
+    event.cancelBubble = true;
+    onSelect?.();
+  };
+  const handleDragEnd = (event: Konva.KonvaEventObject<DragEvent>) => {
+    event.cancelBubble = true;
+    void onMoveEnd?.({
+      x: clampTabletopCoordinate(event.target.x()),
+      y: clampTabletopCoordinate(event.target.y()),
+    });
+  };
+
+  if (shape.kind === "text") {
+    return (
+      <Group
+        name={SHAPE_NODE_NAME}
+        x={shape.x}
+        y={shape.y}
+        draggable={canEdit}
+        onClick={handleSelect}
+        onTap={handleSelect}
+        onDragEnd={handleDragEnd}
+      >
+        {selected && (
+          <Rect
+            x={-6}
+            y={-5}
+            width={shape.width + 12}
+            height={shape.height + 10}
+            stroke="#facc15"
+            strokeWidth={2}
+            dash={[7, 5]}
+            fill="rgba(250,204,21,0.08)"
+          />
+        )}
+        <Text
+          text={shape.text || "文本"}
+          width={shape.width}
+          height={shape.height}
+          fontSize={22}
+          fontStyle="bold"
+          fill={shape.fill}
+          shadowColor="#000000"
+          shadowOpacity={0.45}
+          shadowBlur={5}
+        />
+      </Group>
+    );
+  }
+
+  if (shape.kind === "circle") {
+    return (
+      <Group
+        name={SHAPE_NODE_NAME}
+        x={shape.x}
+        y={shape.y}
+        draggable={canEdit}
+        onClick={handleSelect}
+        onTap={handleSelect}
+        onDragEnd={handleDragEnd}
+      >
+        <Circle
+          x={shape.width / 2}
+          y={shape.height / 2}
+          radius={Math.max(shape.width, shape.height) / 2}
+          fill={shape.fill}
+          stroke={selected ? "#facc15" : shape.stroke}
+          strokeWidth={selected ? shape.strokeWidth + 1 : shape.strokeWidth}
+          dash={dashed ? [8, 6] : undefined}
+        />
+      </Group>
+    );
+  }
+
+  return (
+    <Group
+      name={SHAPE_NODE_NAME}
+      x={shape.x}
+      y={shape.y}
+      draggable={canEdit}
+      onClick={handleSelect}
+      onTap={handleSelect}
+      onDragEnd={handleDragEnd}
+    >
+      <Rect
+        width={shape.width}
+        height={shape.height}
+        fill={shape.fill}
+        stroke={selected ? "#facc15" : shape.stroke}
+        strokeWidth={selected ? shape.strokeWidth + 1 : shape.strokeWidth}
+        dash={dashed ? [8, 6] : undefined}
+      />
+    </Group>
+  );
+};
+
+const TabletopTokenNode: React.FC<{
+  token: TabletopToken;
+  character?: Character;
+  canMove: boolean;
+  selected: boolean;
+  onSelect: () => void;
+  onMoveEnd: (position: { x: number; y: number }) => Promise<void>;
+}> = ({
+  token,
+  character,
+  canMove,
+  selected,
+  onSelect,
+  onMoveEnd,
+}) => {
+  const label = token.label || character?.name || "Token";
+  const avatarImage = useAvatarImage(character?.avatar_url || null);
+  const hasAvatar = Boolean(avatarImage);
+  const color =
+    character?.theme_color ||
+    (character?.type === "monster"
+      ? "#dc2626"
+      : character?.type === "npc"
+        ? "#d97706"
+        : "#4f46e5");
+
+  return (
+    <Group
+      name={TOKEN_NODE_NAME}
+      x={token.x}
+      y={token.y}
+      rotation={token.rotation}
+      draggable={canMove}
+      onClick={(event) => {
+        event.cancelBubble = true;
+        onSelect();
+      }}
+      onTap={(event) => {
+        event.cancelBubble = true;
+        onSelect();
+      }}
+      onDragEnd={(event) => {
+        event.cancelBubble = true;
+        void onMoveEnd({
+          x: clampTabletopCoordinate(event.target.x()),
+          y: clampTabletopCoordinate(event.target.y()),
+        });
+      }}
+      onMouseEnter={(event) => {
+        const stage = event.target.getStage();
+        if (stage) stage.container().style.cursor = canMove ? "grab" : "default";
+      }}
+      onMouseLeave={(event) => {
+        const stage = event.target.getStage();
+        if (stage) stage.container().style.cursor = "default";
+      }}
+    >
+      {selected && (
+        <Circle
+          radius={token.size / 2 + 7}
+          stroke="#e2e8f0"
+          strokeWidth={2}
+          dash={[7, 5]}
+          fill="rgba(255,255,255,0.06)"
+        />
+      )}
+      <Circle
+        radius={token.size / 2}
+        fill={token.isHidden ? "#f59e0b" : color}
+        stroke="rgba(255,255,255,0.9)"
+        strokeWidth={2}
+        shadowColor="#000000"
+        shadowOpacity={0.36}
+        shadowBlur={10}
+      />
+      {avatarImage ? (
+        <Group
+          clipFunc={(context) => {
+            context.arc(0, 0, token.size / 2 - 1, 0, Math.PI * 2, false);
+          }}
+          listening={false}
+        >
+          <Image
+            image={avatarImage}
+            x={-token.size / 2}
+            y={-token.size / 2}
+            width={token.size}
+            height={token.size}
+            listening={false}
+          />
+        </Group>
+      ) : (
+        <Text
+          text={label.slice(0, 1).toUpperCase()}
+          x={-token.size / 2}
+          y={-token.size / 2 + 6}
+          width={token.size}
+          height={token.size}
+          align="center"
+          fontSize={20}
+          fontStyle="bold"
+          fill="#ffffff"
+        />
+      )}
+      {hasAvatar && token.isHidden && (
+        <Circle
+          radius={token.size / 2}
+          fill="rgba(245,158,11,0.38)"
+          listening={false}
+        />
+      )}
+      <Text
+        text={label}
+        x={-52}
+        y={token.size / 2 + 7}
+        width={104}
+        align="center"
+        fontSize={11}
+        fontStyle="bold"
+        fill="rgba(226,232,240,0.94)"
+        ellipsis
+      />
+    </Group>
+  );
+};
+
+function useAvatarImage(url: string | null) {
+  const [image, setImage] = React.useState<HTMLImageElement | null>(null);
+
+  React.useEffect(() => {
+    if (!url) {
+      setImage(null);
+      return;
+    }
+
+    let cancelled = false;
+    const nextImage = new window.Image();
+    nextImage.crossOrigin = "anonymous";
+    nextImage.onload = () => {
+      if (!cancelled) setImage(nextImage);
+    };
+    nextImage.onerror = () => {
+      if (!cancelled) setImage(null);
+    };
+    nextImage.src = url;
+
+    return () => {
+      cancelled = true;
+    };
+  }, [url]);
+
+  return image;
+}

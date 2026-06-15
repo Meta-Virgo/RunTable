@@ -3,18 +3,16 @@ import {
   Bell,
   CheckCheck,
   History,
-  LogOut,
   RefreshCcw,
-  Settings,
   ShieldCheck,
   Trash2,
-  User,
 } from "lucide-react";
 import type { Character, GameHistory, Notification } from "../../types";
 import type { HomePlayerHistoryItem } from "../../services/homeProfileModel";
 import { summarizeMarkdown } from "../../services/squareMarkdown";
 import { AvatarUpload } from "../AvatarUpload";
 import { Messages } from "../Messages";
+import { StaggeredItem } from "../Skeleton";
 import { Button, Input, Textarea, cn } from "../UI";
 import type { HomeTab } from "./HomeNavigation";
 
@@ -24,7 +22,6 @@ type MessageCenterPane = "social" | "square";
 
 interface HomeAccountViewsProps {
   activeTab: AccountTab;
-  onSelectTab: (tab: AccountTab) => void;
   messageCenterPane: MessageCenterPane;
   onSelectMessageCenterPane: (pane: MessageCenterPane) => void;
   settingsSection: SettingsSection;
@@ -75,12 +72,10 @@ interface HomeAccountViewsProps {
   onResetProfile: () => void;
   onChangePassword: () => void | Promise<void>;
   onShowHistory: () => void;
-  onLogout: () => void;
 }
 
 export const HomeAccountViews: React.FC<HomeAccountViewsProps> = ({
   activeTab,
-  onSelectTab,
   messageCenterPane,
   onSelectMessageCenterPane,
   settingsSection,
@@ -121,96 +116,21 @@ export const HomeAccountViews: React.FC<HomeAccountViewsProps> = ({
   onResetProfile,
   onChangePassword,
   onShowHistory,
-  onLogout,
 }) => {
   const displayName = userNickname || "未命名用户";
   const displayBio = normalizeBio(userBio);
   const totalHistory = kpHistory.length + playerHistory.length;
+  const accountCreatedDate = userCreatedAt
+    ? new Date(userCreatedAt).toLocaleDateString()
+    : "---";
 
   return (
-    <div className="mx-auto grid max-w-screen-xl gap-6 md:grid-cols-[15rem_minmax(0,1fr)]">
-      <aside className="space-y-4">
-        <div className="rounded-lg border border-dicecho-border/40 bg-dicecho-panel/75 p-4">
-          <div className="flex items-center gap-3">
-            <AvatarUpload
-              url={userAvatar}
-              onUpload={() => {}}
-              editable={false}
-              size={48}
-            />
-            <div className="min-w-0">
-              <div className="truncate font-semibold text-white">
-                {displayName}
-              </div>
-              <div className="mt-0.5 text-xs text-dicecho-muted">
-                UID: {userCode || "---"}
-              </div>
-            </div>
-          </div>
-          <div className="mt-4 flex flex-wrap gap-2">
-            {levelInfo && (
-              <span className="rounded border border-dicecho-primary/30 bg-dicecho-primary/15 px-2 py-1 text-[11px] font-bold text-dicecho-primary">
-                LV.{levelInfo.level}
-              </span>
-            )}
-            {isVip && (
-              <span className="rounded border border-amber-400/30 bg-amber-400/10 px-2 py-1 text-[11px] font-bold text-amber-200">
-                VIP
-              </span>
-            )}
-          </div>
-        </div>
-
-        <nav className="rounded-lg border border-dicecho-border/40 bg-dicecho-panel/75 p-2">
-          <AccountNavButton
-            icon={User}
-            label="个人中心"
-            active={activeTab === "profile"}
-            onClick={() => onSelectTab("profile")}
-          />
-          <AccountNavButton
-            icon={Bell}
-            label="消息中心"
-            active={activeTab === "notifications"}
-            badge={unreadCount + socialMessageCount}
-            onClick={() => onSelectTab("notifications")}
-          />
-          <AccountNavButton
-            icon={Settings}
-            label="设置"
-            active={activeTab === "settings"}
-            onClick={() => onSelectTab("settings")}
-          />
-          {activeTab === "settings" && (
-            <div className="mb-2 ml-5 mt-1 space-y-1 border-l border-dicecho-border/40 pl-3">
-              <SubNavButton
-                active={settingsSection === "profile"}
-                onClick={() => setSettingsSection("profile")}
-              >
-                个人资料
-              </SubNavButton>
-              <SubNavButton
-                active={settingsSection === "security"}
-                onClick={() => setSettingsSection("security")}
-              >
-                密码与安全
-              </SubNavButton>
-            </div>
-          )}
-          <div className="my-2 border-t border-dicecho-border/35" />
-          <button
-            type="button"
-            onClick={onLogout}
-            className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-red-300 transition-colors hover:bg-red-500/10 hover:text-red-200"
-          >
-            <LogOut size={16} />
-            登出
-          </button>
-        </nav>
-      </aside>
-
-      <section className="min-w-0">
-        {activeTab === "profile" && (
+    <div className="mx-auto max-w-screen-xl space-y-6">
+      {activeTab === "profile" && (
+        <StandaloneAccountPage
+          title="个人中心"
+          description={`UID: ${userCode || "---"} · 注册时间: ${accountCreatedDate}`}
+        >
           <ProfileCenter
             displayName={displayName}
             displayBio={displayBio}
@@ -224,8 +144,18 @@ export const HomeAccountViews: React.FC<HomeAccountViewsProps> = ({
             totalHistory={totalHistory}
             onShowHistory={onShowHistory}
           />
-        )}
-        {activeTab === "notifications" && (
+        </StandaloneAccountPage>
+      )}
+
+      {activeTab === "notifications" && (
+        <StandaloneAccountPage
+          title="消息中心"
+          description={
+            socialMessageCount + unreadCount > 0
+              ? `${socialMessageCount} 条私信/邀请待处理 · ${unreadCount} 条广场未读`
+              : "私信、房间邀请和广场通知集中在这里处理。"
+          }
+        >
           <UnifiedMessagesCenter
             currentUserId={currentUserId}
             myCharacters={myCharacters}
@@ -242,8 +172,20 @@ export const HomeAccountViews: React.FC<HomeAccountViewsProps> = ({
             onJoinRoom={onJoinRoom}
             onInviteTokenHandled={onInviteTokenHandled}
           />
-        )}
-        {activeTab === "settings" && (
+        </StandaloneAccountPage>
+      )}
+
+      {activeTab === "settings" && (
+        <StandaloneAccountPage
+          title="设置"
+          description="管理账户资料、头像和登录安全。"
+          toolbar={
+            <SettingsSectionTabs
+              section={settingsSection}
+              onSelect={setSettingsSection}
+            />
+          }
+        >
           <SettingsCenter
             section={settingsSection}
             editNickname={editNickname}
@@ -262,11 +204,29 @@ export const HomeAccountViews: React.FC<HomeAccountViewsProps> = ({
             onResetProfile={onResetProfile}
             onChangePassword={onChangePassword}
           />
-        )}
-      </section>
+        </StandaloneAccountPage>
+      )}
     </div>
   );
 };
+
+const StandaloneAccountPage: React.FC<{
+  title: string;
+  description: string;
+  toolbar?: React.ReactNode;
+  children: React.ReactNode;
+}> = ({ title, description, toolbar, children }) => (
+  <section className="min-w-0 space-y-5">
+    <div className="flex flex-col gap-4 rounded-lg border border-dicecho-border/40 bg-dicecho-panel/75 px-5 py-4 md:flex-row md:items-center md:justify-between md:px-6">
+      <div className="min-w-0">
+        <h2 className="text-2xl font-bold text-white">{title}</h2>
+        <p className="mt-1 text-sm text-dicecho-muted">{description}</p>
+      </div>
+      {toolbar && <div className="shrink-0">{toolbar}</div>}
+    </div>
+    {children}
+  </section>
+);
 
 const ProfileCenter: React.FC<{
   displayName: string;
@@ -423,13 +383,14 @@ const NotificationsCenter: React.FC<{
             <p className="mt-4 text-sm text-dicecho-muted">暂无消息</p>
           </div>
         ) : (
-          notifications.map((notification) => (
-            <NotificationRow
-              key={notification.id}
-              notification={notification}
-              onMarkRead={onMarkNotificationRead}
-              onDelete={onDeleteNotification}
-            />
+          notifications.map((notification, index) => (
+            <StaggeredItem key={notification.id} index={index}>
+              <NotificationRow
+                notification={notification}
+                onMarkRead={onMarkNotificationRead}
+                onDelete={onDeleteNotification}
+              />
+            </StaggeredItem>
           ))
         )}
       </div>
@@ -534,6 +495,38 @@ const MessageCenterTabButton: React.FC<{
       </span>
     )}
   </button>
+);
+
+const SettingsSectionTabs: React.FC<{
+  section: SettingsSection;
+  onSelect: (section: SettingsSection) => void;
+}> = ({ section, onSelect }) => (
+  <div className="inline-flex rounded-lg border border-dicecho-border/45 bg-dicecho-card/50 p-1">
+    <button
+      type="button"
+      onClick={() => onSelect("profile")}
+      className={cn(
+        "min-h-9 rounded-md px-3 text-sm font-semibold transition-colors",
+        section === "profile"
+          ? "bg-dicecho-primary/25 text-white"
+          : "text-dicecho-muted hover:bg-white/10 hover:text-white"
+      )}
+    >
+      个人资料
+    </button>
+    <button
+      type="button"
+      onClick={() => onSelect("security")}
+      className={cn(
+        "min-h-9 rounded-md px-3 text-sm font-semibold transition-colors",
+        section === "security"
+          ? "bg-dicecho-primary/25 text-white"
+          : "text-dicecho-muted hover:bg-white/10 hover:text-white"
+      )}
+    >
+      密码与安全
+    </button>
+  </div>
 );
 
 const SettingsCenter: React.FC<{
@@ -655,52 +648,6 @@ const SettingsCenter: React.FC<{
       </>
     )}
   </div>
-);
-
-const AccountNavButton: React.FC<{
-  icon: React.ElementType;
-  label: string;
-  active: boolean;
-  badge?: number;
-  onClick: () => void;
-}> = ({ icon: Icon, label, active, badge = 0, onClick }) => (
-  <button
-    type="button"
-    onClick={onClick}
-    className={cn(
-      "flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors",
-      active
-        ? "bg-dicecho-primary/25 text-white"
-        : "text-dicecho-muted hover:bg-white/10 hover:text-white"
-    )}
-  >
-    <Icon size={16} />
-    <span className="flex-1 text-left">{label}</span>
-    {badge > 0 && (
-      <span className="rounded-full bg-dicecho-primary px-1.5 py-0.5 text-[10px] font-bold text-white">
-        {badge > 99 ? "99+" : badge}
-      </span>
-    )}
-  </button>
-);
-
-const SubNavButton: React.FC<{
-  active: boolean;
-  children: React.ReactNode;
-  onClick: () => void;
-}> = ({ active, children, onClick }) => (
-  <button
-    type="button"
-    onClick={onClick}
-    className={cn(
-      "block w-full rounded-md px-2 py-1.5 text-left text-xs transition-colors",
-      active
-        ? "bg-dicecho-primary/15 text-white"
-        : "text-dicecho-muted hover:bg-white/10 hover:text-white"
-    )}
-  >
-    {children}
-  </button>
 );
 
 const ProfileStat: React.FC<{ label: string; value: number }> = ({

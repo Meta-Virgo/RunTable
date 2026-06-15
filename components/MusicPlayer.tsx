@@ -15,6 +15,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { Button } from "./UI";
+import { SkeletonBlock } from "./Skeleton";
 import { useMusicPlaybackController } from "../hooks/useMusicPlaybackController";
 import { themeRgb } from "../utils/theme";
 
@@ -27,10 +28,53 @@ interface MusicPlayerProps {
   isMobile?: boolean;
   isHidden?: boolean;
   globalMute?: boolean;
+  volume?: number;
   syncedIsPlaying?: boolean;
   syncedTrackIndex?: number;
   onUpdateSyncState?: (isPlaying: boolean, trackIndex: number) => void;
 }
+
+const MusicHeaderSkeleton: React.FC = () => (
+  <>
+    <SkeletonBlock className="h-10 w-10 shrink-0 rounded-full bg-dicecho-border/30" />
+    <div className="min-w-0 flex-1 space-y-2">
+      <div className="flex items-center justify-between gap-3">
+        <SkeletonBlock className="h-3.5 w-28 bg-dicecho-border/35" />
+        <SkeletonBlock className="h-3 w-16 bg-dicecho-border/25" />
+      </div>
+      <SkeletonBlock className="h-1 w-full rounded-full bg-dicecho-border/25" />
+    </div>
+    <div className="flex shrink-0 items-center gap-1">
+      <SkeletonBlock className="h-6 w-6 rounded-full bg-dicecho-border/25" />
+      <SkeletonBlock className="h-8 w-8 rounded-full bg-dicecho-primary/25" />
+      <SkeletonBlock className="h-6 w-6 rounded-full bg-dicecho-border/25" />
+    </div>
+  </>
+);
+
+const PlaylistTrackSkeleton: React.FC<{ index: number }> = ({ index }) => (
+  <div className="flex items-center gap-2 p-2">
+    <SkeletonBlock className="h-3 w-6 shrink-0 bg-dicecho-border/20" />
+    <SkeletonBlock className="h-8 w-8 shrink-0 rounded bg-dicecho-border/30" />
+    <div className="min-w-0 flex-1 space-y-1.5">
+      <SkeletonBlock
+        className={`h-3 bg-dicecho-border/35 ${
+          index % 3 === 0 ? "w-2/3" : index % 3 === 1 ? "w-1/2" : "w-3/4"
+        }`}
+      />
+      <SkeletonBlock className="h-2.5 w-20 bg-dicecho-border/25" />
+    </div>
+    <SkeletonBlock className="h-2.5 w-8 shrink-0 bg-dicecho-border/20" />
+  </div>
+);
+
+const PlaylistSkeleton: React.FC = () => (
+  <div className="divide-y divide-dicecho-border/20">
+    {Array.from({ length: 12 }).map((_, index) => (
+      <PlaylistTrackSkeleton key={index} index={index} />
+    ))}
+  </div>
+);
 
 export const MusicPlayer: React.FC<MusicPlayerProps> = ({
   url,
@@ -41,6 +85,7 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
   isMobile = false,
   isHidden = false,
   globalMute = false,
+  volume = 0.8,
   syncedIsPlaying,
   syncedTrackIndex,
   onUpdateSyncState,
@@ -53,6 +98,7 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
     isMobile,
     isHidden,
     globalMute,
+    volume,
     syncedIsPlaying,
     syncedTrackIndex,
     onUpdateSyncState,
@@ -316,131 +362,141 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
                         : "bg-dicecho-panel/65 border-b border-dicecho-border/35"
                     }`}
                   >
-                    {/* Album Art Placeholder */}
-                    <div
-                      onClick={() => parsedType === 2 && togglePlay()}
-                      className={`w-10 h-10 rounded-full bg-dicecho-card flex items-center justify-center border border-dicecho-border/50 shrink-0 animate-spin-slow overflow-hidden ${
-                        parsedType === 2
-                          ? "cursor-pointer hover:scale-105 transition-transform"
-                          : ""
-                      }`}
-                      style={{
-                        animationPlayState: isPlaying ? "running" : "paused",
-                      }}
-                    >
-                      {(parsedType === 0 || parsedType === 2) &&
-                      (playlistTracks[currentTrackIndex]?.album?.picUrl ||
-                        playlistTracks[currentTrackIndex]?.al?.picUrl) ? (
-                        <div className="relative w-full h-full">
-                          <img
-                            src={
-                              playlistTracks[currentTrackIndex].album?.picUrl ||
-                              playlistTracks[currentTrackIndex].al?.picUrl
-                            }
-                            alt="cover"
-                            className="w-full h-full object-cover"
-                          />
-                          {/* Vinyl center hole for single song */}
-                          {parsedType === 2 && (
-                            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-1.5 h-1.5 bg-dicecho-card rounded-full border border-dicecho-border"></div>
+                    {isLoadingPlaylist ? (
+                      <MusicHeaderSkeleton />
+                    ) : (
+                      <>
+                        {/* Album Art Placeholder */}
+                        <div
+                          onClick={() => parsedType === 2 && togglePlay()}
+                          className={`w-10 h-10 rounded-full bg-dicecho-card flex items-center justify-center border border-dicecho-border/50 shrink-0 animate-spin-slow overflow-hidden ${
+                            parsedType === 2
+                              ? "cursor-pointer hover:scale-105 transition-transform"
+                              : ""
+                          }`}
+                          style={{
+                            animationPlayState: isPlaying ? "running" : "paused",
+                          }}
+                        >
+                          {(parsedType === 0 || parsedType === 2) &&
+                          (playlistTracks[currentTrackIndex]?.album?.picUrl ||
+                            playlistTracks[currentTrackIndex]?.al?.picUrl) ? (
+                            <div className="relative w-full h-full">
+                              <img
+                                src={
+                                  playlistTracks[currentTrackIndex].album
+                                    ?.picUrl ||
+                                  playlistTracks[currentTrackIndex].al?.picUrl
+                                }
+                                alt="cover"
+                                className="w-full h-full object-cover"
+                              />
+                              {/* Vinyl center hole for single song */}
+                              {parsedType === 2 && (
+                                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-1.5 h-1.5 bg-dicecho-card rounded-full border border-dicecho-border"></div>
+                              )}
+                            </div>
+                          ) : (
+                            <Music size={18} className="text-dicecho-primary" />
                           )}
                         </div>
-                      ) : (
-                        <Music size={18} className="text-dicecho-primary" />
-                      )}
-                    </div>
 
-                    <div className="flex-1 min-w-0 overflow-hidden">
-                      <div className="flex justify-between items-center mb-1">
-                        <div className="flex-1 overflow-hidden mr-2 relative h-4">
-                          {(() => {
-                            const trackName =
-                              (parsedType === 0 || parsedType === 2) &&
-                              playlistTracks.length > 0
-                                ? playlistTracks[currentTrackIndex]?.name ||
-                                  "未知歌曲"
-                                : "背景音乐";
-                            return (
-                              <div className="text-xs font-bold text-white truncate w-full">
-                                {trackName}
-                              </div>
-                            );
-                          })()}
-                        </div>
-                        <span className="text-[10px] text-dicecho-muted font-mono">
-                          {formatTime(currentTime)} / {formatTime(duration)}
-                        </span>
-                      </div>
+                        <div className="flex-1 min-w-0 overflow-hidden">
+                          <div className="mb-1 flex items-center justify-between gap-3">
+                            <div className="flex-1 overflow-hidden mr-2 relative h-4">
+                              {(() => {
+                                const trackName =
+                                  (parsedType === 0 || parsedType === 2) &&
+                                  playlistTracks.length > 0
+                                    ? playlistTracks[currentTrackIndex]?.name ||
+                                      "未知歌曲"
+                                    : "背景音乐";
+                                return (
+                                  <div className="text-xs font-bold text-white truncate w-full">
+                                    {trackName}
+                                  </div>
+                                );
+                              })()}
+                            </div>
+                            <div className="flex shrink-0 items-center gap-3">
+                              <span className="text-[10px] text-dicecho-muted font-mono">
+                                {formatTime(currentTime)} / {formatTime(duration)}
+                              </span>
+                            </div>
+                          </div>
 
-                      {/* Progress Bar */}
-                      <div
-                        className="h-1 bg-dicecho-raised rounded-full overflow-hidden cursor-pointer group"
-                        onClick={(e) => {
-                          if (!audioRef.current || !duration) return;
-                          const rect = e.currentTarget.getBoundingClientRect();
-                          const x = e.clientX - rect.left;
-                          const percent = x / rect.width;
-                          audioRef.current.currentTime = percent * duration;
-                        }}
-                      >
-                        <div
-                          className="h-full bg-dicecho-primary group-hover:bg-dicecho-primary-strong transition-all relative"
-                          style={{
-                            width: `${(currentTime / duration) * 100}%`,
-                          }}
-                        ></div>
-                      </div>
-                    </div>
-
-                    {/* Controls */}
-                    <div className="flex items-center gap-1">
-                      {parsedType === 0 && (
-                        <>
-                          <button
-                            onClick={togglePlayMode}
-                            className="w-6 h-6 rounded-full text-dicecho-muted hover:text-white flex items-center justify-center transition-all mr-1"
+                          {/* Progress Bar */}
+                          <div
+                            className="h-1 bg-dicecho-raised rounded-full overflow-hidden cursor-pointer group"
+                            onClick={(e) => {
+                              if (!audioRef.current || !duration) return;
+                              const rect =
+                                e.currentTarget.getBoundingClientRect();
+                              const x = e.clientX - rect.left;
+                              const percent = x / rect.width;
+                              audioRef.current.currentTime = percent * duration;
+                            }}
                           >
-                            {playMode === "sequence" ? (
-                              <Repeat size={14} fill="currentColor" />
-                            ) : playMode === "shuffle" ? (
-                              <Shuffle size={14} fill="currentColor" />
+                            <div
+                              className="h-full bg-dicecho-primary group-hover:bg-dicecho-primary-strong transition-all relative"
+                              style={{
+                                width: `${(currentTime / duration) * 100}%`,
+                              }}
+                            ></div>
+                          </div>
+                        </div>
+
+                        {/* Controls */}
+                        <div className="flex shrink-0 items-center gap-1.5">
+                          {parsedType === 0 && (
+                            <>
+                              <button
+                                onClick={togglePlayMode}
+                                className="w-6 h-6 rounded-full text-dicecho-muted hover:text-white flex items-center justify-center transition-all mr-1"
+                              >
+                                {playMode === "sequence" ? (
+                                  <Repeat size={14} fill="currentColor" />
+                                ) : playMode === "shuffle" ? (
+                                  <Shuffle size={14} fill="currentColor" />
+                                ) : (
+                                  <Repeat1 size={14} fill="currentColor" />
+                                )}
+                              </button>
+                              <button
+                                onClick={playPrev}
+                                className="w-6 h-6 rounded-full text-dicecho-muted hover:text-white flex items-center justify-center transition-all"
+                              >
+                                <SkipBack size={14} fill="currentColor" />
+                              </button>
+                            </>
+                          )}
+
+                          <button
+                            onClick={togglePlay}
+                            className="w-8 h-8 rounded-full bg-dicecho-primary-strong hover:bg-dicecho-primary text-white flex items-center justify-center transition-all shadow-lg shadow-dicecho-primary/20 shrink-0"
+                          >
+                            {isPlaying ? (
+                              <Pause size={14} fill="currentColor" />
                             ) : (
-                              <Repeat1 size={14} fill="currentColor" />
+                              <Play
+                                size={14}
+                                fill="currentColor"
+                                className="ml-0.5"
+                              />
                             )}
                           </button>
-                          <button
-                            onClick={playPrev}
-                            className="w-6 h-6 rounded-full text-dicecho-muted hover:text-white flex items-center justify-center transition-all"
-                          >
-                            <SkipBack size={14} fill="currentColor" />
-                          </button>
-                        </>
-                      )}
 
-                      <button
-                        onClick={togglePlay}
-                        className="w-8 h-8 rounded-full bg-dicecho-primary-strong hover:bg-dicecho-primary text-white flex items-center justify-center transition-all shadow-lg shadow-dicecho-primary/20 shrink-0"
-                      >
-                        {isPlaying ? (
-                          <Pause size={14} fill="currentColor" />
-                        ) : (
-                          <Play
-                            size={14}
-                            fill="currentColor"
-                            className="ml-0.5"
-                          />
-                        )}
-                      </button>
-
-                      {parsedType === 0 && (
-                        <button
-                          onClick={() => playNext()}
-                          className="w-6 h-6 rounded-full text-dicecho-muted hover:text-white flex items-center justify-center transition-all"
-                        >
-                          <SkipForward size={14} fill="currentColor" />
-                        </button>
-                      )}
-                    </div>
+                          {parsedType === 0 && (
+                            <button
+                              onClick={() => playNext()}
+                              className="w-6 h-6 rounded-full text-dicecho-muted hover:text-white flex items-center justify-center transition-all"
+                            >
+                              <SkipForward size={14} fill="currentColor" />
+                            </button>
+                          )}
+                        </div>
+                      </>
+                    )}
                   </div>
 
                   {/* Playlist Tracks List */}
@@ -451,9 +507,7 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
                     >
                       <div ref={playlistContentRef}>
                         {isLoadingPlaylist ? (
-                          <div className="p-4 text-center text-xs text-dicecho-muted">
-                            正在加载歌单...
-                          </div>
+                          <PlaylistSkeleton />
                         ) : playlistTracks.length > 0 ? (
                           <div className="divide-y divide-dicecho-border/25">
                             {playlistTracks.map((track, idx) => (

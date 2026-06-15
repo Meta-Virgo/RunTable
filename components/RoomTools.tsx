@@ -1,21 +1,18 @@
-﻿import React, { useMemo } from "react";
+﻿import React from "react";
 import {
   AlertTriangle,
   CalendarClock,
   Check,
   ClipboardList,
   Copy,
-  FileText,
   Link,
-  Share2,
   Lock,
   Send,
   Settings,
-  Shield,
   Sparkles,
   Tags,
 } from "lucide-react";
-import type { Channel, Friendship, Log, RoomInvitationOutboxItem } from "../types";
+import type { Friendship, Log, RoomInvitationOutboxItem } from "../types";
 import { Button, Input, Textarea, cn } from "./UI";
 import {
   createClue,
@@ -32,22 +29,11 @@ import {
   revokeRoomInvitation,
   buildRoomInviteUrl,
 } from "../services/socialMessages";
-import {
-  createPost,
-  createPostModules,
-  fetchChannels,
-} from "../services/squareFeedRepository";
-import {
-  createRoomLogExcerptModule,
-  isPublicRoomLog,
-} from "../services/squarePostModules";
 import { fetchAcceptedFriendships } from "../services/friendsRepository";
-import { buildSessionReport } from "../utils/storyReport";
 import { nowIso, parseTags, useRoomToolsState } from "../hooks/useRoomToolsState";
 
 interface RoomToolsProps {
   roomId: string;
-  roomTitle?: string | null;
   isKP: boolean;
   userId?: string;
   logs: Log[];
@@ -57,16 +43,13 @@ interface RoomToolsProps {
 }
 
 const tabs = [
-  { id: "report", label: "战报", icon: FileText },
   { id: "clues", label: "线索墙", icon: ClipboardList },
   { id: "invite", label: "邀请排期", icon: CalendarClock },
-  { id: "share", label: "广场分享", icon: Share2 },
   { id: "management", label: "跑团管理", icon: Settings },
 ] as const;
 
 export const RoomTools: React.FC<RoomToolsProps> = ({
   roomId,
-  roomTitle,
   isKP,
   userId,
   logs,
@@ -95,7 +78,6 @@ export const RoomTools: React.FC<RoomToolsProps> = ({
     setScheduleNote,
   } = useRoomToolsState(roomId);
 
-  const report = useMemo(() => buildSessionReport(logs), [logs]);
   const viewerRole = isKP ? "keeper" : "player";
   const visibleClues = listVisibleClues(clues, {
     role: viewerRole,
@@ -109,21 +91,6 @@ export const RoomTools: React.FC<RoomToolsProps> = ({
   const [outbox, setOutbox] = React.useState<RoomInvitationOutboxItem[]>([]);
   const [latestLinkUrl, setLatestLinkUrl] = React.useState("");
   const [inviteBusy, setInviteBusy] = React.useState(false);
-  const [squareChannels, setSquareChannels] = React.useState<Channel[]>([]);
-  const [shareChannelId, setShareChannelId] = React.useState("");
-  const [shareContent, setShareContent] = React.useState("");
-  const [shareTitle, setShareTitle] = React.useState("");
-  const [selectedLogIds, setSelectedLogIds] = React.useState<string[]>([]);
-  const [shareBusy, setShareBusy] = React.useState(false);
-
-  const publicShareLogs = React.useMemo(
-    () =>
-      logs
-        .filter(isPublicRoomLog)
-        .sort((left, right) => left.createdAt.localeCompare(right.createdAt)),
-    [logs]
-  );
-
   const refreshInvitations = React.useCallback(async () => {
     if (!isKP || !userId) return;
     const [{ data: friendRows }, { data: invitationRows }] = await Promise.all([
@@ -138,18 +105,6 @@ export const RoomTools: React.FC<RoomToolsProps> = ({
   React.useEffect(() => {
     refreshInvitations();
   }, [refreshInvitations]);
-
-  React.useEffect(() => {
-    fetchChannels().then(({ data }) => {
-      const channels = (data || []) as Channel[];
-      setSquareChannels(channels);
-      const preferred =
-        channels.find((channel) => channel.name.includes("战报")) ||
-        channels.find((channel) => channel.name.includes("鎴樻姤")) ||
-        channels[0];
-      if (preferred) setShareChannelId((previous) => previous || preferred.id);
-    });
-  }, []);
 
   const handleCreateClue = () => {
     if (!clueTitle.trim()) return;
@@ -223,57 +178,6 @@ export const RoomTools: React.FC<RoomToolsProps> = ({
     await refreshInvitations();
   };
 
-  const toggleSelectedLog = (logId: string) => {
-    setSelectedLogIds((previous) =>
-      previous.includes(logId)
-        ? previous.filter((id) => id !== logId)
-        : [...previous, logId]
-    );
-  };
-
-  const handleShareExcerpt = async () => {
-    if (!userId || !shareChannelId) return;
-    const selectedLogs = publicShareLogs.filter((log) =>
-      selectedLogIds.includes(log.id)
-    );
-    const module = createRoomLogExcerptModule({
-      roomId,
-      roomTitle,
-      logs: selectedLogs,
-      title: shareTitle,
-    });
-    if (!module) {
-      alert("请选择至少一条公开日志");
-      return;
-    }
-
-    setShareBusy(true);
-    const postResult = await createPost({
-      channel_id: shareChannelId,
-      user_id: userId,
-      content: shareContent.trim() || `分享跑团片段：${roomTitle || "未命名房间"}`,
-    });
-
-    if (postResult.error || !postResult.data?.id) {
-      setShareBusy(false);
-      alert("发布失败: " + (postResult.error?.message || "未返回帖子 ID"));
-      return;
-    }
-
-    const moduleResult = await createPostModules(postResult.data.id, [module]);
-    setShareBusy(false);
-
-    if (moduleResult.error) {
-      alert("发布模块失败: " + moduleResult.error.message);
-      return;
-    }
-
-    setShareContent("");
-    setShareTitle("");
-    setSelectedLogIds([]);
-    alert("已分享到广场");
-  };
-
   return (
     <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar px-4 md:px-8 py-6">
       <div className="max-w-6xl mx-auto space-y-5">
@@ -300,53 +204,27 @@ export const RoomTools: React.FC<RoomToolsProps> = ({
             ))}
         </div>
 
-        {activeTab === "report" && (
-          <section className="space-y-4">
-            <div className="grid lg:grid-cols-2 gap-4">
-              <div className="rounded-lg border border-dicecho-border/45 bg-dicecho-card/70 p-4 shadow-sm">
-                <h2 className="text-white font-bold flex items-center gap-2">
-                  <FileText size={18} className="text-dicecho-primary" />
-                  鍏紑鎴樻姤
-                </h2>
-                <pre className="mt-3 whitespace-pre-wrap text-sm text-slate-300 leading-6 max-h-[55vh] overflow-y-auto custom-scrollbar">
-                  {report.publicMarkdown}
-                </pre>
-              </div>
-              {isKP && (
-                <div className="rounded-lg border border-dicecho-border/45 bg-dicecho-card/70 p-4 shadow-sm">
-                  <h2 className="text-white font-bold flex items-center gap-2">
-                    <Shield size={18} className="text-amber-300" />
-                    Keeper 绉佸瘑娈佃惤
-                  </h2>
-                  <pre className="mt-3 whitespace-pre-wrap text-sm text-slate-300 leading-6 max-h-[55vh] overflow-y-auto custom-scrollbar">
-                    {report.keeperOnlyMarkdown}
-                  </pre>
-                </div>
-              )}
-            </div>
-          </section>
-        )}
-
         {activeTab === "clues" && (
           <section className="grid lg:grid-cols-[360px_1fr] gap-4">
             {isKP && (
               <div className="rounded-lg border border-dicecho-border/45 bg-dicecho-card/70 p-4 shadow-sm space-y-3">
                 <h2 className="text-white font-bold flex items-center gap-2">
                   <ClipboardList size={18} className="text-dicecho-primary" />
-                  鏂扮嚎绱?                </h2>
-                <Input label="鏍囬" value={clueTitle} onChange={(e) => setClueTitle(e.target.value)} />
-                <Textarea label="鍐呭" rows={4} value={clueBody} onChange={(e) => setClueBody(e.target.value)} />
-                <Input label="鏍囩" value={clueTags} onChange={(e) => setClueTags(e.target.value)} placeholder="person item mansion" />
-                <Textarea label="Keeper note" rows={3} value={keeperNote} onChange={(e) => setKeeperNote(e.target.value)} />
+                  新线索
+                </h2>
+                <Input label="标题" value={clueTitle} onChange={(e) => setClueTitle(e.target.value)} />
+                <Textarea label="内容" rows={4} value={clueBody} onChange={(e) => setClueBody(e.target.value)} />
+                <Input label="标签" value={clueTags} onChange={(e) => setClueTags(e.target.value)} placeholder="人物 物品 庄园" />
+                <Textarea label="Keeper 备注" rows={3} value={keeperNote} onChange={(e) => setKeeperNote(e.target.value)} />
                 <Button icon={Sparkles} onClick={handleCreateClue} disabled={!clueTitle.trim()}>
-                  鍒涘缓闅愯棌绾跨储
+                  创建隐藏线索
                 </Button>
               </div>
             )}
             <div className="space-y-3">
               {visibleClues.length === 0 && (
                 <div className="rounded-lg border border-dicecho-border/45 bg-dicecho-card/55 p-6 text-dicecho-muted">
-                  鏆傛棤绾跨储
+                  暂无线索
                 </div>
               )}
               {visibleClues.map((clue) => (
@@ -361,7 +239,7 @@ export const RoomTools: React.FC<RoomToolsProps> = ({
                     </div>
                     <span className="text-xs text-slate-500 inline-flex items-center gap-1">
                       {clue.visibility === "hidden" ? <Lock size={13} /> : <Sparkles size={13} />}
-                      {clue.visibility}
+                      {clue.visibility === "hidden" ? "隐藏" : "已公开"}
                     </span>
                   </div>
                   {clue.tags.length > 0 && (
@@ -410,7 +288,7 @@ export const RoomTools: React.FC<RoomToolsProps> = ({
                           )
                         }
                       >
-                        {clue.visibility === "hidden" ? "鎻ず" : "闅愯棌"}
+                        {clue.visibility === "hidden" ? "揭示" : "隐藏"}
                       </Button>
                       <Button
                         size="xs"
@@ -436,7 +314,8 @@ export const RoomTools: React.FC<RoomToolsProps> = ({
                           )
                         }
                       >
-                        鍏宠仈鏈€鏂版棩蹇?                      </Button>
+                        关联最新日志
+                      </Button>
                       <Button
                         size="xs"
                         variant="danger"
@@ -448,7 +327,7 @@ export const RoomTools: React.FC<RoomToolsProps> = ({
                           )
                         }
                       >
-                        鍒犻櫎
+                        删除
                       </Button>
                     </div>
                   )}
@@ -480,30 +359,14 @@ export const RoomTools: React.FC<RoomToolsProps> = ({
           />
         )}
 
-        {activeTab === "share" && (
-          <RoomSquareSharePanel
-            channels={squareChannels}
-            shareChannelId={shareChannelId}
-            setShareChannelId={setShareChannelId}
-            shareContent={shareContent}
-            setShareContent={setShareContent}
-            shareTitle={shareTitle}
-            setShareTitle={setShareTitle}
-            publicLogs={publicShareLogs}
-            selectedLogIds={selectedLogIds}
-            toggleSelectedLog={toggleSelectedLog}
-            shareBusy={shareBusy}
-            onShareExcerpt={handleShareExcerpt}
-          />
-        )}
-
         {activeTab === "management" && isKP && (
           <section className="space-y-4">
             <div className="rounded-lg border border-dicecho-accent/30 bg-dicecho-accent/12 p-6 md:p-8 flex flex-col md:flex-row justify-between items-center gap-6 shadow-sm">
               <div className="flex-1">
-                <h3 className="text-lg font-bold text-white mb-2">瀹岀粨璺戝洟</h3>
+                <h3 className="text-lg font-bold text-white mb-2">完结跑团</h3>
                 <p className="text-slate-400 text-sm leading-relaxed">
-                  褰撹窇鍥㈢粨鏉熸椂浣跨敤姝ゅ姛鑳姐€傜郴缁熷皢鐢熸垚璺戝洟灞ュ巻锛岃褰曟墍鏈夌帺瀹剁殑鏈€缁堢姸鎬侊紝骞跺皢鎴块棿鏍囪涓衡€滃凡瀹屾垚鈥濄€?                </p>
+                  当跑团结束时使用此功能。系统将生成跑团履历，记录所有玩家的最终状态，并将房间标记为“已完成”。
+                </p>
               </div>
               <Button
                 onClick={onConcludeGame}
@@ -512,17 +375,18 @@ export const RoomTools: React.FC<RoomToolsProps> = ({
                 icon={Check}
                 className="border border-dicecho-accent/70 bg-dicecho-accent/15 text-[#bff1d5] hover:bg-dicecho-accent/25 hover:text-white hover:border-dicecho-accent"
               >
-                缁撳洟缁撶畻
+                结团结算
               </Button>
             </div>
 
             <div className="rounded-lg border border-red-500/20 bg-red-900/10 p-6 md:p-8 flex flex-col md:flex-row justify-between items-center gap-6 shadow-sm">
               <div className="flex-1">
                 <h3 className="text-lg font-bold text-white mb-2">
-                  娓呯┖鑱婂ぉ璁板綍
+                  清空聊天记录
                 </h3>
                 <p className="text-slate-400 text-sm leading-relaxed">
-                  鍒犻櫎褰撳墠鎴块棿鐨勬墍鏈夎亰澶╄褰曪紙鍖呮嫭楠板瓙鍜屽浘鐗囷級銆傛鎿嶄綔涓嶅彲鎭㈠銆?                </p>
+                  删除当前房间的所有聊天记录（包括骰子和图片）。此操作不可恢复。
+                </p>
               </div>
               <div className="flex items-center gap-4 shrink-0">
                 {clearChatConfirm ? (
@@ -537,17 +401,17 @@ export const RoomTools: React.FC<RoomToolsProps> = ({
                         icon={AlertTriangle}
                         size="lg"
                       >
-                        纭娓呯┖
+                        确认清空
                       </Button>
                       <span className="text-[10px] text-red-400 font-bold uppercase tracking-wider animate-pulse">
-                        姝ゆ搷浣滀笉鍙挙閿€
+                        此操作不可撤销
                       </span>
                     </div>
                     <Button
                       onClick={() => setClearChatConfirm(false)}
                       variant="ghost"
                     >
-                      鍙栨秷
+                      取消
                     </Button>
                   </>
                 ) : (
@@ -557,7 +421,7 @@ export const RoomTools: React.FC<RoomToolsProps> = ({
                     icon={AlertTriangle}
                     size="lg"
                   >
-                    娓呯┖璁板綍
+                    清空记录
                   </Button>
                 )}
               </div>
@@ -565,9 +429,10 @@ export const RoomTools: React.FC<RoomToolsProps> = ({
 
             <div className="rounded-lg border border-red-500/20 bg-red-900/10 p-6 md:p-8 flex flex-col md:flex-row justify-between items-center gap-6 shadow-sm">
               <div className="flex-1">
-                <h3 className="text-lg font-bold text-white mb-2">鍒犻櫎鎴块棿</h3>
+                <h3 className="text-lg font-bold text-white mb-2">删除房间</h3>
                 <p className="text-slate-400 text-sm leading-relaxed">
-                  杩欏皢姘镐箙鍒犻櫎璇ユ埧闂村強鍏舵墍鏈夋暟鎹€傛鎿嶄綔涓嶅彲鎭㈠銆?                </p>
+                  这将永久删除该房间及其所有数据。此操作不可恢复。
+                </p>
               </div>
               <div className="flex items-center gap-4 shrink-0">
                 {deleteConfirm ? (
@@ -582,17 +447,17 @@ export const RoomTools: React.FC<RoomToolsProps> = ({
                         icon={AlertTriangle}
                         size="lg"
                       >
-                        纭鍒犻櫎
+                        确认删除
                       </Button>
                       <span className="text-[10px] text-red-400 font-bold uppercase tracking-wider animate-pulse">
-                        姝ゆ搷浣滀笉鍙挙閿€
+                        此操作不可撤销
                       </span>
                     </div>
                     <Button
                       onClick={() => setDeleteConfirm(false)}
                       variant="ghost"
                     >
-                      鍙栨秷
+                      取消
                     </Button>
                   </>
                 ) : (
@@ -602,7 +467,7 @@ export const RoomTools: React.FC<RoomToolsProps> = ({
                     icon={AlertTriangle}
                     size="lg"
                   >
-                    鍒犻櫎鎴块棿
+                    删除房间
                   </Button>
                 )}
               </div>
@@ -784,130 +649,6 @@ const RoomInvitationsPanel: React.FC<{
             )}
           </article>
         ))}
-    </div>
-  </section>
-);
-
-const RoomSquareSharePanel: React.FC<{
-  channels: Channel[];
-  shareChannelId: string;
-  setShareChannelId: (value: string) => void;
-  shareContent: string;
-  setShareContent: (value: string) => void;
-  shareTitle: string;
-  setShareTitle: (value: string) => void;
-  publicLogs: Log[];
-  selectedLogIds: string[];
-  toggleSelectedLog: (logId: string) => void;
-  shareBusy: boolean;
-  onShareExcerpt: () => Promise<void>;
-}> = ({
-  channels,
-  shareChannelId,
-  setShareChannelId,
-  shareContent,
-  setShareContent,
-  shareTitle,
-  setShareTitle,
-  publicLogs,
-  selectedLogIds,
-  toggleSelectedLog,
-  shareBusy,
-  onShareExcerpt,
-}) => (
-  <section className="grid lg:grid-cols-[360px_1fr] gap-4">
-    <div className="rounded-lg border border-dicecho-border/45 bg-dicecho-card/70 p-4 shadow-sm space-y-3">
-      <h2 className="text-white font-bold flex items-center gap-2">
-        <Share2 size={18} className="text-dicecho-primary" />
-        分享跑团片段
-      </h2>
-      <label className="text-xs text-dicecho-muted mb-1.5 font-medium ml-1">
-        目标频道
-      </label>
-      <select
-        value={shareChannelId}
-        onChange={(event) => setShareChannelId(event.target.value)}
-        className="w-full bg-dicecho-panel/70 border border-dicecho-border/50 text-slate-100 rounded-lg px-4 py-2.5 focus:outline-none focus:border-dicecho-primary/70 transition-colors text-sm"
-      >
-        <option value="">选择频道</option>
-        {channels.map((channel) => (
-          <option key={channel.id} value={channel.id}>
-            {channel.name}
-          </option>
-        ))}
-      </select>
-      <Input
-        label="片段标题"
-        value={shareTitle}
-        onChange={(event) => setShareTitle(event.target.value)}
-        placeholder="例如：古宅门口的一次侦查"
-      />
-      <Textarea
-        label="帖子正文"
-        rows={4}
-        value={shareContent}
-        onChange={(event) => setShareContent(event.target.value)}
-        placeholder="补充这段跑团发生了什么..."
-      />
-      <Button
-        icon={Send}
-        onClick={() => void onShareExcerpt()}
-        disabled={!shareChannelId || selectedLogIds.length === 0 || shareBusy}
-      >
-        {shareBusy ? "发布中..." : "分享到广场"}
-      </Button>
-      <p className="text-xs text-dicecho-muted leading-5">
-        只会发布公开聊天、公开骰点、公开系统日志和公开图片；私聊与暗骰不会进入片段。
-      </p>
-    </div>
-
-    <div className="rounded-lg border border-dicecho-border/45 bg-dicecho-card/70 p-4 shadow-sm space-y-3">
-      <div className="flex items-center justify-between gap-3">
-        <h2 className="text-white font-bold">选择公开日志</h2>
-        <span className="text-xs text-dicecho-muted">
-          已选 {selectedLogIds.length}
-        </span>
-      </div>
-      {publicLogs.length === 0 ? (
-        <p className="text-sm text-dicecho-muted">暂无可分享的公开日志。</p>
-      ) : (
-        <div className="max-h-[58vh] space-y-2 overflow-y-auto pr-1 custom-scrollbar">
-          {publicLogs.map((log) => {
-            const checked = selectedLogIds.includes(log.id);
-            return (
-              <label
-                key={log.id}
-                className={cn(
-                  "flex cursor-pointer items-start gap-3 rounded-lg border p-3 transition-colors",
-                  checked
-                    ? "border-dicecho-primary/50 bg-dicecho-primary/10"
-                    : "border-dicecho-border/35 bg-dicecho-panel/45 hover:border-dicecho-primary/30"
-                )}
-              >
-                <input
-                  type="checkbox"
-                  checked={checked}
-                  onChange={() => toggleSelectedLog(log.id)}
-                  className="mt-1 accent-dicecho-primary"
-                />
-                <div className="min-w-0 flex-1">
-                  <div className="mb-1 flex flex-wrap items-center gap-2 text-xs text-dicecho-muted">
-                    <span>{log.timestamp}</span>
-                    <span className="font-semibold text-slate-300">
-                      {log.charName}
-                    </span>
-                    <span>{log.charRole}</span>
-                    <span>{log.type}</span>
-                  </div>
-                  <p className="line-clamp-3 whitespace-pre-wrap break-words text-sm leading-5 text-slate-200">
-                    {log.type === "image" ? "展示图片" : log.content}
-                  </p>
-                </div>
-              </label>
-            );
-          })}
-        </div>
-      )}
     </div>
   </section>
 );

@@ -96,9 +96,9 @@ describe("Sidebar room member display", () => {
     expect(html).not.toContain('aria-label="Kick Player One"');
   });
 
-  it("renders the scene overview navigation entry", () => {
+  it("renders the scene navigation entry", () => {
     const html = renderSidebar(true);
 
-    expect(html).toContain("场景概览");
+    expect(html).toContain("场景");
   });
 });

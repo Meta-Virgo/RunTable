@@ -1,8 +1,9 @@
 import React, { useState } from "react";
-import { FileText, Heart, Loader2, X } from "lucide-react";
+import { FileText, Heart, X } from "lucide-react";
 import type { Post, PostComment, Profile } from "../../types";
 import { summarizeMarkdown } from "../../services/squareMarkdown";
 import { Button, cn, Modal } from "../UI";
+import { HistorySkeletonList, StaggeredItem } from "../Skeleton";
 import { SquareMarkdown } from "../SquareMarkdown";
 import { SquareMarkdownEditor } from "../SquareMarkdownEditor";
 import { SquarePostModules } from "./SquarePostModules";
@@ -141,13 +142,11 @@ export const SquarePostDetailModal: React.FC<SquarePostDetailModalProps> = ({
           </h4>
 
           {loadingComments ? (
-            <div className="flex justify-center py-8">
-              <Loader2 className="animate-spin text-dicecho-primary" />
-            </div>
+            <HistorySkeletonList count={3} />
           ) : comments.length > 0 ? (
             <div className="space-y-6">
-              {comments.map((comment) => (
-                <div key={comment.id} className="flex gap-3">
+              {comments.map((comment, index) => (
+                <StaggeredItem key={comment.id} index={index} className="flex gap-3">
                   <div
                     className="w-8 h-8 rounded-full bg-dicecho-card overflow-hidden shrink-0 cursor-pointer border border-dicecho-border/40"
                     onClick={() => openProfile(comment.user_id)}
@@ -237,7 +236,7 @@ export const SquarePostDetailModal: React.FC<SquarePostDetailModalProps> = ({
                       </button>
                     </div>
                   </div>
-                </div>
+                </StaggeredItem>
               ))}
             </div>
           ) : (
@@ -304,7 +303,7 @@ export const SquarePostDetailModal: React.FC<SquarePostDetailModalProps> = ({
               !newComment.trim() && "opacity-50"
             )}
           >
-            {sending ? <Loader2 size={16} className="animate-spin" /> : "发送"}
+            {sending ? "发送中" : "发送"}
           </Button>
         </div>
       </div>

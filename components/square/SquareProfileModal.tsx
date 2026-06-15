@@ -1,5 +1,5 @@
 import React from "react";
-import { Crown, Loader2 } from "lucide-react";
+import { Crown } from "lucide-react";
 import type { GameHistory, Profile } from "../../types";
 import {
   getSquareHistoryCharacterDisplay,
@@ -8,27 +8,33 @@ import {
 } from "../../services/squareProfileModel";
 import { AvatarUpload } from "../AvatarUpload";
 import { Modal } from "../UI";
+import { HistorySkeletonList, StaggeredItem } from "../Skeleton";
+import { FriendRequestButton } from "../profile/FriendRequestButton";
 import { themeRgb } from "../../utils/theme";
 
 interface SquareProfileModalProps {
   isOpen: boolean;
   profile: Profile | null;
+  currentUserId?: string | null;
   historyTab: SquareProfileHistoryTab;
   setHistoryTab: (tab: SquareProfileHistoryTab) => void;
   historyLoading: boolean;
   kpHistory: GameHistory[];
   playerHistory: SquarePlayerHistoryItem[];
+  onRequestFriend?: (profile: Profile) => Promise<void> | void;
   onClose: () => void;
 }
 
 export const SquareProfileModal: React.FC<SquareProfileModalProps> = ({
   isOpen,
   profile,
+  currentUserId,
   historyTab,
   setHistoryTab,
   historyLoading,
   kpHistory,
   playerHistory,
+  onRequestFriend,
   onClose,
 }) => {
   if (!isOpen || !profile) return null;
@@ -88,6 +94,15 @@ export const SquareProfileModal: React.FC<SquareProfileModalProps> = ({
                     size={96}
                   />
                 </div>
+                {currentUserId && profile.id !== currentUserId && (
+                  <FriendRequestButton
+                    compact
+                    currentUserId={currentUserId}
+                    profile={profile}
+                    className="absolute bottom-1 right-1"
+                    onRequestFriend={onRequestFriend}
+                  />
+                )}
               </div>
             </div>
           </div>
@@ -124,9 +139,7 @@ export const SquareProfileModal: React.FC<SquareProfileModalProps> = ({
         </div>
         <div className="bg-dicecho-panel/70 border-t border-dicecho-border/40 p-4 max-h-[40vh] overflow-y-auto custom-scrollbar">
           {historyLoading ? (
-            <div className="flex justify-center py-8">
-              <Loader2 className="animate-spin text-dicecho-primary" />
-            </div>
+            <HistorySkeletonList count={3} />
           ) : historyTab === "player" ? (
             <PlayerHistoryList playerHistory={playerHistory} />
           ) : (
@@ -170,11 +183,12 @@ const PlayerHistoryList: React.FC<{
     {playerHistory.length === 0 && (
       <div className="text-center py-8 text-dicecho-muted text-sm">暂无记录</div>
     )}
-    {playerHistory.map((item) => {
+    {playerHistory.map((item, index) => {
       const characterDisplay = getSquareHistoryCharacterDisplay(item);
       return (
-        <div
+        <StaggeredItem
           key={item.id}
+          index={index}
           className={`relative p-3 rounded-lg border transition-colors duration-150 ${
             characterDisplay.isDead
               ? "bg-dicecho-panel/50 border-dicecho-border/30 grayscale"
@@ -225,7 +239,7 @@ const PlayerHistoryList: React.FC<{
               </div>
             </div>
           </div>
-        </div>
+        </StaggeredItem>
       );
     })}
   </div>
@@ -238,9 +252,10 @@ const KpHistoryList: React.FC<{ kpHistory: GameHistory[] }> = ({
     {kpHistory.length === 0 && (
       <div className="text-center py-8 text-dicecho-muted text-sm">暂无记录</div>
     )}
-    {kpHistory.map((history) => (
-      <div
+    {kpHistory.map((history, index) => (
+      <StaggeredItem
         key={history.id}
+        index={index}
         className="bg-dicecho-card/70 border border-dicecho-border/40 p-3 rounded-lg hover:border-dicecho-primary/40 transition-colors duration-150"
       >
         <div className="flex justify-between items-start mb-1">
@@ -253,7 +268,7 @@ const KpHistoryList: React.FC<{ kpHistory: GameHistory[] }> = ({
           <Crown size={10} className="text-yellow-500" />
           <span>主持人 (KP)</span>
         </div>
-      </div>
+      </StaggeredItem>
     ))}
   </div>
 );

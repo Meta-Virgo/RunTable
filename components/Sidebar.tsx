@@ -390,13 +390,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {/* Navigation */}
         <div className="p-3 space-y-2">
           {[
-            { id: "main", icon: MessageSquare, label: "现场 & 通讯" },
+            { id: "main", icon: MessageSquare, label: "现场" },
             {
               id: "setup",
               icon: Users,
-              label: isKP ? "角色 & 模组" : "调查员名册",
+              label: isKP ? "角色" : "调查员名册",
             },
-            { id: "scene", icon: Map, label: "场景概览" },
+            { id: "scene", icon: Map, label: "场景" },
             { id: "tools", icon: ClipboardList, label: "房间工具" },
             { id: "music", icon: Music, label: "背景音乐" },
           ]

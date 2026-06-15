@@ -1,8 +1,9 @@
 import React from "react";
-import { Hash, Loader2, MessageSquare, X } from "lucide-react";
+import { Hash, MessageSquare, X } from "lucide-react";
 import type { Channel } from "../../types";
 import { useElasticScroll } from "../../hooks/useElasticScroll";
 import { cn } from "../UI";
+import { ChannelSkeletonList } from "../Skeleton";
 
 interface SquareChannelSidebarProps {
   activeChannelId: string | null;
@@ -62,9 +63,7 @@ export const SquareChannelSidebar: React.FC<SquareChannelSidebarProps> = ({
         >
           <div ref={channelContentRef} className="space-y-6">
             {loadingChannels ? (
-              <div className="flex justify-center py-8">
-                <Loader2 className="animate-spin text-dicecho-primary" />
-              </div>
+              <ChannelSkeletonList />
             ) : (
               categories.map((category) => (
                 <div key={category}>

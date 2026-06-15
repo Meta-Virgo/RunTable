@@ -35,6 +35,7 @@ type SquareMarkdownEditorProps = {
   livePreview?: boolean;
   renderedEditing?: boolean;
   maxHeight?: number;
+  toolbarExtra?: React.ReactNode;
 };
 
 const formatActions: {
@@ -90,6 +91,7 @@ export const SquareMarkdownEditor: React.FC<SquareMarkdownEditorProps> = ({
   livePreview = false,
   renderedEditing = false,
   maxHeight = 180,
+  toolbarExtra,
 }) => {
   const [mode, setMode] = useState<"source" | "preview">(initialMode);
   const [renderedHtml, setRenderedHtml] = useState(() =>
@@ -257,22 +259,34 @@ export const SquareMarkdownEditor: React.FC<SquareMarkdownEditorProps> = ({
       data-elastic-scroll-ignore="true"
       onWheelCapture={(e) => e.stopPropagation()}
     >
-      {(showToolbar || showModeSwitch) && (
+      {(showToolbar || showModeSwitch || toolbarExtra) && (
         <div className="flex flex-wrap items-center justify-between gap-2">
-          {showToolbar && (
+          {(showToolbar || toolbarExtra) && (
             <div className="flex flex-wrap items-center gap-1">
-              {formatActions.map(({ format, title, icon: Icon }) => (
-                <button
-                  key={format}
-                  type="button"
-                  aria-label={title}
-                  onMouseDown={(event) => event.preventDefault()}
-                  onClick={() => applyFormat(format)}
-                  className="h-7 w-7 inline-flex items-center justify-center rounded-md text-dicecho-muted hover:text-white hover:bg-white/10 transition-colors"
+              {showToolbar &&
+                formatActions.map(({ format, title, icon: Icon }) => (
+                  <button
+                    key={format}
+                    type="button"
+                    aria-label={title}
+                    onMouseDown={(event) => event.preventDefault()}
+                    onClick={() => applyFormat(format)}
+                    className="h-7 w-7 inline-flex items-center justify-center rounded-md text-dicecho-muted hover:text-white hover:bg-white/10 transition-colors"
+                  >
+                    <Icon size={14} />
+                  </button>
+                ))}
+              {toolbarExtra && (
+                <div
+                  className={cn(
+                    "flex items-center gap-1",
+                    showToolbar &&
+                      "ml-1 border-l border-dicecho-border/35 pl-2"
+                  )}
                 >
-                  <Icon size={14} />
-                </button>
-              ))}
+                  {toolbarExtra}
+                </div>
+              )}
             </div>
           )}
           {showModeSwitch && !livePreview && !renderedEditing && (

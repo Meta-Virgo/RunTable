@@ -9,7 +9,7 @@ import { LoadingScreen } from "./components/LoadingScreen";
 import { Button } from "./components/UI";
 import "@livekit/components-styles";
 import { Character } from "./types"; // Removed AppData as it might not be used anymore
-import { Menu, LogOut, Volume2, VolumeX } from "lucide-react";
+import { Edit2, Menu, LogOut, Volume2, VolumeX } from "lucide-react";
 import {
   CharacterModal,
   ChatArea,
@@ -41,6 +41,81 @@ import {
 import { useTabletopCommands } from "./hooks/useTabletopCommands";
 import { useRoomCharacterActions } from "./hooks/useRoomCharacterActions";
 import { clearLocalSupabaseSession, signOut } from "./services/auth";
+
+const LOCAL_MUSIC_VOLUME_STORAGE_KEY = "runtable:music-player-volume";
+const DEFAULT_LOCAL_MUSIC_VOLUME = 0.8;
+
+function clampLocalMusicVolume(value: number) {
+  if (!Number.isFinite(value)) return DEFAULT_LOCAL_MUSIC_VOLUME;
+  return Math.min(1, Math.max(0, value));
+}
+
+function readLocalMusicVolume() {
+  if (typeof window === "undefined") return DEFAULT_LOCAL_MUSIC_VOLUME;
+
+  const stored = window.localStorage.getItem(LOCAL_MUSIC_VOLUME_STORAGE_KEY);
+  if (!stored) return DEFAULT_LOCAL_MUSIC_VOLUME;
+
+  return clampLocalMusicVolume(Number(stored));
+}
+
+const LocalMusicVolumeControl: React.FC<{
+  volume: number;
+  onVolumeChange: (volume: number) => void;
+}> = ({ volume, onVolumeChange }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const containerRef = React.useRef<HTMLDivElement>(null);
+  const Icon = volume === 0 ? VolumeX : Volume2;
+  const volumePercent = Math.round(volume * 100);
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handlePointerDown = (event: PointerEvent) => {
+      if (!containerRef.current?.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    return () => document.removeEventListener("pointerdown", handlePointerDown);
+  }, [isOpen]);
+
+  return (
+    <div ref={containerRef} className="relative">
+      <button
+        type="button"
+        onClick={() => setIsOpen((open) => !open)}
+        title="本地音量"
+        aria-label="本地音量"
+        aria-expanded={isOpen}
+        className={`flex h-9 w-9 items-center justify-center rounded-lg border transition-colors ${
+          isOpen
+            ? "border-dicecho-primary/45 bg-dicecho-primary/15 text-white"
+            : "border-transparent text-dicecho-muted hover:border-dicecho-border/45 hover:bg-dicecho-raised/65 hover:text-white"
+        }`}
+      >
+        <Icon size={16} />
+      </button>
+
+      {isOpen && (
+        <div className="absolute right-11 top-1/2 z-40 flex h-9 -translate-y-1/2 items-center px-2">
+          <input
+            type="range"
+            min={0}
+            max={100}
+            value={volumePercent}
+            onChange={(event) =>
+              onVolumeChange(Number(event.target.value) / 100)
+            }
+            aria-label="本地背景音乐音量"
+            className="h-1 w-32 cursor-pointer appearance-none rounded-full bg-dicecho-raised accent-dicecho-primary"
+          />
+        </div>
+      )}
+    </div>
+  );
+};
 
 const App: React.FC = () => {
   // Routing State
@@ -141,6 +216,23 @@ const App: React.FC = () => {
   const [isMobile, setIsMobile] = useState(false);
   const globalOnlineUsers = useGlobalPresence(session?.user?.id);
   const [globalMute, setGlobalMute] = useState(false);
+  const [localMusicVolume, setLocalMusicVolumeState] =
+    useState(readLocalMusicVolume);
+
+  const setLocalMusicVolume = (nextVolume: number) => {
+    const safeVolume = clampLocalMusicVolume(nextVolume);
+    setLocalMusicVolumeState(safeVolume);
+    if (safeVolume > 0 && globalMute) {
+      setGlobalMute(false);
+    }
+  };
+
+  useEffect(() => {
+    window.localStorage.setItem(
+      LOCAL_MUSIC_VOLUME_STORAGE_KEY,
+      String(localMusicVolume)
+    );
+  }, [localMusicVolume]);
 
   useEffect(() => {
     const syncPageVisibility = () => {
@@ -466,35 +558,48 @@ const App: React.FC = () => {
         isVoiceConnected={voiceConnectionStatus === "connected"}
       />
 
-      <main className="flex-1 flex flex-col relative min-w-0">
+      <main className="flex-1 flex min-h-0 flex-col relative min-w-0">
         <header className="h-16 shrink-0 pt-safe flex items-center justify-between px-4 md:px-8 border-b border-dicecho-border/40 bg-dicecho-panel/85 backdrop-blur-sm sticky top-0 z-20 shadow-sm">
-          <div className="flex items-center gap-3">
+          <div className="flex min-w-0 items-center gap-3">
             <button
               onClick={() => setSidebarOpen(true)}
               className="p-2 -ml-2 text-slate-400 hover:text-white md:hidden"
             >
               <Menu size={24} />
             </button>
-            <div className="flex flex-col justify-center">
-              <h1 className="text-white font-bold text-lg md:text-xl tracking-tight">
-                {moduleInfo.title || "未命名模组"}
-              </h1>
+            <button
+              type="button"
+              onClick={isKP ? () => setShowModuleModal(true) : undefined}
+              disabled={!isKP}
+              className={`group flex min-w-0 flex-col justify-center rounded-lg px-2 py-1.5 text-left transition-colors ${
+                isKP
+                  ? "cursor-pointer"
+                  : "cursor-default"
+              }`}
+              title={isKP ? "编辑房间信息" : undefined}
+            >
+              <span className="flex min-w-0 items-center gap-2">
+                <h1 className="truncate text-white font-bold text-lg md:text-xl tracking-tight">
+                  {moduleInfo.title || "未命名模组"}
+                </h1>
+                {isKP && (
+                  <Edit2
+                    size={14}
+                    className="shrink-0 text-dicecho-muted opacity-70 transition-colors group-hover:text-dicecho-primary group-hover:opacity-100"
+                  />
+                )}
+              </span>
               <p className="text-xs text-dicecho-muted truncate max-w-[150px] md:max-w-md mt-1">
                 {moduleInfo.description || "暂无描述"}
               </p>
-            </div>
+            </button>
           </div>
           <div className="flex items-center gap-2 md:gap-3">
             {roomType !== "voice" && (
-              <Button
-                variant="ghost"
-                size={isMobile ? "icon" : "sm"}
-                icon={globalMute ? VolumeX : Volume2}
-                onClick={() => setGlobalMute(!globalMute)}
-                title={globalMute ? "取消静音" : "静音"}
-              >
-                {!isMobile && (globalMute ? "已静音" : "静音")}
-              </Button>
+              <LocalMusicVolumeControl
+                volume={localMusicVolume}
+                onVolumeChange={setLocalMusicVolume}
+              />
             )}
             <Button
               variant="ghost"
@@ -557,9 +662,7 @@ const App: React.FC = () => {
           </>
         ) : view === "setup" ? (
           <Dashboard
-            moduleInfo={moduleInfo}
             characters={derivedCharacters}
-            onEditModule={() => setShowModuleModal(true)}
             onAddChar={(roleLabel) => {
               // 接收 role 标签，例如 "NPC", "怪物"
               setEditingChar(null);
@@ -583,7 +686,6 @@ const App: React.FC = () => {
         ) : view === "tools" ? (
           <RoomTools
             roomId={currentRoomId}
-            roomTitle={moduleInfo.title}
             isKP={isKP}
             userId={currentUserId}
             logs={logs}
@@ -597,6 +699,7 @@ const App: React.FC = () => {
             isKP={isKP}
             currentUserId={currentUserId}
             characters={derivedCharacters}
+            roomMemberItems={roomMemberItems}
           />
         ) : null}
 
@@ -611,6 +714,7 @@ const App: React.FC = () => {
           isMobile={isMobile}
           isHidden={view !== "music" || roomType === "voice"}
           globalMute={globalMute}
+          volume={localMusicVolume}
           syncedIsPlaying={isMusicPlaying}
           syncedTrackIndex={musicTrackIndex}
           onUpdateSyncState={updateMusicState}

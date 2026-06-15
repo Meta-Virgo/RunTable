@@ -65,14 +65,29 @@ const log = (overrides: Partial<Log>): Log => ({
 });
 
 describe("square post modules", () => {
-  it("builds public character summaries without sensitive fields", () => {
+  it("builds full character snapshots without internal fields", () => {
     const payload = buildCharacterSummaryPayload(character);
 
     expect(payload).toMatchObject({
       name: "Lin",
       job: "侦探",
       stats: { str: 50, san: 60 },
+      notes: "keeper-facing note",
+      backstory: "private backstory",
+      items: [{ name: "knife", quantity: 1 }],
+      spells: [{ name: "spell", quantity: 1 }],
     });
+    expect(payload.skills).toEqual([
+      { name: "Library", value: 80 },
+      { name: "Spot", value: 70 },
+      { name: "Fight", value: 65 },
+      { name: "Stealth", value: 60 },
+      { name: "Charm", value: 55 },
+      { name: "Listen", value: 50 },
+      { name: "Dodge", value: 45 },
+      { name: "FirstAid", value: 40 },
+      { name: "Drive", value: 25 },
+    ]);
     expect(payload.top_skills).toEqual([
       { name: "Library", value: 80 },
       { name: "Spot", value: 70 },
@@ -83,10 +98,10 @@ describe("square post modules", () => {
       { name: "Dodge", value: 45 },
       { name: "FirstAid", value: 40 },
     ]);
-    expect(JSON.stringify(payload)).not.toContain("keeper-facing note");
-    expect(JSON.stringify(payload)).not.toContain("private backstory");
-    expect(JSON.stringify(payload)).not.toContain("knife");
+    expect(JSON.stringify(payload)).not.toContain("user-1");
+    expect(JSON.stringify(payload)).not.toContain("room-1");
     expect(JSON.stringify(payload)).not.toContain("raw");
+    expect(JSON.stringify(payload)).not.toContain("secret");
   });
 
   it("creates character modules with source ids but snapshot payloads", () => {
@@ -140,4 +155,3 @@ describe("square post modules", () => {
     ).toContain("Library");
   });
 });
-

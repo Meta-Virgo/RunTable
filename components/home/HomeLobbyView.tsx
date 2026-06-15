@@ -1,18 +1,20 @@
 import React from "react";
 import {
+  AlertCircle,
   Clock3,
   Filter,
   Hash,
-  Loader2,
   MessageSquare,
   Mic,
   Plus,
+  RefreshCw,
   Search,
   Users,
 } from "lucide-react";
 import type { Character, Room } from "../../types";
 import { Button, Input, Textarea, cn } from "../UI";
 import { RoomCard } from "../RoomCard";
+import { RoomGridSkeleton, StaggeredItem } from "../Skeleton";
 import type { LobbySortMode } from "../../hooks/useLobbyCatalog";
 
 type RoomFilter = "all" | "mine" | "created" | "kp_online";
@@ -29,6 +31,7 @@ interface HomeLobbyViewProps {
   currentUserId: string | null;
   filteredRooms: Room[];
   isLoadingRooms: boolean;
+  roomLoadError: string | null;
   searchQuery: string;
   setSearchQuery: (query: string) => void;
   roomFilter: string;
@@ -56,6 +59,7 @@ interface HomeLobbyViewProps {
   setNewRoomType: (type: "text" | "voice") => void;
   loading: boolean;
   onCreateRoom: () => void;
+  onRefreshRooms: () => void;
   onLoginRequest: () => void;
 }
 
@@ -64,6 +68,7 @@ export const HomeLobbyView: React.FC<HomeLobbyViewProps> = ({
   currentUserId,
   filteredRooms,
   isLoadingRooms,
+  roomLoadError,
   searchQuery,
   setSearchQuery,
   roomFilter,
@@ -87,6 +92,7 @@ export const HomeLobbyView: React.FC<HomeLobbyViewProps> = ({
   setNewRoomType,
   loading,
   onCreateRoom,
+  onRefreshRooms,
   onLoginRequest,
 }) => {
   const nextSortMode: LobbySortMode =
@@ -209,23 +215,37 @@ export const HomeLobbyView: React.FC<HomeLobbyViewProps> = ({
           )}
 
           {isLoadingRooms ? (
-            <div className="flex flex-col items-center justify-center rounded-lg border border-dicecho-border/30 bg-dicecho-panel/50 py-24 text-dicecho-muted animate-fade-in">
-              <Loader2 className="mb-4 h-10 w-10 animate-spin text-dicecho-primary" />
-              <p className="text-sm font-medium">正在加载房间...</p>
+            <RoomGridSkeleton />
+          ) : roomLoadError ? (
+            <div className="rounded-lg border border-red-500/30 bg-dicecho-panel/60 px-6 py-14 text-center text-dicecho-muted">
+              <AlertCircle
+                size={42}
+                className="mx-auto mb-3 text-red-400"
+              />
+              <p className="font-medium text-slate-100">{roomLoadError}</p>
+              <button
+                type="button"
+                onClick={onRefreshRooms}
+                className="mx-auto mt-5 inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-dicecho-border/50 bg-dicecho-card/70 px-4 text-sm font-semibold text-white transition-colors hover:border-dicecho-primary/60 hover:bg-dicecho-raised/80"
+              >
+                <RefreshCw size={15} />
+                重新加载
+              </button>
             </div>
           ) : (
             <div className="grid grid-cols-1 gap-5 animate-fade-in md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
-              {filteredRooms.map((room) => (
-                <RoomCard
-                  key={room.id}
-                  room={room}
-                  isAuthenticated={isAuthenticated}
-                  currentUserId={currentUserId}
-                  myCharacters={myCharacters}
-                  onlineUsers={onlineUsers}
-                  onJoinRoom={onJoinRoom}
-                  onLoginRequest={onLoginRequest}
-                />
+              {filteredRooms.map((room, index) => (
+                <StaggeredItem key={room.id} index={index}>
+                  <RoomCard
+                    room={room}
+                    isAuthenticated={isAuthenticated}
+                    currentUserId={currentUserId}
+                    myCharacters={myCharacters}
+                    onlineUsers={onlineUsers}
+                    onJoinRoom={onJoinRoom}
+                    onLoginRequest={onLoginRequest}
+                  />
+                </StaggeredItem>
               ))}
               {filteredRooms.length === 0 && (
                 <div className="col-span-full rounded-lg border border-dashed border-dicecho-border/40 bg-dicecho-panel/40 py-16 text-center text-dicecho-muted">
@@ -325,7 +345,7 @@ const CreateRoomPanel: React.FC<{
         <Button
           onClick={onCreateRoom}
           disabled={!newRoomTitle.trim() || loading}
-          icon={loading ? Loader2 : Plus}
+          icon={Plus}
         >
           {loading ? "创建中..." : "立即创建"}
         </Button>

@@ -40,6 +40,22 @@ const COVER_GRADIENTS = [
 const hashText = (value: string) =>
   Array.from(value).reduce((total, char) => total + char.charCodeAt(0), 0);
 
+const normalizeCoverImageUrl = (value?: string | null) => {
+  const trimmed = value?.trim();
+  if (!trimmed) return undefined;
+
+  const urlText = /^www\./i.test(trimmed) ? `https://${trimmed}` : trimmed;
+
+  try {
+    const url = new URL(urlText);
+    return ["http:", "https:", "data:", "blob:"].includes(url.protocol)
+      ? url.toString()
+      : undefined;
+  } catch {
+    return undefined;
+  }
+};
+
 export const RoomCard: React.FC<RoomCardProps> = ({
   room,
   isAuthenticated,
@@ -79,7 +95,7 @@ export const RoomCard: React.FC<RoomCardProps> = ({
   const onlineMemberCount =
     lobbyRoom.activeMemberIds?.filter((userId) => onlineUsers.has(userId))
       .length ?? (isKpOnline ? 1 : 0);
-  const coverImageUrl = room.cover_image_url?.trim();
+  const coverImageUrl = normalizeCoverImageUrl(room.cover_image_url);
   const typeLabel = room.type === "voice" ? "语音团" : "文字团";
   const TypeIcon = room.type === "voice" ? Mic : MessageSquare;
   const requiresPassword = Boolean(room.has_password && !isKP);
@@ -310,44 +326,56 @@ const RoomCover: React.FC<{
   TypeIcon,
   description,
   compact,
-}) => (
-  <div
-    className={cn(
-      "relative isolate aspect-[3/4] overflow-hidden rounded-lg",
-      compact && "mb-0"
-    )}
-  >
-    {coverImageUrl ? (
-      <img
-        src={coverImageUrl}
-        alt={`${room.title} 封面`}
-        className="absolute inset-0 h-full w-full object-cover"
-        loading="lazy"
-      />
-    ) : (
-      <div className={cn("absolute inset-0 bg-gradient-to-br", gradient)} />
-    )}
-    <div className="absolute inset-0 bg-[radial-gradient(circle_at_28%_22%,rgba(255,255,255,0.18),transparent_24%),linear-gradient(180deg,rgba(15,20,32,0.04)_0%,rgba(15,20,32,0.18)_48%,rgba(15,20,32,0.46)_100%)]" />
-    <div className="absolute left-2 top-2 inline-flex items-center gap-1 rounded-full border border-white/10 bg-black/35 px-2 py-0.5 text-[11px] font-semibold text-white backdrop-blur-sm">
-      #{room.room_number || "???"}
-    </div>
+}) => {
+  const [failedCoverUrl, setFailedCoverUrl] = useState<string | null>(null);
+  const showCoverImage = Boolean(
+    coverImageUrl && failedCoverUrl !== coverImageUrl
+  );
+
+  useEffect(() => {
+    setFailedCoverUrl(null);
+  }, [coverImageUrl]);
+
+  return (
     <div
-      className="absolute right-2 top-2 inline-flex h-7 w-7 items-center justify-center rounded-full border border-white/10 bg-black/35 text-white backdrop-blur-sm"
-      title={typeLabel}
-      aria-label={typeLabel}
+      className={cn(
+        "relative isolate aspect-[3/4] overflow-hidden rounded-lg",
+        compact && "mb-0"
+      )}
     >
-      <TypeIcon size={14} />
+      {showCoverImage ? (
+        <img
+          src={coverImageUrl}
+          alt={`${room.title} 封面`}
+          className="absolute inset-0 h-full w-full object-cover"
+          loading="lazy"
+          onError={() => setFailedCoverUrl(coverImageUrl || null)}
+        />
+      ) : (
+        <div className={cn("absolute inset-0 bg-gradient-to-br", gradient)} />
+      )}
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_28%_22%,rgba(255,255,255,0.18),transparent_24%),linear-gradient(180deg,rgba(15,20,32,0.04)_0%,rgba(15,20,32,0.18)_48%,rgba(15,20,32,0.46)_100%)]" />
+      <div className="absolute left-2 top-2 inline-flex items-center gap-1 rounded-full border border-white/10 bg-black/35 px-2 py-0.5 text-[11px] font-semibold text-white backdrop-blur-sm">
+        #{room.room_number || "???"}
+      </div>
+      <div
+        className="absolute right-2 top-2 inline-flex h-7 w-7 items-center justify-center rounded-full border border-white/10 bg-black/35 text-white backdrop-blur-sm"
+        title={typeLabel}
+        aria-label={typeLabel}
+      >
+        <TypeIcon size={14} />
+      </div>
+      <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/75 via-black/45 to-transparent px-3 pb-3 pt-10">
+        <h3 className="truncate text-base font-bold leading-6 text-white drop-shadow">
+          {room.title || `房间 #${room.room_number || "???"}`}
+        </h3>
+        <p className="mt-1 line-clamp-2 min-h-[2.5rem] text-sm leading-5 text-white/78 drop-shadow">
+          {description || "暂无简介，等待 KP 补充房间介绍。"}
+        </p>
+      </div>
     </div>
-    <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/75 via-black/45 to-transparent px-3 pb-3 pt-10">
-      <h3 className="truncate text-base font-bold leading-6 text-white drop-shadow">
-        {room.title || `房间 #${room.room_number || "???"}`}
-      </h3>
-      <p className="mt-1 line-clamp-2 min-h-[2.5rem] text-sm leading-5 text-white/78 drop-shadow">
-        {description || "暂无简介，等待 KP 补充房间介绍。"}
-      </p>
-    </div>
-  </div>
-);
+  );
+};
 
 const RoomMetric: React.FC<{
   icon: React.ElementType;

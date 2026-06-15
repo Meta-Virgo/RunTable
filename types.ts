@@ -223,6 +223,13 @@ export interface SquareCharacterSummaryPayload {
   job?: string | null;
   age?: string | null;
   sex?: string | null;
+  db?: string | null;
+  build?: number | null;
+  notes?: string | null;
+  backstory?: string | null;
+  inventory_text?: string | null;
+  items?: InventoryItem[];
+  spells?: InventoryItem[];
   stats: {
     str: number;
     con: number;
@@ -237,6 +244,7 @@ export interface SquareCharacterSummaryPayload {
     san: number;
     mp: number;
   };
+  skills?: Array<{ name: string; value: number }>;
   top_skills: Array<{ name: string; value: number }>;
 }
 
@@ -464,4 +472,113 @@ export interface MoveOwnSceneMarkerInput {
   markerId: string;
   x: number;
   y: number;
+}
+
+export interface RoomSceneMarkerDragPayload {
+  roomId: string;
+  sceneId: string;
+  markerId: string;
+  characterId: string;
+  userId: string;
+  x: number;
+  y: number;
+  sentAt: string;
+}
+
+export type TabletopDocumentScope = "keeper" | "public";
+
+export type TabletopMapTheme = "stone" | "mansion" | "cavern" | "facility";
+
+export interface GeneratedMapConfig {
+  seed: string;
+  width: number;
+  height: number;
+  gridSize: number;
+  roomCount: number;
+  corridorDensity: number;
+  theme: TabletopMapTheme;
+}
+
+export interface TabletopMapTile {
+  x: number;
+  y: number;
+  kind: "wall" | "floor" | "door" | "void";
+  roomId?: string;
+  revealed: boolean;
+}
+
+export interface TabletopGeneratedMap {
+  config: GeneratedMapConfig;
+  tiles: TabletopMapTile[];
+}
+
+export interface TabletopScene {
+  id: string;
+  title: string;
+  description: string | null;
+  map: TabletopGeneratedMap;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface TabletopToken {
+  id: string;
+  roomId: string;
+  sceneId: string;
+  characterId: string;
+  x: number;
+  y: number;
+  size: number;
+  rotation: number;
+  zIndex: number;
+  isHidden: boolean;
+  isLocked: boolean;
+  label: string | null;
+  updatedAt?: string;
+}
+
+export interface FogRegion {
+  id: string;
+  sceneId: string;
+  shape: "rect" | "polygon";
+  points: number[];
+  mode: "hidden" | "revealed";
+}
+
+export interface TabletopShape {
+  id: string;
+  sceneId: string;
+  kind: "rect" | "circle" | "text";
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  text?: string;
+  fill: string;
+  stroke: string;
+  strokeWidth: number;
+  zIndex: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface TabletopState {
+  roomId: string;
+  activeSceneId: string | null;
+  scenes: TabletopScene[];
+  tokens: TabletopToken[];
+  shapes: TabletopShape[];
+  fogRegions: FogRegion[];
+  updatedAt: string;
+}
+
+export interface TabletopBootstrap {
+  room_id: string;
+  scope: TabletopDocumentScope;
+  snapshot_base64: string | null;
+  state_json: TabletopState | null;
+  last_update_id: number;
+  version: number;
+  updates: { id: number; update_base64: string; created_at: string }[];
+  tokens: TabletopToken[];
 }

@@ -1,8 +1,10 @@
 import { supabase } from "../supabase";
 import type {
+  Character,
   MoveOwnSceneMarkerInput,
   RoomScene,
   RoomSceneMarker,
+  RoomSceneMarkerDragPayload,
   UpsertRoomSceneMarkerInput,
   CreateRoomSceneInput,
   UpdateRoomSceneInput,
@@ -30,9 +32,38 @@ export const SCENE_BACKGROUND_PATTERNS = [
   "mist",
 ] as const;
 
+export const SCENE_WORLD_WIDTH = 1600;
+export const SCENE_WORLD_HEIGHT = 1000;
+export const SCENE_MARKER_DRAG_EVENT = "scene-marker-drag";
+export const SCENE_MIN_SCALE = 0.35;
+export const SCENE_MAX_SCALE = 3;
+
 export function clampSceneCoordinate(value: number) {
   if (!Number.isFinite(value)) return 50;
   return Math.min(100, Math.max(0, Math.round(value * 10) / 10));
+}
+
+export function clampSceneScale(value: number) {
+  if (!Number.isFinite(value)) return 1;
+  return Math.min(SCENE_MAX_SCALE, Math.max(SCENE_MIN_SCALE, value));
+}
+
+export function getRoomSceneDragChannelName(roomId: string) {
+  return `room-scenes-drag:${roomId}`;
+}
+
+export function scenePercentToWorld(position: { x: number; y: number }) {
+  return {
+    x: (clampSceneCoordinate(position.x) / 100) * SCENE_WORLD_WIDTH,
+    y: (clampSceneCoordinate(position.y) / 100) * SCENE_WORLD_HEIGHT,
+  };
+}
+
+export function sceneWorldToPercent(position: { x: number; y: number }) {
+  return {
+    x: clampSceneCoordinate((position.x / SCENE_WORLD_WIDTH) * 100),
+    y: clampSceneCoordinate((position.y / SCENE_WORLD_HEIGHT) * 100),
+  };
 }
 
 export function isOwnInvestigatorMarker(input: {
@@ -45,6 +76,57 @@ export function isOwnInvestigatorMarker(input: {
     Boolean(input.currentUserId) &&
     input.characterUserId === input.currentUserId &&
     input.characterType === "investigator"
+  );
+}
+
+export function canMoveSceneMarker(input: {
+  marker: RoomSceneMarker;
+  character?: Pick<Character, "user_id" | "type">;
+  isKeeper: boolean;
+  currentUserId?: string;
+}) {
+  return (
+    input.isKeeper ||
+    isOwnInvestigatorMarker({
+      marker: input.marker,
+      characterUserId: input.character?.user_id,
+      characterType: input.character?.type,
+      currentUserId: input.currentUserId,
+    })
+  );
+}
+
+export function buildSceneMarkerDragPayload(input: {
+  marker: RoomSceneMarker;
+  roomId: string;
+  userId: string;
+  position: { x: number; y: number };
+  sentAt?: string;
+}): RoomSceneMarkerDragPayload {
+  return {
+    roomId: input.roomId,
+    sceneId: input.marker.scene_id,
+    markerId: input.marker.id,
+    characterId: input.marker.character_id,
+    userId: input.userId,
+    x: clampSceneCoordinate(input.position.x),
+    y: clampSceneCoordinate(input.position.y),
+    sentAt: input.sentAt || new Date().toISOString(),
+  };
+}
+
+export function isSceneMarkerDragPayload(input: unknown) {
+  const payload = input as Partial<RoomSceneMarkerDragPayload> | null;
+  return Boolean(
+    payload &&
+      typeof payload.roomId === "string" &&
+      typeof payload.sceneId === "string" &&
+      typeof payload.markerId === "string" &&
+      typeof payload.characterId === "string" &&
+      typeof payload.userId === "string" &&
+      typeof payload.x === "number" &&
+      typeof payload.y === "number" &&
+      typeof payload.sentAt === "string"
   );
 }
 

@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "../supabase";
 import { Character, Room } from "../types";
-import { getCurrentUser } from "../services/auth";
 import {
   fetchRoomActivityCounts,
   fetchRoomMemberUserIds,
@@ -34,6 +33,23 @@ const processRooms = async (rooms: any[]) => {
   return buildLobbyCatalogRooms({ rooms, activityCounts, memberUserIds });
 };
 
+function getRoomLoadErrorMessage(error: unknown) {
+  const message =
+    error instanceof Error
+      ? error.message
+      : typeof error === "object" && error && "message" in error
+        ? String((error as { message?: unknown }).message)
+        : "";
+
+  if (message.toLowerCase().includes("failed to fetch")) {
+    return "无法连接到房间服务，请检查网络后重试。";
+  }
+
+  return message
+    ? `房间列表加载失败：${message}`
+    : "房间列表加载失败，请稍后重试。";
+}
+
 export function useLobbyCatalog({
   currentUserId,
   characters,
@@ -41,6 +57,7 @@ export function useLobbyCatalog({
 }: UseLobbyCatalogOptions) {
   const [rooms, setRooms] = useState<Room[]>([]);
   const [isLoadingRooms, setIsLoadingRooms] = useState(false);
+  const [roomLoadError, setRoomLoadError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [roomFilter, setRoomFilter] = useState<RoomFilter>("all");
   const [sortMode, setSortMode] = useState<LobbySortMode>("activity");
@@ -51,18 +68,27 @@ export function useLobbyCatalog({
 
   const refreshRooms = useCallback(async () => {
     setIsLoadingRooms(true);
-    const {
-      data: { user },
-    } = await getCurrentUser();
-    const { data, error } = await fetchVisibleRooms(user?.id);
+    setRoomLoadError(null);
 
-    if (data) {
-      setRooms(await processRooms(data));
+    try {
+      const { data, error } = await fetchVisibleRooms(
+        currentUserId || undefined
+      );
+
+      if (error) {
+        console.error("Error fetching rooms:", error);
+        setRoomLoadError(getRoomLoadErrorMessage(error));
+        return;
+      }
+
+      setRooms(await processRooms(data || []));
+    } catch (error) {
+      console.error("Error fetching rooms:", error);
+      setRoomLoadError(getRoomLoadErrorMessage(error));
+    } finally {
+      setIsLoadingRooms(false);
     }
-
-    if (error) console.error("Error fetching rooms:", error);
-    setIsLoadingRooms(false);
-  }, []);
+  }, [currentUserId]);
 
   useEffect(() => {
     refreshRooms();
@@ -115,6 +141,7 @@ export function useLobbyCatalog({
     rooms,
     filteredRooms,
     isLoadingRooms,
+    roomLoadError,
     searchQuery,
     setSearchQuery,
     roomFilter,

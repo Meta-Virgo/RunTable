@@ -1,6 +1,5 @@
 import React from "react";
 import {
-  Edit2,
   UserPlus,
   Users,
   Swords,
@@ -12,13 +11,11 @@ import {
   Copy,
 } from "lucide-react";
 import { Button, StatBadge, cn } from "./UI";
-import { ModuleInfo, Character } from "../types";
+import { Character } from "../types";
 import { useElasticScroll } from "../hooks/useElasticScroll";
 
 interface DashboardProps {
-  moduleInfo: ModuleInfo;
   characters: Character[];
-  onEditModule: () => void;
   onAddChar: (role: string) => void;
   onEditChar: (char: Character) => void;
   onDuplicateChar: (char: Character) => void;
@@ -26,9 +23,7 @@ interface DashboardProps {
 }
 
 export const Dashboard: React.FC<DashboardProps> = ({
-  moduleInfo,
   characters,
-  onEditModule,
   onAddChar,
   onEditChar,
   onDuplicateChar,
@@ -49,26 +44,6 @@ export const Dashboard: React.FC<DashboardProps> = ({
       className="flex-1 overflow-y-auto p-4 md:p-8 custom-scrollbar animate-fade-in overscroll-y-none"
     >
       <div ref={contentRef} className="max-w-6xl mx-auto space-y-6 pb-12">
-        {/* Module Info - KP Only */}
-        {isKP && (
-          <section>
-            <div
-              onClick={onEditModule}
-              className="group rounded-lg border border-dicecho-border/45 bg-dicecho-card/70 p-6 md:p-8 relative overflow-hidden transition-colors cursor-pointer hover:bg-dicecho-raised/70 shadow-sm"
-            >
-              <div className="absolute top-0 right-0 p-4 opacity-100 md:opacity-0 group-hover:opacity-100 transition-opacity text-slate-400">
-                <Edit2 size={20} />
-              </div>
-              <h2 className="text-2xl md:text-3xl font-bold text-white mb-3 md:mb-4 group-hover:text-dicecho-primary transition-colors">
-                {moduleInfo.title || "未命名模组"}
-              </h2>
-              <p className="text-slate-400 leading-relaxed max-w-3xl text-sm md:text-base line-clamp-3 md:line-clamp-none">
-                {moduleInfo.description || "点击编辑模组信息..."}
-              </p>
-            </div>
-          </section>
-        )}
-
         {/* Investigators */}
         <section>
           <div className="flex justify-between items-end mb-6">

@@ -13,14 +13,12 @@ import {
 export { nowIso, parseTags, toLocalDateTimeValue };
 
 export type RoomToolsTab =
-  | "report"
   | "clues"
   | "invite"
-  | "share"
   | "management";
 
 export function useRoomToolsState(roomId: string) {
-  const [activeTab, setActiveTab] = useState<RoomToolsTab>("report");
+  const [activeTab, setActiveTab] = useState<RoomToolsTab>("clues");
   const [clues, setClues] = useState<RoomClue[]>([]);
   const [clueTitle, setClueTitle] = useState("");
   const [clueBody, setClueBody] = useState("");

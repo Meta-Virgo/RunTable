@@ -17,6 +17,9 @@ import { SquareNotificationsMenu } from "./square/SquareNotificationsMenu";
 import { SquarePostDetailModal } from "./square/SquarePostDetailModal";
 import { SquarePostList } from "./square/SquarePostList";
 import { SquareProfileModal } from "./square/SquareProfileModal";
+import { requestFriendship } from "../services/friendsModel";
+import * as friendsRepository from "../services/friendsRepository";
+import type { Profile } from "../types";
 
 export const Square: React.FC = () => {
   const {
@@ -110,6 +113,21 @@ export const Square: React.FC = () => {
       scrollContainerRef.current.scrollTo({ top: 0, behavior: "smooth" });
     }
   };
+
+  const handleRequestFriend = React.useCallback(
+    async (profile: Profile) => {
+      if (!currentUser?.id) return;
+
+      const result = await requestFriendship({
+        currentUserId: currentUser.id,
+        targetUserId: profile.id,
+        repository: friendsRepository,
+        storage: localStorage,
+      });
+      alert(result.message);
+    },
+    [currentUser?.id]
+  );
 
   return (
     <div className="flex h-full dicecho-page-bg text-slate-200 overflow-hidden relative">
@@ -238,11 +256,13 @@ export const Square: React.FC = () => {
       <SquareProfileModal
         isOpen={profilePanel.isOpen}
         profile={profilePanel.selectedProfile}
+        currentUserId={currentUser?.id}
         historyTab={profilePanel.historyTab}
         setHistoryTab={profilePanel.setHistoryTab}
         historyLoading={profilePanel.historyLoading}
         kpHistory={profilePanel.kpHistory}
         playerHistory={profilePanel.playerHistory}
+        onRequestFriend={handleRequestFriend}
         onClose={profilePanel.closeProfile}
       />
       {/* Post Detail Modal */}

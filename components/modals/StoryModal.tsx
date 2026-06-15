@@ -23,9 +23,9 @@ export const StoryModal: React.FC<{
           </div>
         </button>
       </div>
-      <div className="flex-1 p-6 md:p-10 overflow-y-auto font-serif text-slate-800 leading-relaxed whitespace-pre-wrap text-base md:text-lg bg-[#f8f6ef]">
+      <div className="flex-1 m-4 md:m-6 px-5 py-5 md:px-7 md:py-6 overflow-y-auto font-serif text-slate-100 leading-7 md:leading-8 whitespace-pre-wrap text-sm md:text-base rounded-lg border border-dicecho-border/45 bg-dicecho-card/55 shadow-inner shadow-black/20 custom-scrollbar">
         {isLoading ? (
-          <div className="flex flex-col items-center justify-center h-full text-slate-500 gap-4">
+          <div className="flex flex-col items-center justify-center h-full text-dicecho-muted gap-4">
             <div className="w-8 h-8 border-4 border-dicecho-border/40 border-t-dicecho-primary rounded-full animate-spin"></div>
             <p>正在生成战报，请稍候...</p>
           </div>

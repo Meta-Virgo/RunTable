@@ -9,13 +9,18 @@ import {
   History,
   MessageCircle,
   Crown,
-  Loader2,
   User,
   Trash2,
 } from "lucide-react";
 import { AvatarUpload } from "./AvatarUpload";
 import { useElasticScroll } from "../hooks/useElasticScroll";
 import { HomeHistoryModal } from "./home/HomeHistoryModal";
+import { FriendRequestButton } from "./profile/FriendRequestButton";
+import {
+  FriendCardSkeleton,
+  HistorySkeletonList,
+  StaggeredItem,
+} from "./Skeleton";
 import { themeRgb } from "../utils/theme";
 import {
   fetchFriendsProfileHistory,
@@ -42,6 +47,7 @@ export const Friends: React.FC<FriendsProps> = ({
   const [activeTab, setActiveTab] = useState<"list" | "requests">("list");
   const [friends, setFriends] = useState<Friendship[]>([]);
   const [requests, setRequests] = useState<Friendship[]>([]);
+  const [isLoadingOverview, setIsLoadingOverview] = useState(true);
 
   // Search State
   const [searchQuery, setSearchQuery] = useState("");
@@ -68,20 +74,28 @@ export const Friends: React.FC<FriendsProps> = ({
   useElasticScroll(resumeScrollRef, resumeContentRef);
 
   useEffect(() => {
-    if (currentUser) {
-      fetchFriendsOverviewForUser();
-    }
+    fetchFriendsOverviewForUser();
   }, [currentUser, activeTab]);
 
   const fetchFriendsOverviewForUser = async () => {
-    if (!currentUser) return;
+    if (!currentUser) {
+      setFriends([]);
+      setRequests([]);
+      setIsLoadingOverview(false);
+      return;
+    }
 
-    const overview = await fetchFriendsOverview({
-      currentUserId: currentUser.id,
-      repository: friendsRepository,
-    });
-    setFriends(overview.friends);
-    setRequests(overview.requests);
+    setIsLoadingOverview(true);
+    try {
+      const overview = await fetchFriendsOverview({
+        currentUserId: currentUser.id,
+        repository: friendsRepository,
+      });
+      setFriends(overview.friends);
+      setRequests(overview.requests);
+    } finally {
+      setIsLoadingOverview(false);
+    }
   };
 
   const handleSearch = async () => {
@@ -89,13 +103,16 @@ export const Friends: React.FC<FriendsProps> = ({
     setIsSearching(true);
     setSearchResults([]);
 
-    const results = await searchFriendProfiles({
-      currentUserId: currentUser.id,
-      query: searchQuery,
-      repository: friendsRepository,
-    });
-    setSearchResults(results);
-    setIsSearching(false);
+    try {
+      const results = await searchFriendProfiles({
+        currentUserId: currentUser.id,
+        query: searchQuery,
+        repository: friendsRepository,
+      });
+      setSearchResults(results);
+    } finally {
+      setIsSearching(false);
+    }
   };
 
   const sendFriendRequest = async (targetUserId: string) => {
@@ -108,6 +125,9 @@ export const Friends: React.FC<FriendsProps> = ({
       storage: localStorage,
     });
     alert(result.message);
+    if (result.status === "sent") {
+      void fetchFriendsOverviewForUser();
+    }
   };
 
   const handleAccept = async (friendshipId: string) => {
@@ -147,13 +167,16 @@ export const Friends: React.FC<FriendsProps> = ({
 
   const fetchUserHistory = async (userId: string) => {
     setHistoryLoading(true);
-    const history = await fetchFriendsProfileHistory({
-      userId,
-      repository: friendsProfileRepository,
-    });
-    setKpHistory(history.kpHistory);
-    setPlayerHistory(history.playerHistory);
-    setHistoryLoading(false);
+    try {
+      const history = await fetchFriendsProfileHistory({
+        userId,
+        repository: friendsProfileRepository,
+      });
+      setKpHistory(history.kpHistory);
+      setPlayerHistory(history.playerHistory);
+    } finally {
+      setHistoryLoading(false);
+    }
   };
 
   const openResume = (user: Profile) => {
@@ -168,6 +191,12 @@ export const Friends: React.FC<FriendsProps> = ({
     setShowHistoryModal(true);
   };
 
+  const selectedUserIsFriend = Boolean(
+    selectedUser &&
+      friends.some(
+        (friendship) => friendship.friend_profile?.id === selectedUser.id
+      )
+  );
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Sub Navigation */}
@@ -217,19 +246,33 @@ export const Friends: React.FC<FriendsProps> = ({
                 onClick={handleSearch}
                 disabled={isSearching}
               >
-                {isSearching ? <Loader2 className="animate-spin" /> : "搜索"}
+                {isSearching ? "搜索中" : "搜索"}
               </Button>
             </div>
 
             {/* Search Results */}
-            {searchResults.length > 0 && (
+            {isSearching ? (
               <div className="space-y-4">
                 <h3 className="text-white font-bold text-lg border-l-4 border-dicecho-primary pl-3">
                   搜索结果
                 </h3>
-                {searchResults.map((user) => (
-                  <div
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+                  {Array.from({ length: 3 }).map((_, index) => (
+                    <StaggeredItem key={index} index={index}>
+                      <FriendCardSkeleton />
+                    </StaggeredItem>
+                  ))}
+                </div>
+              </div>
+            ) : searchResults.length > 0 && (
+              <div className="space-y-4">
+                <h3 className="text-white font-bold text-lg border-l-4 border-dicecho-primary pl-3">
+                  搜索结果
+                </h3>
+                {searchResults.map((user, index) => (
+                  <StaggeredItem
                     key={user.id}
+                    index={index}
                     className="bg-dicecho-card/70 border border-dicecho-border/45 p-6 rounded-lg flex items-center gap-6 shadow-sm"
                   >
                     <div
@@ -273,7 +316,7 @@ export const Friends: React.FC<FriendsProps> = ({
                         </Button>
                       </div>
                     </div>
-                  </div>
+                  </StaggeredItem>
                 ))}
               </div>
             )}
@@ -292,68 +335,77 @@ export const Friends: React.FC<FriendsProps> = ({
                 </h3>
               )}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {friends.map((f) => {
-                  const profile = f.friend_profile!;
-                  return (
-                    <div
-                      key={f.id}
-                      className="bg-dicecho-card/70 border border-dicecho-border/45 p-4 rounded-lg flex items-center gap-4 hover:bg-dicecho-raised/70 transition-colors group cursor-pointer shadow-sm"
-                      onClick={() => openResume(profile)}
-                    >
-                      <div>
-                        <AvatarUpload
-                          url={profile.avatar_url}
-                          onUpload={() => {}}
-                          editable={false}
-                          size={56}
-                        />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <h3 className="font-bold text-white text-lg truncate">
-                            {profile.nickname || "Unknown"}
-                          </h3>
-                          {profile.is_vip && (
-                            <span className="text-[10px] bg-dicecho-primary/20 text-dicecho-primary border border-dicecho-primary/30 px-1 rounded">
-                              VIP
-                            </span>
-                          )}
+                {isLoadingOverview ? (
+                  Array.from({ length: 1 }).map((_, index) => (
+                    <StaggeredItem key={index} index={index}>
+                      <FriendCardSkeleton />
+                    </StaggeredItem>
+                  ))
+                ) : (
+                  friends.map((f, index) => {
+                    const profile = f.friend_profile!;
+                    return (
+                      <StaggeredItem
+                        key={f.id}
+                        index={index}
+                        className="bg-dicecho-card/70 border border-dicecho-border/45 p-4 rounded-lg flex items-center gap-4 hover:bg-dicecho-raised/70 transition-colors group cursor-pointer shadow-sm"
+                        onClick={() => openResume(profile)}
+                      >
+                        <div>
+                          <AvatarUpload
+                            url={profile.avatar_url}
+                            onUpload={() => {}}
+                            editable={false}
+                            size={56}
+                          />
                         </div>
-                        <div className="text-xs text-slate-500 font-mono">
-                          UID: {profile.user_code}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <h3 className="font-bold text-white text-lg truncate">
+                              {profile.nickname || "Unknown"}
+                            </h3>
+                            {profile.is_vip && (
+                              <span className="text-[10px] bg-dicecho-primary/20 text-dicecho-primary border border-dicecho-primary/30 px-1 rounded">
+                                VIP
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-xs text-slate-500 font-mono">
+                            UID: {profile.user_code}
+                          </div>
+                          <div className="text-xs text-slate-400 truncate mt-1">
+                            {profile.bio || "这个人很懒..."}
+                          </div>
                         </div>
-                        <div className="text-xs text-slate-400 truncate mt-1">
-                          {profile.bio || "这个人很懒..."}
+                        <div className="flex flex-col gap-1">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            icon={MessageCircle}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onOpenDirectMessage?.(profile);
+                            }}
+                            title="发送私信"
+                          />
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="text-red-400 hover:text-red-300 hover:bg-red-500/10"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteFriend(f.id);
+                            }}
+                            title="删除好友"
+                          >
+                            <Trash2 size={18} />
+                          </Button>
                         </div>
-                      </div>
-                      <div className="flex flex-col gap-1">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          icon={MessageCircle}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onOpenDirectMessage?.(profile);
-                          }}
-                          title="发送私信"
-                        />
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="text-red-400 hover:text-red-300 hover:bg-red-500/10"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDeleteFriend(f.id);
-                          }}
-                          title="删除好友"
-                        >
-                          <Trash2 size={18} />
-                        </Button>
-                      </div>
-                    </div>
-                  );
-                })}
-                {friends.length === 0 && (
+                      </StaggeredItem>
+                    );
+                  })
+                )}
+                {!isLoadingOverview && friends.length === 0 && (
                   <div className="col-span-full text-center py-12 text-slate-500">
                     <User size={48} className="mx-auto mb-3 opacity-20" />
                     <p>暂无好友，去搜索添加一些新朋友吧！</p>
@@ -366,49 +418,54 @@ export const Friends: React.FC<FriendsProps> = ({
 
         {activeTab === "requests" && (
           <div className="space-y-4 max-w-2xl">
-            {requests.map((r) => {
-              const profile = r.friend_profile!;
-              return (
-                <div
-                  key={r.id}
-                  className="bg-dicecho-card/70 border border-dicecho-primary/30 p-4 rounded-lg flex items-center gap-4 shadow-sm"
-                >
-                  <AvatarUpload
-                    url={profile.avatar_url}
-                    onUpload={() => {}}
-                    editable={false}
-                    size={48}
-                  />
-                  <div className="flex-1">
-                    <div className="font-bold text-white">
-                      {profile.nickname}
+            {isLoadingOverview ? (
+              <HistorySkeletonList count={3} />
+            ) : (
+              requests.map((r, index) => {
+                const profile = r.friend_profile!;
+                return (
+                  <StaggeredItem
+                    key={r.id}
+                    index={index}
+                    className="bg-dicecho-card/70 border border-dicecho-primary/30 p-4 rounded-lg flex items-center gap-4 shadow-sm"
+                  >
+                    <AvatarUpload
+                      url={profile.avatar_url}
+                      onUpload={() => {}}
+                      editable={false}
+                      size={48}
+                    />
+                    <div className="flex-1">
+                      <div className="font-bold text-white">
+                        {profile.nickname}
+                      </div>
+                      <div className="text-xs text-slate-500">
+                        请求添加你为好友
+                      </div>
                     </div>
-                    <div className="text-xs text-slate-500">
-                      请求添加你为好友
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        variant="primary"
+                        icon={UserCheck}
+                        onClick={() => handleAccept(r.id)}
+                      >
+                        接受
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        icon={UserX}
+                        onClick={() => handleReject(r.id)}
+                      >
+                        拒绝
+                      </Button>
                     </div>
-                  </div>
-                  <div className="flex gap-2">
-                    <Button
-                      size="sm"
-                      variant="primary"
-                      icon={UserCheck}
-                      onClick={() => handleAccept(r.id)}
-                    >
-                      接受
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      icon={UserX}
-                      onClick={() => handleReject(r.id)}
-                    >
-                      拒绝
-                    </Button>
-                  </div>
-                </div>
-              );
-            })}
-            {requests.length === 0 && (
+                  </StaggeredItem>
+                );
+              })
+            )}
+            {!isLoadingOverview && requests.length === 0 && (
               <div className="text-center py-12 text-slate-500">
                 <p>暂无新的好友申请</p>
               </div>
@@ -476,6 +533,18 @@ export const Friends: React.FC<FriendsProps> = ({
                         size={96}
                       />
                     </div>
+                    {currentUser?.id && selectedUser.id !== currentUser.id && (
+                      <FriendRequestButton
+                        compact
+                        currentUserId={currentUser.id}
+                        profile={selectedUser}
+                        isFriend={selectedUserIsFriend}
+                        className="absolute bottom-1 right-1"
+                        onRequestFriend={(profile) =>
+                          sendFriendRequest(profile.id)
+                        }
+                      />
+                    )}
                   </div>
                 </div>
               </div>
@@ -557,9 +626,7 @@ export const Friends: React.FC<FriendsProps> = ({
             >
               <div ref={resumeContentRef}>
                 {historyLoading ? (
-                  <div className="flex justify-center py-8">
-                    <Loader2 className="animate-spin text-dicecho-primary" />
-                  </div>
+                  <HistorySkeletonList count={3} />
                 ) : historyTab === "player" ? (
                   <div className="space-y-3">
                     {playerHistory.length === 0 && (
@@ -567,13 +634,14 @@ export const Friends: React.FC<FriendsProps> = ({
                         暂无记录
                       </div>
                     )}
-                    {playerHistory.map((item) => {
+                    {playerHistory.map((item, index) => {
                       const characterDisplay =
                         getFriendsHistoryCharacterDisplay(item);
 
                       return (
-                        <div
+                        <StaggeredItem
                           key={item.id}
+                          index={index}
                           className={`relative p-3 rounded-lg border transition-colors duration-150 ${
                             characterDisplay.isDead
                               ? "bg-dicecho-panel/50 border-dicecho-border/30 grayscale"
@@ -627,7 +695,7 @@ export const Friends: React.FC<FriendsProps> = ({
                               </div>
                             </div>
                           </div>
-                        </div>
+                        </StaggeredItem>
                       );
                     })}
                   </div>
@@ -638,9 +706,10 @@ export const Friends: React.FC<FriendsProps> = ({
                         暂无记录
                       </div>
                     )}
-                    {kpHistory.map((history) => (
-                      <div
+                    {kpHistory.map((history, index) => (
+                      <StaggeredItem
                         key={history.id}
+                        index={index}
                         className="bg-dicecho-card/70 border border-dicecho-border/40 p-3 rounded-lg hover:border-dicecho-primary/40 transition-colors duration-150"
                       >
                         <div className="flex justify-between items-start mb-1">
@@ -655,7 +724,7 @@ export const Friends: React.FC<FriendsProps> = ({
                           <Crown size={10} className="text-yellow-500" />
                           <span>主持人 (KP)</span>
                         </div>
-                      </div>
+                      </StaggeredItem>
                     ))}
                   </div>
                 )}

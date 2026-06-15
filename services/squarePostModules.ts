@@ -35,6 +35,15 @@ const clipText = (value: string, maxLength = MAX_LOG_TEXT_LENGTH) => {
   return `${text.slice(0, maxLength - 3).trimEnd()}...`;
 };
 
+const normalizeInventoryItems = (items: Character["items"] = []) =>
+  items
+    .filter((item) => item.name?.trim())
+    .map((item) => ({
+      name: item.name.trim(),
+      quantity: toNumber(item.quantity) || 1,
+      description: item.description?.trim() || undefined,
+    }));
+
 export function buildCharacterSummaryPayload(
   character: Character
 ): SquareCharacterSummaryPayload {
@@ -46,11 +55,11 @@ export function buildCharacterSummaryPayload(
     {} as SquareCharacterSummaryPayload["stats"]
   );
 
-  const top_skills = Object.entries(character.skills || {})
+  const skills = Object.entries(character.skills || {})
     .filter((entry): entry is [string, number] => typeof entry[1] === "number")
     .sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0]))
-    .slice(0, MAX_TOP_SKILLS)
     .map(([name, value]) => ({ name, value }));
+  const top_skills = skills.slice(0, MAX_TOP_SKILLS);
 
   return {
     title: character.name || "未命名调查员",
@@ -62,7 +71,15 @@ export function buildCharacterSummaryPayload(
     job: character.job || null,
     age: character.age || null,
     sex: character.sex || null,
+    db: character.db || null,
+    build: typeof character.build === "number" ? character.build : null,
+    notes: character.notes?.trim() || null,
+    backstory: character.backstory?.trim() || null,
+    inventory_text: character.inventory?.trim() || null,
+    items: normalizeInventoryItems(character.items),
+    spells: normalizeInventoryItems(character.spells),
     stats,
+    skills,
     top_skills,
   };
 }
@@ -154,7 +171,12 @@ export function getSquareModuleSearchText(module: SquarePostModule) {
       payload.job,
       payload.age,
       payload.sex,
-      ...payload.top_skills.map((skill) => skill.name),
+      payload.backstory,
+      payload.notes,
+      payload.inventory_text,
+      ...(payload.skills || payload.top_skills).map((skill) => skill.name),
+      ...(payload.items || []).map((item) => item.name),
+      ...(payload.spells || []).map((spell) => spell.name),
     ]
       .filter(Boolean)
       .join(" ");

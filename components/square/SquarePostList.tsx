@@ -1,9 +1,10 @@
 import React, { useState } from "react";
-import { CornerDownRight, Heart, Loader2, MessageSquare, Trash2 } from "lucide-react";
+import { CornerDownRight, Heart, MessageSquare, Trash2 } from "lucide-react";
 import type { Post } from "../../types";
 import { getSquareModuleSearchText } from "../../services/squarePostModules";
 import { summarizeMarkdown } from "../../services/squareMarkdown";
 import { cn } from "../UI";
+import { FeedSkeletonList, StaggeredItem } from "../Skeleton";
 import { SquareMarkdown } from "../SquareMarkdown";
 import { SquarePostModules } from "./SquarePostModules";
 import { formatSquareTime } from "./squareTime";
@@ -76,12 +77,7 @@ export const SquarePostList: React.FC<SquarePostListProps> = ({
   );
 
   if (loadingPosts) {
-    return (
-      <div className="text-center py-10 text-dicecho-muted">
-        <Loader2 className="animate-spin mx-auto mb-2 text-dicecho-primary" />
-        加载中...
-      </div>
-    );
+    return <FeedSkeletonList count={4} />;
   }
 
   if (posts.length === 0) {
@@ -94,10 +90,11 @@ export const SquarePostList: React.FC<SquarePostListProps> = ({
 
   return (
     <>
-      {visiblePosts.map((post) => (
-        <div
+      {visiblePosts.map((post, index) => (
+        <StaggeredItem
           key={post.id}
-          className="group flex gap-4 rounded-lg border border-dicecho-border/40 bg-dicecho-card/80 p-4 shadow-sm animate-fade-in dicecho-card-shadow"
+          index={index}
+          className="group flex gap-4 rounded-lg border border-dicecho-border/40 bg-dicecho-card/80 p-4 shadow-sm dicecho-card-shadow"
         >
           <div className="w-10 h-10 rounded-full bg-dicecho-panel flex items-center justify-center text-slate-300 font-bold shrink-0 overflow-hidden border border-dicecho-border/40">
             <button
@@ -255,7 +252,7 @@ export const SquarePostList: React.FC<SquarePostListProps> = ({
               </>
             )}
           </div>
-        </div>
+        </StaggeredItem>
       ))}
     </>
   );

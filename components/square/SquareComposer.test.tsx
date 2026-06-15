@@ -57,7 +57,32 @@ const module = {
 } satisfies CreateSquarePostModuleInput;
 
 describe("Square composer modules", () => {
-  it("renders character module controls and pending previews", () => {
+  it("keeps module controls hidden until the toolbar action is used", () => {
+    const html = renderToStaticMarkup(
+      <SquareComposer
+        activeChannelName="general"
+        shareableCharacters={[character]}
+        pendingModules={[]}
+        addCharacterModule={vi.fn()}
+        removeModule={vi.fn()}
+        newPostContent=""
+        setNewPostContent={vi.fn()}
+        posting={false}
+        pendingImage={null}
+        clearPendingImage={vi.fn()}
+        processFile={vi.fn()}
+        handlePaste={vi.fn()}
+        handleDrop={vi.fn()}
+        handlePost={vi.fn()}
+      />
+    );
+
+    expect(html).toContain('aria-label="添加分享模块"');
+    expect(html).not.toContain("选择车卡");
+    expect(html).not.toContain("可附加自己的公开车卡摘要");
+  });
+
+  it("renders pending module previews", () => {
     const html = renderToStaticMarkup(
       <SquareComposer
         activeChannelName="general"
@@ -77,10 +102,9 @@ describe("Square composer modules", () => {
       />
     );
 
-    expect(html).toContain("分享模块");
-    expect(html).toContain("添加车卡");
     expect(html).toContain("Lin");
-    expect(html).toContain("车卡分享");
+    expect(html).toContain("车卡");
+    expect(html).toContain("只读");
+    expect(html).toContain("移除分享模块");
   });
 });
-

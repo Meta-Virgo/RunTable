@@ -17,20 +17,29 @@ interface ActionResult {
 
 export function useInvestigatorLibrary() {
   const [myCharacters, setMyCharacters] = useState<Character[]>([]);
+  const [isLoadingCharacters, setIsLoadingCharacters] = useState(true);
 
   const refreshMyCharacters = useCallback(async () => {
-    const {
-      data: { user },
-    } = await getCurrentUser();
-    if (!user) return;
+    setIsLoadingCharacters(true);
+    try {
+      const {
+        data: { user },
+      } = await getCurrentUser();
+      if (!user) {
+        setMyCharacters([]);
+        return;
+      }
 
-    const { data, error } = await fetchUserInvestigators(user.id);
+      const { data, error } = await fetchUserInvestigators(user.id);
 
-    if (data) {
-      setMyCharacters(data.map(mapCharacterRow));
+      if (data) {
+        setMyCharacters(data.map(mapCharacterRow));
+      }
+
+      if (error) console.error("Error fetching characters:", error);
+    } finally {
+      setIsLoadingCharacters(false);
     }
-
-    if (error) console.error("Error fetching characters:", error);
   }, []);
 
   useEffect(() => {
@@ -90,6 +99,7 @@ export function useInvestigatorLibrary() {
 
   return {
     myCharacters,
+    isLoadingCharacters,
     refreshMyCharacters,
     saveInvestigator,
     deleteInvestigator,

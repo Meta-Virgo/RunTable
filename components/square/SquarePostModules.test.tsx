@@ -31,6 +31,14 @@ describe("Square post modules", () => {
             mp: 16,
           },
           top_skills: [{ name: "侦查", value: 70 }],
+          skills: [
+            { name: "侦查", value: 70 },
+            { name: "图书馆使用", value: 80 },
+          ],
+          backstory: "来自密斯卡托尼克大学。",
+          notes: "随身带着旧怀表。",
+          items: [{ name: "手电筒", quantity: 1, description: "备用电池" }],
+          spells: [{ name: "守护术", quantity: 1 }],
         },
       },
       {
@@ -55,8 +63,15 @@ describe("Square post modules", () => {
     const html = renderToStaticMarkup(<SquarePostModules modules={modules} />);
 
     expect(html).toContain("车卡分享");
+    expect(html).toContain("只读快照");
+    expect(html).toContain("查看档案");
     expect(html).toContain("Lin");
     expect(html).toContain("侦查");
+    expect(html).toContain("图书馆使用");
+    expect(html).toContain("来自密斯卡托尼克大学");
+    expect(html).not.toContain("旧怀表");
+    expect(html).not.toContain("手电筒");
+    expect(html).not.toContain("守护术");
     expect(html).toContain("跑团片段");
     expect(html).toContain("古宅门口");
     expect(html).toContain("门缓缓打开");

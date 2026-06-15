@@ -4,7 +4,6 @@ import { Button, Input, Textarea, Modal, cn } from "./UI";
 import {
   Plus,
   User,
-  Loader2,
   Edit2,
   BookOpen,
   ArrowUp,
@@ -25,6 +24,11 @@ import {
 import { HomeHistoryModal } from "./home/HomeHistoryModal";
 import { HomeLobbyView } from "./home/HomeLobbyView";
 import { HomeAccountViews } from "./home/HomeAccountViews";
+import {
+  CharacterCardSkeleton,
+  FeedSkeletonList,
+  StaggeredItem,
+} from "./Skeleton";
 import {
   createRoom,
   setRoomPassword,
@@ -150,11 +154,16 @@ export const Home: React.FC<HomeProps> = ({
     saveProfile,
     changePassword,
   } = useHomeProfileData();
-  const { myCharacters, saveInvestigator, deleteInvestigator } =
-    useInvestigatorLibrary();
+  const {
+    myCharacters,
+    isLoadingCharacters,
+    saveInvestigator,
+    deleteInvestigator,
+  } = useInvestigatorLibrary();
   const {
     filteredRooms,
     isLoadingRooms,
+    roomLoadError,
     searchQuery,
     setSearchQuery,
     roomFilter,
@@ -441,8 +450,10 @@ export const Home: React.FC<HomeProps> = ({
             <div className="flex-1 min-h-0 relative">
               <Suspense
                 fallback={
-                  <div className="h-full grid place-items-center text-slate-500">
-                    Loading...
+                  <div className="h-full overflow-hidden p-4 md:p-6">
+                    <div className="mx-auto max-w-4xl space-y-6">
+                      <FeedSkeletonList count={3} />
+                    </div>
                   </div>
                 }
               >
@@ -472,6 +483,7 @@ export const Home: React.FC<HomeProps> = ({
                 currentUserId={currentUserId}
                 filteredRooms={filteredRooms}
                 isLoadingRooms={isLoadingRooms}
+                roomLoadError={roomLoadError}
                 searchQuery={searchQuery}
                 setSearchQuery={setSearchQuery}
                 roomFilter={roomFilter}
@@ -495,6 +507,7 @@ export const Home: React.FC<HomeProps> = ({
                 setNewRoomType={setNewRoomType}
                 loading={loading}
                 onCreateRoom={handleCreateRoom}
+                onRefreshRooms={refreshRooms}
                 onLoginRequest={requestLogin}
               />
             ) : activeTab === "characters" ? (
@@ -513,67 +526,76 @@ export const Home: React.FC<HomeProps> = ({
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {myCharacters.map((char) => (
-                    <div
-                      key={char.id}
-                      className="bg-dicecho-card/80 border border-dicecho-border/40 hover:border-dicecho-primary/50 rounded-lg p-5 transition-all group relative overflow-hidden shadow-sm"
-                    >
-                      <div className="flex gap-4 mb-3">
-                        <div className="flex-shrink-0">
-                          <AvatarUpload
-                            url={char.avatar_url}
-                            onUpload={() => {}}
-                            editable={false}
-                            size={64}
-                          />
-                        </div>
-                        <div className="flex-grow">
-                          <div className="flex justify-between items-start">
-                            <div>
-                              <h3 className="font-bold text-white text-lg">
-                                {char.name}
-                              </h3>
-                              <p className="text-xs text-slate-400 mt-1">
-                                {char.sex} · {char.age}岁
-                              </p>
-                            </div>
-                            <div className="text-right">
-                              <div className="text-lg font-mono font-bold text-dicecho-primary">
-                                {char.hp}
-                                <span className="text-xs text-slate-500 ml-1">
-                                  HP
-                                </span>
+                  {isLoadingCharacters ? (
+                    Array.from({ length: 6 }).map((_, index) => (
+                      <StaggeredItem key={index} index={index}>
+                        <CharacterCardSkeleton />
+                      </StaggeredItem>
+                    ))
+                  ) : (
+                    myCharacters.map((char, index) => (
+                      <StaggeredItem
+                        key={char.id}
+                        index={index}
+                        className="bg-dicecho-card/80 border border-dicecho-border/40 hover:border-dicecho-primary/50 rounded-lg p-5 transition-all group relative overflow-hidden shadow-sm"
+                      >
+                        <div className="flex gap-4 mb-3">
+                          <div className="flex-shrink-0">
+                            <AvatarUpload
+                              url={char.avatar_url}
+                              onUpload={() => {}}
+                              editable={false}
+                              size={64}
+                            />
+                          </div>
+                          <div className="flex-grow">
+                            <div className="flex justify-between items-start">
+                              <div>
+                                <h3 className="font-bold text-white text-lg">
+                                  {char.name}
+                                </h3>
+                                <p className="text-xs text-slate-400 mt-1">
+                                  {char.sex} · {char.age}岁
+                                </p>
                               </div>
-                              <div className="text-sm font-mono text-slate-500">
-                                {char.san} SAN
+                              <div className="text-right">
+                                <div className="text-lg font-mono font-bold text-dicecho-primary">
+                                  {char.hp}
+                                  <span className="text-xs text-slate-500 ml-1">
+                                    HP
+                                  </span>
+                                </div>
+                                <div className="text-sm font-mono text-slate-500">
+                                  {char.san} SAN
+                                </div>
                               </div>
                             </div>
                           </div>
                         </div>
-                      </div>
 
-                      <div className="mb-4">
-                        <p className="text-xs text-slate-300 line-clamp-3 leading-relaxed">
-                          {char.backstory || "暂无背景故事..."}
-                        </p>
-                      </div>
+                        <div className="mb-4">
+                          <p className="text-xs text-slate-300 line-clamp-3 leading-relaxed">
+                            {char.backstory || "暂无背景故事..."}
+                          </p>
+                        </div>
 
-                      <div>
-                        <Button
-                          variant="secondary"
-                          size="sm"
-                          className="w-full"
-                          onClick={() => {
-                            setEditingChar(char);
-                            setShowCharModal(true);
-                          }}
-                        >
-                          编辑档案
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
-                  {myCharacters.length === 0 && (
+                        <div>
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            className="w-full"
+                            onClick={() => {
+                              setEditingChar(char);
+                              setShowCharModal(true);
+                            }}
+                          >
+                            编辑档案
+                          </Button>
+                        </div>
+                      </StaggeredItem>
+                    ))
+                  )}
+                  {!isLoadingCharacters && myCharacters.length === 0 && (
                     <div className="col-span-full py-12 text-center text-dicecho-muted border-2 border-dashed border-dicecho-border/40 rounded-lg">
                       <User size={48} className="mx-auto mb-3 opacity-20" />
                       <p>还没有创建角色，点击右上角新建</p>
@@ -617,7 +639,6 @@ export const Home: React.FC<HomeProps> = ({
                       ? "notifications"
                       : "profile"
                 }
-                onSelectTab={(tab) => setActiveTab(tab)}
                 messageCenterPane={messageCenterPane}
                 onSelectMessageCenterPane={setMessageCenterPane}
                 settingsSection={settingsSection}
@@ -664,7 +685,6 @@ export const Home: React.FC<HomeProps> = ({
                 onResetProfile={handleResetProfileForm}
                 onChangePassword={handleChangePassword}
                 onShowHistory={() => setShowHistoryModal(true)}
-                onLogout={onAuthAction}
               />
             )}
           </div>
@@ -736,7 +756,7 @@ export const Home: React.FC<HomeProps> = ({
             <Button
               onClick={handleUpdateRoom}
               disabled={!editingRoom.title.trim() || loading}
-              icon={loading ? Loader2 : Edit2}
+              icon={Edit2}
             >
               {loading ? "保存中..." : "保存修改"}
             </Button>

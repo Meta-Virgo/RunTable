@@ -1,10 +1,16 @@
 import { describe, expect, it, vi } from "vitest";
 import {
+  buildSceneMarkerDragPayload,
+  canMoveSceneMarker,
   clampSceneCoordinate,
   createRoomScene,
+  getRoomSceneDragChannelName,
   isOwnInvestigatorMarker,
+  isSceneMarkerDragPayload,
   isVisibleSceneMarker,
   moveOwnSceneMarker,
+  scenePercentToWorld,
+  sceneWorldToPercent,
   upsertRoomSceneMarker,
 } from "./roomScenes";
 import { supabase } from "../supabase";
@@ -36,6 +42,17 @@ describe("room scene model helpers", () => {
     expect(clampSceneCoordinate(120)).toBe(100);
     expect(clampSceneCoordinate(42.26)).toBe(42.3);
     expect(clampSceneCoordinate(Number.NaN)).toBe(50);
+  });
+
+  it("converts marker percentage positions to stable world coordinates", () => {
+    expect(scenePercentToWorld({ x: 50, y: 25 })).toEqual({
+      x: 800,
+      y: 250,
+    });
+    expect(sceneWorldToPercent({ x: 400, y: 750 })).toEqual({
+      x: 25,
+      y: 75,
+    });
   });
 
   it("allows users to move only their own investigator marker", () => {
@@ -78,6 +95,59 @@ describe("room scene model helpers", () => {
         isKeeper: false,
       })
     ).toBe(false);
+  });
+
+  it("uses one movement guard for keeper and owner investigator tokens", () => {
+    expect(
+      canMoveSceneMarker({
+        marker,
+        character: { user_id: "someone-else", type: "npc" },
+        isKeeper: true,
+        currentUserId: "keeper-1",
+      })
+    ).toBe(true);
+    expect(
+      canMoveSceneMarker({
+        marker,
+        character: { user_id: "user-1", type: "investigator" },
+        isKeeper: false,
+        currentUserId: "user-1",
+      })
+    ).toBe(true);
+    expect(
+      canMoveSceneMarker({
+        marker,
+        character: { user_id: "user-2", type: "investigator" },
+        isKeeper: false,
+        currentUserId: "user-1",
+      })
+    ).toBe(false);
+  });
+
+  it("builds authenticated drag broadcast payloads", () => {
+    const payload = buildSceneMarkerDragPayload({
+      marker,
+      roomId: "room-1",
+      userId: "user-1",
+      position: { x: 101, y: 12.34 },
+      sentAt: "2026-06-14T00:00:00.000Z",
+    });
+
+    expect(getRoomSceneDragChannelName("room-1")).toBe(
+      "room-scenes-drag:room-1"
+    );
+    expect(payload).toEqual({
+      roomId: "room-1",
+      sceneId: "scene-1",
+      markerId: "marker-1",
+      characterId: "char-1",
+      userId: "user-1",
+      x: 100,
+      y: 12.3,
+      sentAt: "2026-06-14T00:00:00.000Z",
+    });
+    expect(isSceneMarkerDragPayload(payload)).toBe(true);
+    expect(isSceneMarkerDragPayload({ ...payload, x: "100" })).toBe(false);
   });
 });
 

@@ -32,6 +32,7 @@ interface UseMusicPlaybackControllerOptions {
   isMobile: boolean;
   isHidden: boolean;
   globalMute: boolean;
+  volume: number;
   syncedIsPlaying?: boolean;
   syncedTrackIndex?: number;
   onUpdateSyncState?: (isPlaying: boolean, trackIndex: number) => void;
@@ -45,6 +46,7 @@ export function useMusicPlaybackController({
   isMobile,
   isHidden,
   globalMute,
+  volume,
   syncedIsPlaying,
   syncedTrackIndex,
   onUpdateSyncState,
@@ -79,6 +81,7 @@ export function useMusicPlaybackController({
   const playlistScrollRef = useRef<HTMLDivElement>(null);
   const playlistContentRef = useRef<HTMLDivElement>(null);
   const loadMoreRef = useRef<HTMLDivElement>(null);
+  const isLoadingMoreRef = useRef(false);
   const { position, handleMouseDown, hasMoved } = useDraggable(
     null,
     "music_player_pos"
@@ -119,9 +122,15 @@ export function useMusicPlaybackController({
 
   useEffect(() => {
     if (audioRef.current) {
-      audioRef.current.muted = globalMute;
+      audioRef.current.muted = globalMute || volume === 0;
     }
-  }, [globalMute]);
+  }, [globalMute, volume]);
+
+  useEffect(() => {
+    if (audioRef.current) {
+      audioRef.current.volume = volume;
+    }
+  }, [volume]);
 
   useEffect(() => {
     setVisualTrackIndex(currentTrackIndex);
@@ -215,9 +224,16 @@ export function useMusicPlaybackController({
     }
   }, [url]);
 
-  const loadMoreTracks = async () => {
-    if (isLoadingMore || playlistTracks.length >= allTrackIds.length) return;
+  useEffect(() => {
+    isLoadingMoreRef.current = isLoadingMore;
+  }, [isLoadingMore]);
 
+  const loadMoreTracks = async () => {
+    if (isLoadingMoreRef.current || playlistTracks.length >= allTrackIds.length) {
+      return;
+    }
+
+    isLoadingMoreRef.current = true;
     setIsLoadingMore(true);
 
     try {
@@ -227,7 +243,6 @@ export function useMusicPlaybackController({
       });
 
       if (nextIds.length === 0) {
-        setIsLoadingMore(false);
         return;
       }
 
@@ -238,30 +253,105 @@ export function useMusicPlaybackController({
     } catch (error) {
       console.error("Failed to load more tracks", error);
     } finally {
+      isLoadingMoreRef.current = false;
       setIsLoadingMore(false);
     }
   };
 
   useEffect(() => {
+    const scrollContainer = playlistScrollRef.current;
+    const loadMoreTarget = loadMoreRef.current;
+    const canLoadMore = () =>
+      !isLoadingMoreRef.current && playlistTracks.length < allTrackIds.length;
+
+    const requestLoadMore = () => {
+      if (canLoadMore()) void loadMoreTracks();
+    };
+
     const observer = new IntersectionObserver(
       (entries) => {
-        if (
-          entries[0].isIntersecting &&
-          !isLoadingMore &&
-          playlistTracks.length < allTrackIds.length
-        ) {
-          void loadMoreTracks();
-        }
+        if (entries[0].isIntersecting) requestLoadMore();
       },
-      { threshold: 0.1 }
+      {
+        root: scrollContainer,
+        rootMargin: "120px 0px",
+        threshold: 0,
+      }
     );
 
-    if (loadMoreRef.current) {
-      observer.observe(loadMoreRef.current);
+    if (loadMoreTarget) {
+      observer.observe(loadMoreTarget);
     }
 
-    return () => observer.disconnect();
-  }, [isLoadingMore, playlistTracks.length, allTrackIds.length]);
+    const handleScroll = () => {
+      if (!scrollContainer) return;
+
+      const distanceToBottom =
+        scrollContainer.scrollHeight -
+        scrollContainer.scrollTop -
+        scrollContainer.clientHeight;
+
+      if (distanceToBottom < 160) requestLoadMore();
+    };
+
+    if (scrollContainer) {
+      scrollContainer.addEventListener("scroll", handleScroll, {
+        passive: true,
+      });
+      handleScroll();
+    }
+
+    return () => {
+      observer.disconnect();
+      scrollContainer?.removeEventListener("scroll", handleScroll);
+    };
+  }, [playlistTracks.length, allTrackIds.length]);
+
+  useEffect(() => {
+    if (
+      parsedType !== 0 ||
+      mode !== "sidebar" ||
+      isHidden ||
+      isLoadingPlaylist ||
+      playlistTracks.length >= allTrackIds.length
+    ) {
+      return;
+    }
+
+    const requestLoadMoreIfViewportNeedsTracks = () => {
+      const scrollContainer = playlistScrollRef.current;
+      if (!scrollContainer || isLoadingMoreRef.current) return;
+
+      const distanceToBottom =
+        scrollContainer.scrollHeight -
+        scrollContainer.scrollTop -
+        scrollContainer.clientHeight;
+
+      if (distanceToBottom < 160) {
+        void loadMoreTracks();
+      }
+    };
+
+    const frameId = window.requestAnimationFrame(
+      requestLoadMoreIfViewportNeedsTracks
+    );
+    const timeoutId = window.setTimeout(
+      requestLoadMoreIfViewportNeedsTracks,
+      120
+    );
+
+    return () => {
+      window.cancelAnimationFrame(frameId);
+      window.clearTimeout(timeoutId);
+    };
+  }, [
+    parsedType,
+    mode,
+    isHidden,
+    isLoadingPlaylist,
+    playlistTracks.length,
+    allTrackIds.length,
+  ]);
 
   useEffect(() => {
     if (
@@ -352,6 +442,7 @@ export function useMusicPlaybackController({
           }
 
           audioRef.current.src = realUrl;
+          audioRef.current.volume = volume;
           audioRef.current.dataset.currentId = String(trackId);
 
           const shouldPlay = shouldAutoplayLoadedTrack({
@@ -395,6 +486,7 @@ export function useMusicPlaybackController({
     currentTrackIndex,
     syncedIsPlaying,
     isKP,
+    volume,
   ]);
 
   const togglePlay = () => {
@@ -459,9 +551,10 @@ export function useMusicPlaybackController({
 
     if (parsedType === 2 && parsedId && retryCount === 0) {
       setRetryCount(1);
-      if (audioRef.current) {
-        audioRef.current.src = getMusicOuterFallbackUrl(parsedId);
-        audioRef.current
+        if (audioRef.current) {
+          audioRef.current.src = getMusicOuterFallbackUrl(parsedId);
+          audioRef.current.volume = volume;
+          audioRef.current
           .play()
           .catch((playError) => console.error("Fallback play error:", playError));
       }

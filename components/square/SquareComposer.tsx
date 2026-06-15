@@ -1,7 +1,7 @@
 import React from "react";
-import { Badge, Loader2, Plus, Send, X } from "lucide-react";
+import { BadgePlus, Plus, Send, X } from "lucide-react";
 import type { Character, CreateSquarePostModuleInput } from "../../types";
-import { Button } from "../UI";
+import { Button, cn } from "../UI";
 import { SquareMarkdownEditor } from "../SquareMarkdownEditor";
 import { SquarePostModules } from "./SquarePostModules";
 
@@ -43,10 +43,17 @@ export const SquareComposer: React.FC<SquareComposerProps> = ({
   handlePost,
 }) => {
   const fileInputRef = React.useRef<HTMLInputElement>(null);
+  const [showModulePicker, setShowModulePicker] = React.useState(false);
   const [selectedCharacterId, setSelectedCharacterId] = React.useState("");
   const selectedCharacter = shareableCharacters.find(
     (character) => character.id === selectedCharacterId
   );
+  const handleAddSelectedCharacter = () => {
+    if (!selectedCharacter) return;
+    addCharacterModule(selectedCharacter);
+    setSelectedCharacterId("");
+    setShowModulePicker(false);
+  };
 
   return (
     <div
@@ -79,20 +86,39 @@ export const SquareComposer: React.FC<SquareComposerProps> = ({
           renderedEditing
           textareaClassName="min-h-[80px]"
           previewVariant="preview"
+          toolbarExtra={
+            <button
+              type="button"
+              aria-label="添加分享模块"
+              title="添加分享模块"
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={() => setShowModulePicker((isOpen) => !isOpen)}
+              className={cn(
+                "relative inline-flex h-7 w-7 items-center justify-center rounded-md text-dicecho-muted transition-colors hover:bg-white/10 hover:text-white",
+                showModulePicker &&
+                  "bg-dicecho-primary/15 text-dicecho-primary"
+              )}
+            >
+              <BadgePlus size={14} />
+              {pendingModules.length > 0 && (
+                <span className="absolute -right-1 -top-1 grid h-4 min-w-4 place-items-center rounded-full border border-dicecho-card bg-dicecho-primary px-1 text-[10px] font-bold leading-none text-white">
+                  {pendingModules.length}
+                </span>
+              )}
+            </button>
+          }
         />
-        <div className="mt-3 rounded-lg border border-dicecho-border/35 bg-dicecho-panel/45 p-3">
-          <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-            <div className="inline-flex items-center gap-2 text-xs font-semibold text-slate-200">
-              <Badge size={14} className="text-dicecho-primary" />
-              分享模块
-            </div>
-            <div className="flex min-w-0 flex-1 items-center justify-end gap-2">
+        {showModulePicker && (
+          <div className="mt-2 rounded-lg border border-dicecho-border/35 bg-dicecho-panel/55 p-2">
+            <div className="flex min-w-0 flex-wrap items-center gap-2">
               <select
                 value={selectedCharacterId}
                 onChange={(event) => setSelectedCharacterId(event.target.value)}
-                className="min-w-0 max-w-[220px] rounded-md border border-dicecho-border/50 bg-dicecho-card/80 px-2 py-1.5 text-xs text-slate-100 focus:border-dicecho-primary/70 focus:outline-none"
+                className="min-w-0 flex-1 rounded-md border border-dicecho-border/50 bg-dicecho-card/80 px-2 py-1.5 text-xs text-slate-100 focus:border-dicecho-primary/70 focus:outline-none"
               >
-                <option value="">选择车卡</option>
+                <option value="">
+                  {shareableCharacters.length > 0 ? "选择车卡" : "暂无可分享车卡"}
+                </option>
                 {shareableCharacters.map((character) => (
                   <option key={character.id} value={character.id}>
                     {character.name}
@@ -104,38 +130,30 @@ export const SquareComposer: React.FC<SquareComposerProps> = ({
                 variant="secondary"
                 icon={Plus}
                 disabled={!selectedCharacter}
-                onClick={() => {
-                  if (!selectedCharacter) return;
-                  addCharacterModule(selectedCharacter);
-                  setSelectedCharacterId("");
-                }}
+                onClick={handleAddSelectedCharacter}
               >
                 添加车卡
               </Button>
             </div>
           </div>
-          {pendingModules.length > 0 ? (
-            <div className="space-y-2">
-              {pendingModules.map((module, index) => (
-                <div key={`${module.module_type}-${index}`} className="relative">
-                  <SquarePostModules modules={[module]} compact />
-                  <button
-                    type="button"
-                    onClick={() => removeModule(index)}
-                    className="absolute right-2 top-2 rounded-full border border-dicecho-border/40 bg-dicecho-panel p-1 text-dicecho-muted hover:text-white"
-                    aria-label="移除分享模块"
-                  >
-                    <X size={12} />
-                  </button>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="text-xs text-dicecho-muted">
-              可附加自己的公开车卡摘要。备注、背景、物品和法术不会被发布。
-            </p>
-          )}
-        </div>
+        )}
+        {pendingModules.length > 0 && (
+          <div className="mt-3 space-y-2">
+            {pendingModules.map((module, index) => (
+              <div key={`${module.module_type}-${index}`} className="relative">
+                <SquarePostModules modules={[module]} compact />
+                <button
+                  type="button"
+                  onClick={() => removeModule(index)}
+                  className="absolute right-2 top-2 rounded-full border border-dicecho-border/40 bg-dicecho-panel p-1 text-dicecho-muted hover:text-white"
+                  aria-label="移除分享模块"
+                >
+                  <X size={12} />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
         <div className="flex justify-between items-center mt-2 pt-2 border-t border-dicecho-border/30 relative z-20">
           <div className="flex gap-2">
             <input
@@ -157,7 +175,7 @@ export const SquareComposer: React.FC<SquareComposerProps> = ({
               posting ||
               (!newPostContent.trim() && !pendingImage && pendingModules.length === 0)
             }
-            icon={posting ? Loader2 : Send}
+            icon={Send}
           >
             {posting ? "发布中..." : "发布"}
           </Button>
