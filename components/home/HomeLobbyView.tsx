@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import type { Character, Room } from "../../types";
 import { Button, Input, Textarea, cn } from "../UI";
+import { CoverImageUpload } from "../CoverImageUpload";
 import { RoomCard } from "../RoomCard";
 import { RoomGridSkeleton, StaggeredItem } from "../Skeleton";
 import type { LobbySortMode } from "../../hooks/useLobbyCatalog";
@@ -198,6 +199,7 @@ export const HomeLobbyView: React.FC<HomeLobbyViewProps> = ({
 
           {showCreateRoom && (
             <CreateRoomPanel
+              currentUserId={currentUserId}
               loading={loading}
               newRoomDesc={newRoomDesc}
               newRoomCoverImageUrl={newRoomCoverImageUrl}
@@ -263,6 +265,7 @@ export const HomeLobbyView: React.FC<HomeLobbyViewProps> = ({
 };
 
 const CreateRoomPanel: React.FC<{
+  currentUserId: string | null;
   loading: boolean;
   newRoomTitle: string;
   setNewRoomTitle: (title: string) => void;
@@ -277,6 +280,7 @@ const CreateRoomPanel: React.FC<{
   onCancel: () => void;
   onCreateRoom: () => void;
 }> = ({
+  currentUserId,
   loading,
   newRoomDesc,
   newRoomCoverImageUrl,
@@ -319,11 +323,11 @@ const CreateRoomPanel: React.FC<{
         onChange={(event) => setNewRoomTitle(event.target.value)}
         placeholder="例如：印斯茅斯之影"
       />
-      <Input
-        label="封面 URL（可选）"
+      <CoverImageUpload
         value={newRoomCoverImageUrl}
-        onChange={(event) => setNewRoomCoverImageUrl(event.target.value)}
-        placeholder="https://example.com/cover.jpg"
+        onChange={setNewRoomCoverImageUrl}
+        currentUserId={currentUserId}
+        disabled={loading}
       />
       <Input
         label="房间密码（可选）"

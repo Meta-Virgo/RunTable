@@ -1,10 +1,8 @@
-import React, { useState, useCallback } from "react";
-import { createPortal } from "react-dom";
+import React, { useState } from "react";
+import { Camera, Loader2, User } from "lucide-react";
 import { supabase } from "../supabase";
-import { User, Loader2, Camera } from "lucide-react";
+import { ImageCropDialog } from "./ImageCropDialog";
 import { cn } from "./UI";
-import Cropper from "react-easy-crop";
-import getCroppedImg from "../utils/cropImage";
 
 interface AvatarUploadProps {
   url?: string | null;
@@ -17,65 +15,46 @@ interface AvatarUploadProps {
 export const AvatarUpload: React.FC<AvatarUploadProps> = ({
   url,
   onUpload,
-  size = 96, // 24 * 4 = 96px (w-24)
+  size = 96,
   editable = true,
   className,
 }) => {
   const [uploading, setUploading] = useState(false);
   const [imageSrc, setImageSrc] = useState<string | null>(null);
-  const [crop, setCrop] = useState({ x: 0, y: 0 });
-  const [zoom, setZoom] = useState(1);
-  const [croppedAreaPixels, setCroppedAreaPixels] = useState<any>(null);
 
-  const onCropComplete = useCallback(
-    (_croppedArea: any, croppedAreaPixels: any) => {
-      setCroppedAreaPixels(croppedAreaPixels);
-    },
-    []
-  );
+  const releaseImageSrc = React.useCallback((src: string | null) => {
+    if (src?.startsWith("blob:")) {
+      URL.revokeObjectURL(src);
+    }
+  }, []);
 
   const onSelectFile = (event: React.ChangeEvent<HTMLInputElement>) => {
-    if (event.target.files && event.target.files.length > 0) {
-      const file = event.target.files[0];
+    const file = event.target.files?.[0];
+    if (!file || !file.type.startsWith("image/")) return;
 
-      // Clean up previous object URL if it exists
-      if (imageSrc && imageSrc.startsWith('blob:')) {
-        URL.revokeObjectURL(imageSrc);
-      }
-
-      const url = URL.createObjectURL(file);
-      setImageSrc(url);
-      
-      // Reset input value to allow selecting the same file again if needed
-      event.target.value = "";
-    }
+    releaseImageSrc(imageSrc);
+    setImageSrc(URL.createObjectURL(file));
+    event.target.value = "";
   };
 
-  // Clean up object URL when component unmounts or imageSrc changes
   React.useEffect(() => {
-    return () => {
-      if (imageSrc && imageSrc.startsWith('blob:')) {
-        URL.revokeObjectURL(imageSrc);
-      }
-    };
-  }, [imageSrc]);
+    return () => releaseImageSrc(imageSrc);
+  }, [imageSrc, releaseImageSrc]);
 
-  const handleUpload = async () => {
-    if (!imageSrc || !croppedAreaPixels) return;
+  const closeDialog = () => {
+    releaseImageSrc(imageSrc);
+    setImageSrc(null);
+  };
 
+  const handleUpload = async (croppedBlob: Blob) => {
     try {
       setUploading(true);
-      const croppedBlob = await getCroppedImg(imageSrc, croppedAreaPixels);
-      if (!croppedBlob) throw new Error("Could not crop image");
-      if (croppedBlob.size === 0) throw new Error("Cropped image is empty");
 
-      const fileExt = "jpg";
-      const fileName = `${Math.random().toString(36).substring(2)}.${fileExt}`;
-      const filePath = `${fileName}`;
+      const fileName = `${Math.random().toString(36).substring(2)}.jpg`;
 
       const { error: uploadError } = await supabase.storage
         .from("avatars")
-        .upload(filePath, croppedBlob, {
+        .upload(fileName, croppedBlob, {
           contentType: "image/jpeg",
         });
 
@@ -83,20 +62,15 @@ export const AvatarUpload: React.FC<AvatarUploadProps> = ({
         throw uploadError;
       }
 
-      const { data } = supabase.storage.from("avatars").getPublicUrl(filePath);
+      const { data } = supabase.storage.from("avatars").getPublicUrl(fileName);
 
       onUpload(data.publicUrl);
-      setImageSrc(null); // Close modal
+      closeDialog();
     } catch (error: any) {
       alert("Error uploading avatar: " + error.message);
     } finally {
       setUploading(false);
     }
-  };
-
-  const handleCancel = () => {
-    setImageSrc(null);
-    setUploading(false);
   };
 
   const Container = editable ? "label" : "div";
@@ -105,7 +79,7 @@ export const AvatarUpload: React.FC<AvatarUploadProps> = ({
     <>
       <Container
         className={cn(
-          "relative group block",
+          "group relative block",
           className,
           editable && "cursor-pointer"
         )}
@@ -113,28 +87,24 @@ export const AvatarUpload: React.FC<AvatarUploadProps> = ({
       >
         <div
           className={cn(
-            "rounded-full overflow-hidden bg-dicecho-card border-2 border-dicecho-border/55 flex items-center justify-center relative w-full h-full",
-            editable && "hover:border-dicecho-primary/70 transition-colors"
+            "relative flex h-full w-full items-center justify-center overflow-hidden rounded-full border-2 border-dicecho-border/55 bg-dicecho-card",
+            editable && "transition-colors hover:border-dicecho-primary/70"
           )}
         >
           {url ? (
-            <img
-              src={url}
-              alt="Avatar"
-              className="w-full h-full object-cover"
-            />
+            <img src={url} alt="Avatar" className="h-full w-full object-cover" />
           ) : (
             <User size={size * 0.5} className="text-dicecho-muted" />
           )}
 
           {uploading && (
-            <div className="absolute inset-0 bg-black/50 flex items-center justify-center z-10">
+            <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/50">
               <Loader2 className="animate-spin text-white" />
             </div>
           )}
 
           {editable && !uploading && (
-            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center z-10">
+            <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/40 opacity-0 transition-opacity group-hover:opacity-100">
               <Camera className="text-white opacity-80" size={size * 0.3} />
             </div>
           )}
@@ -151,63 +121,18 @@ export const AvatarUpload: React.FC<AvatarUploadProps> = ({
         )}
       </Container>
 
-      {imageSrc &&
-        createPortal(
-          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-            <div className="bg-dicecho-panel rounded-lg w-full max-w-md overflow-hidden shadow-lg shadow-black/25 border border-dicecho-border/55 flex flex-col h-[500px]">
-              <div className="p-4 border-b border-dicecho-border/45 bg-dicecho-card/55">
-                <h3 className="text-lg font-semibold text-white">裁切头像</h3>
-              </div>
-
-              <div className="relative flex-1 bg-black">
-                <Cropper
-                  image={imageSrc}
-                  crop={crop}
-                  zoom={zoom}
-                  aspect={1}
-                  onCropChange={setCrop}
-                  onCropComplete={onCropComplete}
-                  onZoomChange={setZoom}
-                />
-              </div>
-
-              <div className="p-4 bg-dicecho-card/55 border-t border-dicecho-border/45 flex justify-between items-center gap-4">
-                <div className="flex-1">
-                  <input
-                    type="range"
-                    value={zoom}
-                    min={1}
-                    max={3}
-                    step={0.1}
-                    aria-labelledby="Zoom"
-                    onChange={(e) => setZoom(Number(e.target.value))}
-                    className="w-full h-1 bg-dicecho-raised rounded-lg appearance-none cursor-pointer accent-dicecho-primary"
-                  />
-                </div>
-                <div className="flex gap-2">
-                  <button
-                    onClick={handleCancel}
-                    className="px-4 py-2 text-sm font-medium text-dicecho-muted hover:text-white hover:bg-white/10 rounded-lg transition-colors"
-                  >
-                    取消
-                  </button>
-                  <button
-                    onClick={handleUpload}
-                    disabled={uploading}
-                    className="px-4 py-2 text-sm font-medium bg-dicecho-primary-strong text-white rounded-lg hover:bg-dicecho-primary transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {uploading ? (
-                      <Loader2 className="animate-spin w-4 h-4" />
-                    ) : (
-                      "保存"
-                    )}
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>,
-          document.body
-        )}
+      {imageSrc && (
+        <ImageCropDialog
+          imageSrc={imageSrc}
+          title="裁切头像"
+          aspect={1}
+          outputWidth={400}
+          outputHeight={400}
+          processing={uploading}
+          onCancel={closeDialog}
+          onConfirm={handleUpload}
+        />
+      )}
     </>
   );
 };

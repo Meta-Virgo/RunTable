@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { CharacterModal } from "./modals/CharacterModal";
 import { AvatarUpload } from "./AvatarUpload";
+import { CoverImageUpload } from "./CoverImageUpload";
 import { Friends } from "./Friends";
 import { useElasticScroll } from "../hooks/useElasticScroll";
 import { useLobbyCatalog } from "../hooks/useLobbyCatalog";
@@ -720,16 +721,16 @@ export const Home: React.FC<HomeProps> = ({
                 setEditingRoom({ ...editingRoom, title: e.target.value })
               }
             />
-            <Input
-              label="房间封面 URL（可选）"
+            <CoverImageUpload
               value={editingRoom.cover_image_url || ""}
-              onChange={(e) =>
+              onChange={(url) =>
                 setEditingRoom({
                   ...editingRoom,
-                  cover_image_url: e.target.value,
+                  cover_image_url: url,
                 })
               }
-              placeholder="https://example.com/cover.jpg"
+              currentUserId={currentUserId}
+              disabled={loading}
             />
             <Input
               label="房间密码 (留空公开)"
