@@ -20,6 +20,8 @@ const MIN_SHAPE_SIZE = 16;
 const MAJOR_GRID_INTERVAL = 5;
 const TOKEN_NODE_NAME = "tabletop-token";
 const SHAPE_NODE_NAME = "tabletop-shape";
+const HIDDEN_TOKEN_FILL = "#64748b";
+const HIDDEN_TOKEN_AVATAR_OVERLAY = "rgba(100,116,139,0.46)";
 
 type TabletopStageState = {
   scale: number;
@@ -974,7 +976,7 @@ const TabletopTokenNode: React.FC<{
       )}
       <Circle
         radius={token.size / 2}
-        fill={token.isHidden ? "#f59e0b" : color}
+        fill={token.isHidden ? HIDDEN_TOKEN_FILL : color}
         stroke="rgba(255,255,255,0.9)"
         strokeWidth={2}
         shadowColor="#000000"
@@ -1013,7 +1015,7 @@ const TabletopTokenNode: React.FC<{
       {hasAvatar && token.isHidden && (
         <Circle
           radius={token.size / 2}
-          fill="rgba(245,158,11,0.38)"
+          fill={HIDDEN_TOKEN_AVATAR_OVERLAY}
           listening={false}
         />
       )}
