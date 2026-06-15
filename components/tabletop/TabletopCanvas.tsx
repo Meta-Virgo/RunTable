@@ -21,6 +21,56 @@ const MAJOR_GRID_INTERVAL = 5;
 const TOKEN_NODE_NAME = "tabletop-token";
 const SHAPE_NODE_NAME = "tabletop-shape";
 
+type TabletopStageState = {
+  scale: number;
+  x: number;
+  y: number;
+};
+
+const viewportMemory = new Map<string, TabletopStageState>();
+
+function getViewportStorageKey(roomId: string, sceneId: string | null | undefined) {
+  return `tabletop-viewport:${roomId}:${sceneId || "none"}`;
+}
+
+function readSavedViewport(key: string): TabletopStageState | null {
+  const memory = viewportMemory.get(key);
+  if (memory) return memory;
+
+  const saved = window.localStorage.getItem(key);
+  if (!saved) return null;
+
+  try {
+    const parsed = JSON.parse(saved) as Partial<TabletopStageState>;
+    const x = parsed.x;
+    const y = parsed.y;
+    const scale = parsed.scale;
+    if (
+      typeof x === "number" &&
+      typeof y === "number" &&
+      typeof scale === "number" &&
+      Number.isFinite(x) &&
+      Number.isFinite(y) &&
+      Number.isFinite(scale)
+    ) {
+      return {
+        x,
+        y,
+        scale: clampTabletopScale(scale),
+      };
+    }
+  } catch {
+    // Ignore stale viewport cache.
+  }
+
+  return null;
+}
+
+function writeSavedViewport(key: string, viewport: TabletopStageState) {
+  viewportMemory.set(key, viewport);
+  window.localStorage.setItem(key, JSON.stringify(viewport));
+}
+
 interface TabletopCanvasProps {
   state: TabletopState;
   scene: TabletopScene | null;
@@ -85,8 +135,10 @@ export const TabletopCanvas: React.FC<TabletopCanvasProps> = ({
   const containerRef = React.useRef<HTMLDivElement>(null);
   const stageRef = React.useRef<Konva.Stage>(null);
   const textInputRef = React.useRef<HTMLInputElement>(null);
+  const initializedViewportKeyRef = React.useRef<string | null>(null);
+  const skipNextViewportSaveRef = React.useRef(false);
   const [size, setSize] = React.useState({ width: 0, height: 0 });
-  const [stageState, setStageState] = React.useState({
+  const [stageState, setStageState] = React.useState<TabletopStageState>({
     scale: 1,
     x: 0,
     y: 0,
@@ -123,6 +175,10 @@ export const TabletopCanvas: React.FC<TabletopCanvasProps> = ({
     () => tokens.find((token) => token.id === selectedTokenId) || null,
     [selectedTokenId, tokens]
   );
+  const viewportStorageKey = React.useMemo(
+    () => getViewportStorageKey(state.roomId, scene?.id),
+    [scene?.id, state.roomId]
+  );
 
   const fitCanvas = React.useCallback(() => {
     const width = containerRef.current?.clientWidth || size.width;
@@ -134,8 +190,9 @@ export const TabletopCanvas: React.FC<TabletopCanvasProps> = ({
       y: height / 2,
     };
     setStageState(next);
+    writeSavedViewport(viewportStorageKey, next);
     onScaleChange(next.scale);
-  }, [onScaleChange, size.height, size.width]);
+  }, [onScaleChange, size.height, size.width, viewportStorageKey]);
 
   React.useEffect(() => {
     const element = containerRef.current;
@@ -168,37 +225,45 @@ export const TabletopCanvas: React.FC<TabletopCanvasProps> = ({
     return () => observer.disconnect();
   }, [scene?.id]);
 
-  React.useEffect(() => {
+  React.useLayoutEffect(() => {
+    if (!scene || !size.width || !size.height) return;
+    if (initializedViewportKeyRef.current === viewportStorageKey) return;
+
+    const saved = readSavedViewport(viewportStorageKey);
+    skipNextViewportSaveRef.current = true;
+    initializedViewportKeyRef.current = viewportStorageKey;
+
+    if (saved) {
+      setStageState(saved);
+      onScaleChange(saved.scale);
+      return;
+    }
+
     fitCanvas();
-  }, [fitCanvas, fitRequest, scene?.id]);
+  }, [
+    fitCanvas,
+    onScaleChange,
+    scene,
+    size.height,
+    size.width,
+    viewportStorageKey,
+  ]);
 
   React.useEffect(() => {
-    const key = `tabletop-viewport:${state.roomId}:${scene?.id || "none"}`;
-    const saved = window.localStorage.getItem(key);
-    if (!saved) return;
-    try {
-      const parsed = JSON.parse(saved) as typeof stageState;
-      if (
-        Number.isFinite(parsed.x) &&
-        Number.isFinite(parsed.y) &&
-        Number.isFinite(parsed.scale)
-      ) {
-        const next = { ...parsed, scale: clampTabletopScale(parsed.scale) };
-        setStageState(next);
-        onScaleChange(next.scale);
-      }
-    } catch {
-      // Ignore stale viewport cache.
-    }
-  }, [onScaleChange, scene?.id, state.roomId]);
+    if (fitRequest === 0) return;
+    initializedViewportKeyRef.current = viewportStorageKey;
+    fitCanvas();
+  }, [fitCanvas, fitRequest, viewportStorageKey]);
 
   React.useEffect(() => {
     if (!scene) return;
-    window.localStorage.setItem(
-      `tabletop-viewport:${state.roomId}:${scene.id}`,
-      JSON.stringify(stageState)
-    );
-  }, [scene, stageState, state.roomId]);
+    if (initializedViewportKeyRef.current !== viewportStorageKey) return;
+    if (skipNextViewportSaveRef.current) {
+      skipNextViewportSaveRef.current = false;
+      return;
+    }
+    writeSavedViewport(viewportStorageKey, stageState);
+  }, [scene, stageState, viewportStorageKey]);
 
   const getWorldPointer = React.useCallback(() => {
     const stage = stageRef.current;
@@ -261,8 +326,32 @@ export const TabletopCanvas: React.FC<TabletopCanvasProps> = ({
       y: pointer.y - mousePointTo.y * nextScale,
     };
     setStageState(next);
+    writeSavedViewport(viewportStorageKey, next);
     onScaleChange(next.scale);
   };
+
+  const handleStageDragPosition = React.useCallback(
+    (stage: Konva.Stage) => {
+      const nextX = stage.x();
+      const nextY = stage.y();
+      let nextViewport: TabletopStageState | null = null;
+      setStageState((previous) => {
+        if (previous.x === nextX && previous.y === nextY) {
+          return previous;
+        }
+        nextViewport = {
+          ...previous,
+          x: nextX,
+          y: nextY,
+        };
+        return nextViewport;
+      });
+      if (nextViewport) {
+        writeSavedViewport(viewportStorageKey, nextViewport);
+      }
+    },
+    [viewportStorageKey]
+  );
 
   const isShapeDraftTool = tool === "rect" || tool === "circle";
   const isFogDraftTool = tool === "reveal" || tool === "hide";
@@ -478,13 +567,15 @@ export const TabletopCanvas: React.FC<TabletopCanvasProps> = ({
           scaleY={stageState.scale}
           draggable={!isDrawingTool && !isTextTool && !isMapEditTool}
           onWheel={handleWheel}
+          onDragMove={(event) => {
+            const stage = event.target.getStage();
+            if (!stage || event.target !== stage) return;
+            handleStageDragPosition(stage);
+          }}
           onDragEnd={(event) => {
-            if (event.target !== event.target.getStage()) return;
-            setStageState((previous) => ({
-              ...previous,
-              x: event.target.x(),
-              y: event.target.y(),
-            }));
+            const stage = event.target.getStage();
+            if (!stage || event.target !== stage) return;
+            handleStageDragPosition(stage);
           }}
           onMouseDown={(event) => {
             onSelectedTokenChange(null);

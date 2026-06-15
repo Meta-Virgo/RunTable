@@ -6,7 +6,7 @@ import React, {
 import { LoginModal } from "./components/Login";
 import { Welcome } from "./components/Welcome";
 import { LoadingScreen } from "./components/LoadingScreen";
-import { Button } from "./components/UI";
+import { Button, cn } from "./components/UI";
 import "@livekit/components-styles";
 import { Character } from "./types"; // Removed AppData as it might not be used anymore
 import { Edit2, Menu, LogOut, Volume2, VolumeX } from "lucide-react";
@@ -207,6 +207,7 @@ const App: React.FC = () => {
 
   // Application State
   const [view, setView] = useState("main");
+  const [hasOpenedSceneView, setHasOpenedSceneView] = useState(false);
   const [isPageHidden, setIsPageHidden] = useState(() =>
     typeof document === "undefined" ? false : document.visibilityState === "hidden"
   );
@@ -307,6 +308,16 @@ const App: React.FC = () => {
       clearRoomSession();
     }
   }, [authLoading, clearRoomSession, currentRoomId, session]);
+
+  useEffect(() => {
+    setHasOpenedSceneView(false);
+  }, [currentRoomId]);
+
+  useEffect(() => {
+    if (view === "scene") {
+      setHasOpenedSceneView(true);
+    }
+  }, [view]);
 
   // Responsive Check
   useEffect(() => {
@@ -531,6 +542,7 @@ const App: React.FC = () => {
         voiceConnectionStatus === "disconnected"
       ? "bg-rose-500"
       : "bg-amber-400 animate-pulse";
+  const shouldRenderSceneView = hasOpenedSceneView || view === "scene";
 
   const appContent = (
     <Suspense fallback={<LoadingScreen />}>
@@ -629,11 +641,12 @@ const App: React.FC = () => {
           </div>
         )}
 
+        <div className="relative min-h-0 flex-1 overflow-hidden">
         {view !== "setup" &&
         view !== "music" &&
         view !== "tools" &&
         view !== "scene" ? (
-          <>
+          <div className="absolute inset-0 flex min-h-0 flex-col">
             <ChatArea
               logs={logs}
               activeChar={activeChar}
@@ -659,8 +672,9 @@ const App: React.FC = () => {
                 <StartAudio label="点击开启声音" />
               </>
             )}
-          </>
+          </div>
         ) : view === "setup" ? (
+          <div className="absolute inset-0 flex min-h-0 flex-col">
           <Dashboard
             characters={derivedCharacters}
             onAddChar={(roleLabel) => {
@@ -683,7 +697,9 @@ const App: React.FC = () => {
             onDuplicateChar={handleDuplicateCharacter}
             isKP={isKP}
           />
+          </div>
         ) : view === "tools" ? (
+          <div className="absolute inset-0 flex min-h-0 flex-col">
           <RoomTools
             roomId={currentRoomId}
             isKP={isKP}
@@ -693,15 +709,30 @@ const App: React.FC = () => {
             onClearChat={handleClearChat}
             onConcludeGame={() => setShowConclusionModal(true)}
           />
-        ) : view === "scene" ? (
-          <RoomSceneView
-            roomId={currentRoomId}
-            isKP={isKP}
-            currentUserId={currentUserId}
-            characters={derivedCharacters}
-            roomMemberItems={roomMemberItems}
-          />
+          </div>
         ) : null}
+
+        {shouldRenderSceneView && (
+          <div
+            aria-hidden={view !== "scene"}
+            className={cn(
+              "absolute inset-0 flex min-h-0 transition-opacity duration-150",
+              view === "scene"
+                ? "z-10 opacity-100"
+                : "pointer-events-none z-0 opacity-0"
+            )}
+          >
+            <RoomSceneView
+              key={currentRoomId}
+              roomId={currentRoomId}
+              isKP={isKP}
+              currentUserId={currentUserId}
+              characters={derivedCharacters}
+              roomMemberItems={roomMemberItems}
+            />
+          </div>
+        )}
+        </div>
 
         <MusicPlayer
           url={bgMusicUrl}
