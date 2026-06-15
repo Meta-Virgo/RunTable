@@ -114,6 +114,11 @@ function getErrorMessage(error: unknown, fallback: string) {
   return maybeError?.message ? `${fallback}: ${maybeError.message}` : fallback;
 }
 
+function isTokenNotFoundError(error: unknown) {
+  const maybeError = error as { message?: string } | null;
+  return /Token not found/i.test(maybeError?.message || "");
+}
+
 function getConnectionDetail(error: unknown) {
   const maybeError = error as {
     code?: string;
@@ -500,7 +505,9 @@ export function useTabletopRoom({
       const results = await Promise.all(
         sceneTokens.map((token) => deleteTabletopToken(token.id))
       );
-      const failed = results.find((result) => result.error);
+      const failed = results.find(
+        (result) => result.error && !isTokenNotFoundError(result.error)
+      );
       if (failed?.error) {
         alert(getErrorMessage(failed.error, "删除场景点位失败"));
         return;
@@ -725,7 +732,7 @@ export function useTabletopRoom({
         return;
       }
       const { error } = await deleteTabletopToken(tokenId);
-      if (error) {
+      if (error && !isTokenNotFoundError(error)) {
         alert(getErrorMessage(error, "删除 Token 失败"));
         return;
       }
