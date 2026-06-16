@@ -1,12 +1,14 @@
 # Architecture Optimization Plan
 
-Date: 2026-06-10
+Date: 2026-06-16
 
 ## Current Judgment
 
 The architecture is now good enough for this pass. The main domain flows have deepened modules around 广场信息流, 大厅目录, 跑团指令, 个人大厅摘要, 调查员库, 好友 / 个人资料, 角色生命周期, 房间工具, 房间会话 Chat Surface, and 房间会话动作.
 
 The remaining large files are mostly orchestration modules or dense view implementations whose current interfaces are earning their keep. By the deletion test, deleting the new modules would spread behavior back across callers; deleting the remaining shells would mostly move coordination elsewhere. Future work should deepen a module only when a product change reveals repeated knowledge or a second adapter at an existing seam.
+
+2026-06-16 update: the newest product change around 桌面 / 地图画布 made one new shallow module visible. `components/tabletop/TabletopCanvas.tsx` was carrying viewport cache parsing, pointer projection, zoom anchoring, text draft sizing, draft shape geometry, and map-tile hit testing in the JSX event implementation. Those rules now sit behind `components/tabletop/tabletopCanvasModel.ts`, with `components/tabletop/tabletopCanvasModel.test.ts` as the interface test surface. The Supabase schema pass also added `supabase/migrations/20260616070439_harden_public_api_and_indexes.sql` to preserve current public API hardening and advisor-driven index fixes in migration history.
 
 ## Completed Deepening
 
@@ -22,6 +24,8 @@ The remaining large files are mostly orchestration modules or dense view impleme
 | Done | 房间辅助弹窗 | `components/modals/*`, `components/AppLazyComponents.ts` | Room information, character editing, status, story report, and conclusion modals now live in independent lazy-loaded modules instead of a broad modal drawer. |
 | Done | 好友 / 个人资料 Social Surface | `components/Friends.tsx`, `services/friendsModel.ts`, `services/friendsRepository.ts`, `services/friendsProfileModel.ts`, `services/friendsProfileRepository.ts` | Friend profile history reuses the shared 个人大厅摘要 history model and view; friend search/request/delete behavior now sits behind a tested social model and repository. |
 | Done | 角色生命周期 Import Model | `services/characterImportModel.ts`, `components/modals/CharacterModal.tsx` | `.st` import aliases and skill/stat parsing now have one tested model instead of living inside the character modal JSX. |
+| Done | 桌面 / 地图画布 Interaction Model | `components/tabletop/TabletopCanvas.tsx`, `components/tabletop/tabletopCanvasModel.ts` | Viewport restore, pointer projection, anchored zoom, draft shape geometry, text sizing, and map tile targeting now have one pure interface and direct tests. |
+| Done | Supabase Public API / Schema Hardening | `supabase/migrations/20260616070439_harden_public_api_and_indexes.sql` | Advisor-driven foreign-key indexes, clue wall RLS performance shape, storage listing policy removal, and SECURITY DEFINER execute grants are recorded in schema history. |
 
 ## Completed Candidates
 
@@ -104,6 +108,42 @@ Progress:
 - 2026-06-09: Extracted `components/modals/StatusModal.tsx`, `components/modals/StoryModal.tsx`, and `components/modals/ConclusionModal.tsx`; updated `components/AppLazyComponents.ts` to lazy-load each directly. `components/Modals.tsx` is now about 997 lines.
 - 2026-06-10: Extracted `.st` character import parsing into `services/characterImportModel.ts` with `services/characterImportModel.test.ts`. `components/Modals.tsx` is now about 907 lines, and the character modal only applies an import result instead of owning alias tables and parsing rules.
 - 2026-06-10: Extracted `components/modals/ModuleModal.tsx` and `components/modals/CharacterModal.tsx`; updated `components/AppLazyComponents.ts` and `components/Home.tsx` to import them directly. `components/Modals.tsx` was deleted.
+
+### 5. 桌面 / 地图画布 Interaction Model
+
+Recommendation: Strong
+
+Files: `components/tabletop/TabletopCanvas.tsx`, `components/tabletop/tabletopCanvasModel.ts`, `components/tabletop/tabletopCanvasModel.test.ts`
+
+Problem: `TabletopCanvas.tsx` mixed Konva rendering with viewport cache parsing, pointer projection, zoom anchoring, text draft sizing, draft shape geometry, and map tile hit testing. Deleting any one helper would spread the same geometry knowledge back into event handlers.
+
+Solution: Extract the pure canvas interaction rules into a tested model module and keep the React module focused on event wiring and rendering.
+
+Benefit: Better locality for 桌面 / 地图画布 interaction bugs; tests hit one interface without mounting Konva; future tools can reuse coordinate and draft logic without widening the JSX module.
+
+Status: Done for this pass.
+
+Progress:
+
+- 2026-06-16: Added `components/tabletop/tabletopCanvasModel.ts` and `components/tabletop/tabletopCanvasModel.test.ts`; `TabletopCanvas.tsx` now calls the model for viewport keys, saved viewport parsing, fit/zoom, pointer-to-world projection, text draft sizing, drawn-shape drafts, and map tile targeting.
+
+### 6. Supabase Public API / Schema Hardening
+
+Recommendation: Strong
+
+Files: `supabase/migrations/20260616070439_harden_public_api_and_indexes.sql`
+
+Problem: The live schema already had the intended security posture, but migration history did not preserve the latest advisor-driven indexes and public API hardening decisions. That made the database structure shallow: the interface depended on remote state knowledge rather than a replayable migration.
+
+Solution: Add a migration that records the current schema hardening: targeted foreign-key indexes, optimized clue wall RLS policies, storage object listing policy removal, and explicit SECURITY DEFINER execute grants.
+
+Benefit: Better locality for Supabase schema drift; deploys can replay the same hardening; future reviews see why frontend-facing RPCs remain callable while trigger-only helpers do not.
+
+Status: Done for this pass.
+
+Progress:
+
+- 2026-06-16: Verified public tables have RLS enabled, checked `security definer` execute privileges, checked storage policies, and verified the target indexes exist on the live `TRPG-Live` project. Kept the migration as schema history because the remote migration list does not yet include this hardening name.
 
 ## Future Watchlist
 

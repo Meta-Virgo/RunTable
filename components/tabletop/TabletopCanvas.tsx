@@ -11,10 +11,20 @@ import type {
 } from "../../types";
 import {
   clampTabletopCoordinate,
-  clampTabletopScale,
 } from "../../services/tabletopModel";
 import type { TabletopMapBrush, TabletopTool } from "../RoomSceneView";
 import { Button, cn } from "../UI";
+import {
+  createFittedTabletopViewport,
+  createTabletopDraftRect,
+  createTextShapeDraft,
+  createZoomedTabletopViewport,
+  getMapTileAtWorldPoint,
+  getTabletopViewportStorageKey,
+  parseSavedTabletopViewport,
+  projectViewportPointToWorld,
+  type TabletopStageState,
+} from "./tabletopCanvasModel";
 
 const MIN_SHAPE_SIZE = 16;
 const MAJOR_GRID_INTERVAL = 5;
@@ -23,49 +33,13 @@ const SHAPE_NODE_NAME = "tabletop-shape";
 const HIDDEN_TOKEN_FILL = "#64748b";
 const HIDDEN_TOKEN_AVATAR_OVERLAY = "rgba(100,116,139,0.46)";
 
-type TabletopStageState = {
-  scale: number;
-  x: number;
-  y: number;
-};
-
 const viewportMemory = new Map<string, TabletopStageState>();
-
-function getViewportStorageKey(roomId: string, sceneId: string | null | undefined) {
-  return `tabletop-viewport:${roomId}:${sceneId || "none"}`;
-}
 
 function readSavedViewport(key: string): TabletopStageState | null {
   const memory = viewportMemory.get(key);
   if (memory) return memory;
 
-  const saved = window.localStorage.getItem(key);
-  if (!saved) return null;
-
-  try {
-    const parsed = JSON.parse(saved) as Partial<TabletopStageState>;
-    const x = parsed.x;
-    const y = parsed.y;
-    const scale = parsed.scale;
-    if (
-      typeof x === "number" &&
-      typeof y === "number" &&
-      typeof scale === "number" &&
-      Number.isFinite(x) &&
-      Number.isFinite(y) &&
-      Number.isFinite(scale)
-    ) {
-      return {
-        x,
-        y,
-        scale: clampTabletopScale(scale),
-      };
-    }
-  } catch {
-    // Ignore stale viewport cache.
-  }
-
-  return null;
+  return parseSavedTabletopViewport(window.localStorage.getItem(key));
 }
 
 function writeSavedViewport(key: string, viewport: TabletopStageState) {
@@ -178,19 +152,15 @@ export const TabletopCanvas: React.FC<TabletopCanvasProps> = ({
     [selectedTokenId, tokens]
   );
   const viewportStorageKey = React.useMemo(
-    () => getViewportStorageKey(state.roomId, scene?.id),
+    () => getTabletopViewportStorageKey(state.roomId, scene?.id),
     [scene?.id, state.roomId]
   );
 
   const fitCanvas = React.useCallback(() => {
     const width = containerRef.current?.clientWidth || size.width;
     const height = containerRef.current?.clientHeight || size.height;
-    if (!width || !height) return;
-    const next = {
-      scale: 1,
-      x: width / 2,
-      y: height / 2,
-    };
+    const next = createFittedTabletopViewport({ width, height });
+    if (!next) return;
     setStageState(next);
     writeSavedViewport(viewportStorageKey, next);
     onScaleChange(next.scale);
@@ -271,24 +241,12 @@ export const TabletopCanvas: React.FC<TabletopCanvasProps> = ({
     const stage = stageRef.current;
     const pointer = stage?.getPointerPosition();
     if (!pointer) return null;
-    return {
-      x: (pointer.x - stageState.x) / stageState.scale,
-      y: (pointer.y - stageState.y) / stageState.scale,
-    };
-  }, [stageState.scale, stageState.x, stageState.y]);
+    return projectViewportPointToWorld(pointer, stageState);
+  }, [stageState]);
 
   const createTextAtPoint = React.useCallback(
     (point: { x: number; y: number }) => {
-      const text = textDraft.trim() || "文本";
-      const length = Array.from(text).length;
-      void onCreateShape({
-        kind: "text",
-        x: point.x,
-        y: point.y,
-        width: Math.min(480, Math.max(96, length * 18)),
-        height: Math.max(34, Math.ceil(length / 22) * 30),
-        text,
-      });
+      void onCreateShape(createTextShapeDraft(point, textDraft));
       onToolChange("select");
     },
     [onCreateShape, onToolChange, textDraft]
@@ -296,37 +254,23 @@ export const TabletopCanvas: React.FC<TabletopCanvasProps> = ({
 
   const createTextAtViewportCenter = React.useCallback(() => {
     if (!size.width || !size.height) return;
-    createTextAtPoint({
-      x: (size.width / 2 - stageState.x) / stageState.scale,
-      y: (size.height / 2 - stageState.y) / stageState.scale,
-    });
-  }, [
-    createTextAtPoint,
-    size.height,
-    size.width,
-    stageState.scale,
-    stageState.x,
-    stageState.y,
-  ]);
+    createTextAtPoint(
+      projectViewportPointToWorld(
+        { x: size.width / 2, y: size.height / 2 },
+        stageState
+      )
+    );
+  }, [createTextAtPoint, size.height, size.width, stageState]);
 
   const handleWheel = (event: Konva.KonvaEventObject<WheelEvent>) => {
     event.evt.preventDefault();
     const pointer = stageRef.current?.getPointerPosition();
     if (!pointer) return;
-    const oldScale = stageState.scale;
-    const mousePointTo = {
-      x: (pointer.x - stageState.x) / oldScale,
-      y: (pointer.y - stageState.y) / oldScale,
-    };
-    const scaleBy = 1.08;
-    const nextScale = clampTabletopScale(
-      event.evt.deltaY > 0 ? oldScale / scaleBy : oldScale * scaleBy
-    );
-    const next = {
-      scale: nextScale,
-      x: pointer.x - mousePointTo.x * nextScale,
-      y: pointer.y - mousePointTo.y * nextScale,
-    };
+    const next = createZoomedTabletopViewport({
+      viewport: stageState,
+      pointer,
+      deltaY: event.evt.deltaY,
+    });
     setStageState(next);
     writeSavedViewport(viewportStorageKey, next);
     onScaleChange(next.scale);
@@ -361,36 +305,24 @@ export const TabletopCanvas: React.FC<TabletopCanvasProps> = ({
 
   const paintMapTileAtPointer = React.useCallback(() => {
     if (!scene || !isMapEditTool) return;
-    const point = getWorldPointer();
-    if (!point) return;
-    const tileX = Math.floor(point.x / gridSize);
-    const tileY = Math.floor(point.y / gridSize);
-    if (
-      tileX < 0 ||
-      tileY < 0 ||
-      tileX >= scene.map.config.width ||
-      tileY >= scene.map.config.height
-    ) {
-      return;
-    }
-    const key = `${tileX}:${tileY}:${mapBrush}`;
+    const tile = getMapTileAtWorldPoint({
+      point: getWorldPointer(),
+      gridSize,
+      mapWidth: scene.map.config.width,
+      mapHeight: scene.map.config.height,
+    });
+    if (!tile) return;
+    const key = `${tile.x}:${tile.y}:${mapBrush}`;
     if (lastPaintedTileRef.current === key) return;
     lastPaintedTileRef.current = key;
-    void onUpdateMapTile({ x: tileX, y: tileY, kind: mapBrush });
+    void onUpdateMapTile({ x: tile.x, y: tile.y, kind: mapBrush });
   }, [getWorldPointer, gridSize, isMapEditTool, mapBrush, onUpdateMapTile, scene]);
 
   const draftShape = React.useMemo(() => {
     if (!drawStart || !drawEnd || (!isShapeDraftTool && !isFogDraftTool)) {
       return null;
     }
-    return {
-      kind: isShapeDraftTool ? tool : "rect",
-      mode: isFogDraftTool ? tool : "shape",
-      x: Math.min(drawStart.x, drawEnd.x),
-      y: Math.min(drawStart.y, drawEnd.y),
-      width: Math.abs(drawEnd.x - drawStart.x),
-      height: Math.abs(drawEnd.y - drawStart.y),
-    };
+    return createTabletopDraftRect({ start: drawStart, end: drawEnd, tool });
   }, [drawEnd, drawStart, isFogDraftTool, isShapeDraftTool, tool]);
 
   const deleteSelectedToken = React.useCallback(() => {
