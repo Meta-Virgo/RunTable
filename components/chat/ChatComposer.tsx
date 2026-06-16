@@ -17,6 +17,7 @@ import type { Character, Log, ModuleInfo } from "../../types";
 import { callDeepSeekAI, buildContext } from "../../services/ai";
 import { Button, cn, NumberStepper } from "../UI";
 import { ChatAiAssistantModal } from "./ChatAiAssistantModal";
+import { canShowAiAssistant } from "./chatComposerModel";
 
 type ChatQuote = {
   id: string;
@@ -117,6 +118,7 @@ export const ChatComposer: React.FC<ChatComposerProps> = ({
 
   const myChar = characters.find((character) => character.id === activeCharId);
   const canRollCheck = !!myChar;
+  const showAiAssistant = canShowAiAssistant({ isKP, isVip });
 
   const calculateMenuStyles = (
     ref: React.RefObject<HTMLElement>,
@@ -149,6 +151,12 @@ export const ChatComposer: React.FC<ChatComposerProps> = ({
       )}px`;
     }
   }, [inputText]);
+
+  useEffect(() => {
+    if (!showAiAssistant) {
+      setShowAIModal(false);
+    }
+  }, [showAiAssistant]);
 
   const handleAskAI = async () => {
     if (!isVip) {
@@ -527,7 +535,7 @@ export const ChatComposer: React.FC<ChatComposerProps> = ({
                     <FileText size={18} />
                   </button>
                 )}
-                {isKP && (
+                {showAiAssistant && (
                   <button
                     onClick={() => setShowAIModal(true)}
                     className="p-2 text-dicecho-primary hover:text-white transition-colors hover:bg-dicecho-primary/15 rounded-lg shrink-0"
@@ -677,20 +685,22 @@ export const ChatComposer: React.FC<ChatComposerProps> = ({
         </div>
       </div>
 
-      <ChatAiAssistantModal
-        open={showAIModal}
-        aiPrompt={aiPrompt}
-        setAiPrompt={setAiPrompt}
-        aiResult={aiResult}
-        aiLoading={aiLoading}
-        aiError={aiError}
-        onAskAI={handleAskAI}
-        onUseResult={(result) => {
-          setInputText(result);
-          setShowAIModal(false);
-        }}
-        onClose={() => setShowAIModal(false)}
-      />
+      {showAiAssistant && (
+        <ChatAiAssistantModal
+          open={showAIModal}
+          aiPrompt={aiPrompt}
+          setAiPrompt={setAiPrompt}
+          aiResult={aiResult}
+          aiLoading={aiLoading}
+          aiError={aiError}
+          onAskAI={handleAskAI}
+          onUseResult={(result) => {
+            setInputText(result);
+            setShowAIModal(false);
+          }}
+          onClose={() => setShowAIModal(false)}
+        />
+      )}
     </>
   );
 };
