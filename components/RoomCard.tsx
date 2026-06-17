@@ -181,7 +181,7 @@ export const RoomCard: React.FC<RoomCardProps> = ({
           className="max-w-4xl"
         >
           <div className="grid max-h-[90vh] overflow-y-auto custom-scrollbar md:grid-cols-[minmax(0,0.92fr)_minmax(0,1fr)]">
-            <div className="p-4 md:p-5">
+            <div className="min-h-[28rem]">
               <RoomCover
                 room={room}
                 coverImageUrl={coverImageUrl}
@@ -338,7 +338,7 @@ const RoomCover: React.FC<{
 
   if (!compact) {
     return (
-      <div className="relative isolate aspect-[3/4] overflow-hidden rounded-lg">
+      <div className="relative isolate h-full min-h-[28rem] overflow-hidden rounded-l-lg">
         {showCoverImage ? (
           <img
             src={coverImageUrl}
