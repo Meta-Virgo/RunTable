@@ -126,6 +126,13 @@ const fallbackRoleForType = (type?: Character["type"]) => {
   return "NPC";
 };
 
+export function formatMessageTimestamp(createdAt: string) {
+  return new Date(createdAt).toLocaleTimeString([], {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
 export function mapMessageToLog(
   message: MessageRow,
   profileMap: Map<string, ProfileRow>,
@@ -143,10 +150,7 @@ export function mapMessageToLog(
 
   return {
     id: message.id,
-    timestamp: new Date(message.created_at).toLocaleTimeString([], {
-      hour: "2-digit",
-      minute: "2-digit",
-    }),
+    timestamp: formatMessageTimestamp(message.created_at),
     createdAt: message.created_at,
     userId: message.user_id,
     charId: message.character_id || "pc",

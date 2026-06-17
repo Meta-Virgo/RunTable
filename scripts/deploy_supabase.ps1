@@ -1,5 +1,5 @@
 param(
-    [string]$ProjectRef = "otvlvdjjtuhobeslcvwr",
+    [string]$ProjectRef = "ejuwvqjaserearyvohxw",
     [switch]$SkipLogin,
     [switch]$SkipDbPush,
     [switch]$SkipFunctionDeploy
@@ -14,7 +14,7 @@ function Invoke-Supabase {
     if (Get-Command supabase -ErrorAction SilentlyContinue) {
         & supabase @SupabaseArgs
     } else {
-        & npx -y supabase@2.67.3 @SupabaseArgs
+        & npx -y supabase@2.106.0 @SupabaseArgs
     }
 
     if ($LASTEXITCODE -ne 0) {

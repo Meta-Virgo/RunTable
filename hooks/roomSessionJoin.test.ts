@@ -194,6 +194,64 @@ describe("room session join action", () => {
     expect(testAdapters.addRoomSystemMessage).not.toHaveBeenCalled();
   });
 
+  it("normalizes bootstrap log timestamps with the client formatter", async () => {
+    const createdAt = "2026-06-08T10:05:00.000Z";
+    const testAdapters = {
+      ...adapters(),
+      joinRoomSessionBootstrap: vi.fn().mockResolvedValue({
+        data: {
+          room,
+          membership: membership(),
+          characters: [{ id: "char-1" }],
+          room_members: [membership()],
+          logs: [
+            {
+              id: "log-1",
+              timestamp: "10:05",
+              createdAt,
+              userId: "user-1",
+              charId: "char-1",
+              charName: "char-1",
+              charRole: "Investigator",
+              type: "normal",
+              content: "hello",
+              isMine: true,
+              recipientId: null,
+            },
+          ],
+          has_more_logs: false,
+          user_id: "user-1",
+          user_nickname: "Yves",
+        },
+        error: null,
+      }),
+      addRoomSystemMessage: vi.fn().mockResolvedValue({ error: null }),
+    };
+
+    const result = await joinRoomSessionAction({
+      input: {
+        roomId: "room-1",
+        charId: "char-1",
+        isRestoring: true,
+      },
+      adapters: testAdapters,
+      isCurrent: () => true,
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      logs: [
+        {
+          id: "log-1",
+          timestamp: new Date(createdAt).toLocaleTimeString([], {
+            hour: "2-digit",
+            minute: "2-digit",
+          }),
+        },
+      ],
+    });
+  });
+
   it("cancels a stale join after sending the enter message before returning session state", async () => {
     const testAdapters = adapters();
     let checks = 0;

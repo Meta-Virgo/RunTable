@@ -1,0 +1,9 @@
+.codex-run/
+.env
+.env.*
+!.env.example
+.playwright-cli/
+.tools/
+output/
+run-output-*.png
+supabase/.temp/

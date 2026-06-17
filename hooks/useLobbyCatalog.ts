@@ -1,10 +1,12 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "../supabase";
 import { Character, Room } from "../types";
 import {
+  fetchLobbyCatalogBootstrap,
   fetchRoomActivityCounts,
   fetchRoomMemberUserIds,
   fetchVisibleRooms,
+  isMissingLobbyBootstrapError,
 } from "../services/rooms";
 import {
   applyLobbyCatalogRoomChange,
@@ -65,12 +67,34 @@ export function useLobbyCatalog({
     () => getLobbyCharacterRoomIds(characters),
     [characters]
   );
+  const useBootstrapRef = useRef(true);
 
   const refreshRooms = useCallback(async () => {
     setIsLoadingRooms(true);
     setRoomLoadError(null);
 
     try {
+      if (useBootstrapRef.current) {
+        const { data: bootstrap, error: bootstrapError } =
+          await fetchLobbyCatalogBootstrap(Boolean(currentUserId));
+
+        if (bootstrapError) {
+          if (isMissingLobbyBootstrapError(bootstrapError)) {
+            useBootstrapRef.current = false;
+          } else {
+            throw bootstrapError;
+          }
+        } else {
+          setRooms(
+            buildLobbyCatalogRooms({
+              rooms: ((bootstrap as any)?.rooms || []) as Room[],
+              activityCounts: new Map(),
+            })
+          );
+          return;
+        }
+      }
+
       const { data, error } = await fetchVisibleRooms(
         currentUserId || undefined
       );

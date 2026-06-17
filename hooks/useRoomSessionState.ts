@@ -104,6 +104,7 @@ export function useRoomSessionState({
 
   const charactersRef = useRef(characters);
   const hasWarnedMusicSchemaRef = useRef(false);
+  const bootstrappedRoomRef = useRef<string | null>(null);
   const joinSequenceRef = useRef(createRoomJoinSequence());
   useEffect(() => {
     charactersRef.current = characters;
@@ -157,6 +158,7 @@ export function useRoomSessionState({
         },
         isCurrent: () => joinSequenceRef.current.isCurrent(joinSequence),
         adapters: remoteAdapters.join,
+        pageSize,
       });
 
       if (!result.ok) return result;
@@ -169,6 +171,10 @@ export function useRoomSessionState({
         result.authority.role,
         result.authority.membershipStatus
       );
+      bootstrappedRoomRef.current =
+        result.logs !== undefined || result.hasMoreLogs !== undefined
+          ? result.room.id
+          : null;
 
       if (!isRestoring) {
         const url = new URL(window.location.href);
@@ -179,6 +185,9 @@ export function useRoomSessionState({
       stateDispatchers.patch({
         roomMembers: result.roomMembers || [],
         characters: result.characters || [],
+        logs: result.logs || [],
+        hasMoreLogs:
+          result.hasMoreLogs === undefined ? true : result.hasMoreLogs,
       });
 
       return { ok: true };
@@ -205,6 +214,7 @@ export function useRoomSessionState({
 
   const clearRoomSession = useCallback(() => {
     joinSequenceRef.current.invalidate();
+    bootstrappedRoomRef.current = null;
     const nextState = buildClearedRoomSessionState();
     applyRoomSessionState(nextState);
     window.history.replaceState(null, "", window.location.pathname);
@@ -551,6 +561,7 @@ export function useRoomSessionState({
     userId,
     userNickname,
     pageSize,
+    skipInitialFetch: bootstrappedRoomRef.current === currentRoomId,
     charactersRef,
     adapter: realtimeAdapter,
     onKicked: clearRoomSession,

@@ -68,42 +68,47 @@ as $$
   );
 $$;
 
-drop policy if exists "Room members can receive scene drag broadcasts"
-  on realtime.messages;
-create policy "Room members can receive scene drag broadcasts"
-on realtime.messages
-for select
-to authenticated
-using (
-  extension = 'broadcast'
-  and app_private.get_room_id_from_scene_drag_topic((select realtime.topic())) is not null
-  and (
-    app_private.is_active_room_member(
-      app_private.get_room_id_from_scene_drag_topic((select realtime.topic())),
-      (select auth.uid())
-    )
-    or app_private.is_room_keeper(
-      app_private.get_room_id_from_scene_drag_topic((select realtime.topic())),
-      (select auth.uid())
-    )
-  )
-);
+do $$
+begin
+  if to_regclass('realtime.messages') is not null then
+    drop policy if exists "Room members can receive scene drag broadcasts"
+      on realtime.messages;
+    create policy "Room members can receive scene drag broadcasts"
+    on realtime.messages
+    for select
+    to authenticated
+    using (
+      extension = 'broadcast'
+      and app_private.get_room_id_from_scene_drag_topic((select realtime.topic())) is not null
+      and (
+        app_private.is_active_room_member(
+          app_private.get_room_id_from_scene_drag_topic((select realtime.topic())),
+          (select auth.uid())
+        )
+        or app_private.is_room_keeper(
+          app_private.get_room_id_from_scene_drag_topic((select realtime.topic())),
+          (select auth.uid())
+        )
+      )
+    );
 
-drop policy if exists "Authorized users can send scene drag broadcasts"
-  on realtime.messages;
-create policy "Authorized users can send scene drag broadcasts"
-on realtime.messages
-for insert
-to authenticated
-with check (
-  extension = 'broadcast'
-  and event = 'scene-marker-drag'
-  and app_private.can_send_room_scene_drag_broadcast(
-    (select realtime.topic()),
-    payload,
-    (select auth.uid())
-  )
-);
+    drop policy if exists "Authorized users can send scene drag broadcasts"
+      on realtime.messages;
+    create policy "Authorized users can send scene drag broadcasts"
+    on realtime.messages
+    for insert
+    to authenticated
+    with check (
+      extension = 'broadcast'
+      and event = 'scene-marker-drag'
+      and app_private.can_send_room_scene_drag_broadcast(
+        (select realtime.topic()),
+        payload,
+        (select auth.uid())
+      )
+    );
+  end if;
+end $$;
 
 revoke all on function app_private.get_room_id_from_scene_drag_topic(text)
   from public;

@@ -7,6 +7,7 @@ import {
   createPostModules,
   deletePost,
   fetchChannels,
+  fetchSquareFeedBootstrap,
   fetchLatestComments,
   fetchLikedPostIds,
   fetchPostsForChannel,
@@ -14,6 +15,7 @@ import {
   fetchProfileById,
   fetchProfilesByIds,
   fetchSquareUser,
+  isMissingSquareFeedBootstrapError,
   likePost,
   unlikePost,
   uploadPostImage,
@@ -29,6 +31,8 @@ export function useSquareFeed() {
   const [loadingChannels, setLoadingChannels] = useState(true);
   const [loadingPosts, setLoadingPosts] = useState(false);
   const [currentUser, setCurrentUser] = useState<any>(null);
+  const useBootstrapRef = useRef(true);
+  const skipNextPostRefreshRef = useRef(false);
   const feedContextRef = useRef({
     activeChannelId: null as string | null,
     currentUser: null as any,
@@ -67,11 +71,51 @@ export function useSquareFeed() {
   );
 
   useEffect(() => {
+    let cancelled = false;
+
+    const applyBootstrap = async (channelId: string | null = null) => {
+      const { data, error } = await fetchSquareFeedBootstrap(channelId);
+
+      if (error) {
+        if (isMissingSquareFeedBootstrapError(error)) {
+          useBootstrapRef.current = false;
+          return false;
+        }
+
+        throw error;
+      }
+
+      if (cancelled) return true;
+
+      const bootstrap = data as any;
+      const bootstrapChannels = (bootstrap?.channels || []) as Channel[];
+      setCurrentUser(bootstrap?.current_user || null);
+      setChannels(bootstrapChannels);
+      skipNextPostRefreshRef.current = Boolean(bootstrap?.active_channel_id);
+      setActiveChannelId(bootstrap?.active_channel_id || null);
+      setPosts((bootstrap?.posts || []) as Post[]);
+      setLoadingChannels(false);
+      setLoadingPosts(false);
+      return true;
+    };
+
     const init = async () => {
+      if (useBootstrapRef.current) {
+        try {
+          const loaded = await applyBootstrap();
+          if (loaded) return;
+        } catch (error) {
+          console.error("Failed to load square feed bootstrap:", error);
+          useBootstrapRef.current = false;
+        }
+      }
+
       const user = await fetchSquareUser();
-      if (user) setCurrentUser(user);
+      if (cancelled) return;
+      setCurrentUser(user || null);
 
       const { data } = await fetchChannels();
+      if (cancelled) return;
       if (data) {
         setChannels(data);
         const defaultChannel =
@@ -84,12 +128,45 @@ export function useSquareFeed() {
     };
 
     init();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const refreshPosts = useCallback(async () => {
     if (!activeChannelId) return;
+    if (skipNextPostRefreshRef.current) {
+      skipNextPostRefreshRef.current = false;
+      return;
+    }
 
     setLoadingPosts(true);
+
+    if (useBootstrapRef.current) {
+      try {
+        const { data, error } = await fetchSquareFeedBootstrap(activeChannelId);
+
+        if (error) {
+          if (isMissingSquareFeedBootstrapError(error)) {
+            useBootstrapRef.current = false;
+          } else {
+            throw error;
+          }
+        } else {
+          const bootstrap = data as any;
+          setCurrentUser(bootstrap?.current_user || null);
+          if (bootstrap?.channels) setChannels(bootstrap.channels as Channel[]);
+          setPosts((bootstrap?.posts || []) as Post[]);
+          setLoadingPosts(false);
+          return;
+        }
+      } catch (error) {
+        console.error("Failed to refresh square feed bootstrap:", error);
+        useBootstrapRef.current = false;
+      }
+    }
+
     const { data } = await fetchPostsForChannel(activeChannelId);
 
     if (data) {
@@ -104,6 +181,7 @@ export function useSquareFeed() {
   }, [refreshPosts]);
 
   useEffect(() => {
+    if (useBootstrapRef.current) return;
     if (posts.length === 0) return;
 
     let cancelled = false;

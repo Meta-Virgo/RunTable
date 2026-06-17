@@ -1,6 +1,29 @@
 import { supabase } from "../supabase";
 import type { RoomMembership } from "./roomAuthority";
 
+export function isMissingLobbyBootstrapError(error: unknown) {
+  const maybeError = error as {
+    code?: string;
+    message?: string;
+    details?: string;
+    hint?: string;
+  } | null;
+  const text = [
+    maybeError?.message,
+    maybeError?.details,
+    maybeError?.hint,
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+
+  return (
+    maybeError?.code === "42883" ||
+    maybeError?.code === "PGRST202" ||
+    text.includes("get_lobby_catalog_bootstrap")
+  );
+}
+
 export const ROOM_SELECT =
   "id, created_at, kp_id, title, description, status, room_number, has_password, last_active_at, bg_music_url, cover_image_url, type, is_music_playing, music_track_index";
 
@@ -113,6 +136,12 @@ export async function fetchVisibleRooms(userId?: string) {
   }
 
   return runQuery(LEGACY_ROOM_WITH_COUNTS_SELECT);
+}
+
+export async function fetchLobbyCatalogBootstrap(includePrivate: boolean) {
+  return supabase.rpc("get_lobby_catalog_bootstrap", {
+    p_include_private: includePrivate,
+  });
 }
 
 export async function fetchRoomActivityCounts(roomIds: string[]) {
@@ -288,6 +317,47 @@ export async function joinRoom(input: {
   });
 }
 
+export function isMissingRoomSessionBootstrapError(error: unknown) {
+  const maybeError = error as {
+    code?: string;
+    message?: string;
+    details?: string;
+    hint?: string;
+  } | null;
+  const text = [
+    maybeError?.message,
+    maybeError?.details,
+    maybeError?.hint,
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+
+  return (
+    maybeError?.code === "42883" ||
+    maybeError?.code === "PGRST202" ||
+    text.includes("join_room_session_bootstrap")
+  );
+}
+
+export async function joinRoomSessionBootstrap(input: {
+  roomId: string;
+  characterId: string | null;
+  password?: string | null;
+  invitationId?: string | null;
+  inviteToken?: string | null;
+  pageSize: number;
+}) {
+  return supabase.rpc("join_room_session_bootstrap", {
+    p_room_id: input.roomId,
+    p_character_id: input.characterId,
+    p_password: input.password || null,
+    p_invitation_id: input.invitationId || null,
+    p_invite_token: input.inviteToken || null,
+    p_page_size: input.pageSize,
+  });
+}
+
 export async function fetchCurrentRoomMembership(
   roomId: string,
   userId: string
@@ -331,13 +401,17 @@ export async function addRoomSystemMessage(
   content: string,
   characterId: string | null = null
 ) {
-  return supabase.from("messages").insert({
-    room_id: roomId,
-    user_id: userId,
-    character_id: characterId,
-    type: "system",
-    content,
-  });
+  return supabase
+    .from("messages")
+    .insert({
+      room_id: roomId,
+      user_id: userId,
+      character_id: characterId,
+      type: "system",
+      content,
+    })
+    .select()
+    .single();
 }
 
 export async function setRoomPassword(roomId: string, password: string) {

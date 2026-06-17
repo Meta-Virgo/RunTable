@@ -17,6 +17,8 @@ import {
   fetchRoomById,
   fetchRoomCharacters,
   joinRoom as joinRoomRpc,
+  isMissingRoomSessionBootstrapError,
+  joinRoomSessionBootstrap,
   kickRoomMember,
   setRoomPassword,
   updateRoomModule,
@@ -39,6 +41,8 @@ export function createRoomSessionRemoteAdapters() {
       mapCharacterRow,
       fetchProfileNickname,
       addRoomSystemMessage,
+      joinRoomSessionBootstrap,
+      isMissingRoomSessionBootstrapError,
     },
     restore: {
       getCurrentUser,

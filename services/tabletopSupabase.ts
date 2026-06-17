@@ -77,6 +77,51 @@ export async function persistTabletopUpdate(input: {
   });
 }
 
+export function isMissingTabletopBatchPersistError(error: unknown) {
+  const maybeError = error as {
+    code?: string;
+    message?: string;
+    details?: string;
+    hint?: string;
+  } | null;
+  const text = [
+    maybeError?.message,
+    maybeError?.details,
+    maybeError?.hint,
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+
+  return (
+    maybeError?.code === "42883" ||
+    maybeError?.code === "PGRST202" ||
+    text.includes("persist_room_tabletop_update_batch")
+  );
+}
+
+export async function persistTabletopUpdateBatch(input: {
+  roomId: string;
+  clientId: number;
+  updates: Array<{
+    scope: TabletopDocumentScope;
+    updateBase64: string;
+    snapshotBase64: string;
+    state: TabletopState;
+  }>;
+}) {
+  return supabase.rpc("persist_room_tabletop_update_batch", {
+    p_room_id: input.roomId,
+    p_client_id: String(input.clientId),
+    p_updates: input.updates.map((update) => ({
+      scope: update.scope,
+      update_base64: update.updateBase64,
+      snapshot_base64: update.snapshotBase64,
+      state_json: update.state,
+    })),
+  });
+}
+
 export async function moveTabletopToken(input: {
   tokenId: string;
   x: number;

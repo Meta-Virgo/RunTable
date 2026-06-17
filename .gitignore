@@ -31,3 +31,5 @@ supabase/.temp
 .tools/
 .codex-run/
 run-output-*.png
+
+.vercel

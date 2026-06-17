@@ -14,6 +14,7 @@ interface UseRoomRealtimeOptions {
   userId?: string;
   userNickname: string;
   pageSize: number;
+  skipInitialFetch?: boolean;
   charactersRef: MutableRefObject<Character[]>;
   adapter: RoomRealtimeAdapter;
   onKicked: () => void;
@@ -56,6 +57,7 @@ export function useRoomRealtime({
   userId,
   userNickname,
   pageSize,
+  skipInitialFetch = false,
   charactersRef,
   adapter,
   onKicked,
@@ -73,7 +75,9 @@ export function useRoomRealtime({
         adapter.replaceCharacters(chars.map(mapCharacterRow));
       }
     };
-    fetchCharacters();
+    if (!skipInitialFetch) {
+      fetchCharacters();
+    }
 
     const fetchMessages = async () => {
       const { data: msgs, error: msgError } = await fetchLatestMessages(
@@ -98,7 +102,9 @@ export function useRoomRealtime({
         adapter.setHasMoreLogs(false);
       }
     };
-    fetchMessages();
+    if (!skipInitialFetch) {
+      fetchMessages();
+    }
 
     const channel = supabase
       .channel(`room:${currentRoomId}`)
@@ -232,6 +238,7 @@ export function useRoomRealtime({
     onKicked,
     onRoomDeleted,
     pageSize,
+    skipInitialFetch,
     userId,
     userNickname,
   ]);

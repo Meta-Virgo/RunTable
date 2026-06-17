@@ -46,7 +46,9 @@ import {
 import {
   deleteTabletopToken,
   fetchTabletopBootstrap,
+  isMissingTabletopBatchPersistError,
   moveTabletopToken,
+  persistTabletopUpdateBatch,
   persistTabletopUpdate,
   setActiveTabletopScene,
   SupabaseYBridge,
@@ -178,8 +180,10 @@ export function useTabletopRoom({
   const bridgeRef = useRef<SupabaseYBridge | null>(null);
   const publicBridgeRef = useRef<SupabaseYBridge | null>(null);
   const persistTimerRef = useRef<number | null>(null);
+  const latestPersistUpdateRef = useRef("");
   const suppressPersistRef = useRef(false);
   const backendAvailableRef = useRef(true);
+  const batchPersistAvailableRef = useRef(true);
   const [backendAvailable, setBackendAvailable] = useState(true);
   const indexedPersistenceRef = useRef<IndexeddbPersistence | null>(null);
 
@@ -188,11 +192,50 @@ export function useTabletopRoom({
     [characters]
   );
 
-  const persistCurrentDoc = useCallback(
+  const flushPersistedDoc = useCallback(
     async (targetDoc: Y.Doc, updateBase64 = "") => {
       if (!isKeeper || !backendAvailableRef.current) return;
       const keeperState = getTabletopDocState(targetDoc, roomId);
       const keeperSnapshotBase64 = encodeTabletopDoc(targetDoc);
+      const publicState = projectTabletopStateForViewer({
+        state: keeperState,
+        isKeeper: false,
+      });
+      const publicDoc = createTabletopDoc(publicState);
+      const snapshotBase64 = encodeTabletopDoc(publicDoc);
+
+      if (batchPersistAvailableRef.current) {
+        const { error } = await persistTabletopUpdateBatch({
+          roomId,
+          clientId: clientIdRef.current,
+          updates: [
+            {
+              scope: "keeper",
+              updateBase64: updateBase64 || keeperSnapshotBase64,
+              snapshotBase64: keeperSnapshotBase64,
+              state: keeperState,
+            },
+            {
+              scope: "public",
+              updateBase64: snapshotBase64,
+              snapshotBase64,
+              state: publicState,
+            },
+          ],
+        });
+
+        if (!error) {
+          publicBridgeRef.current?.sendUpdate(snapshotBase64, publicState);
+          return;
+        }
+
+        if (!isMissingTabletopBatchPersistError(error)) {
+          throw error;
+        }
+
+        batchPersistAvailableRef.current = false;
+      }
+
       await persistTabletopUpdate({
         roomId,
         scope: "keeper",
@@ -202,12 +245,6 @@ export function useTabletopRoom({
         state: keeperState,
       });
 
-      const publicState = projectTabletopStateForViewer({
-        state: keeperState,
-        isKeeper: false,
-      });
-      const publicDoc = createTabletopDoc(publicState);
-      const snapshotBase64 = encodeTabletopDoc(publicDoc);
       await persistTabletopUpdate({
         roomId,
         scope: "public",
@@ -221,15 +258,34 @@ export function useTabletopRoom({
     [isKeeper, roomId]
   );
 
+  const schedulePersistedDoc = useCallback(
+    (targetDoc: Y.Doc, updateBase64 = "") => {
+      if (!isKeeper || !backendAvailableRef.current) return;
+      latestPersistUpdateRef.current = updateBase64 || latestPersistUpdateRef.current;
+      if (persistTimerRef.current) window.clearTimeout(persistTimerRef.current);
+      persistTimerRef.current = window.setTimeout(() => {
+        persistTimerRef.current = null;
+        const pendingUpdate = latestPersistUpdateRef.current;
+        latestPersistUpdateRef.current = "";
+        void flushPersistedDoc(targetDoc, pendingUpdate).catch((error) => {
+          console.error(error);
+          setConnectionDetail(getConnectionDetail(error));
+          setConnectionStatus("error");
+        });
+      }, 1200);
+    },
+    [flushPersistedDoc, isKeeper]
+  );
+
   const applyState = useCallback(
     async (updater: (current: TabletopState) => TabletopState) => {
       const current = getTabletopDocState(doc, roomId);
       const next = normalizeTabletopState(updater(current));
       setTabletopDocState(doc, next);
       setState(isKeeper ? next : projectTabletopStateForViewer({ state: next, isKeeper }));
-      await persistCurrentDoc(doc);
+      schedulePersistedDoc(doc);
     },
-    [doc, isKeeper, persistCurrentDoc, roomId]
+    [doc, isKeeper, roomId, schedulePersistedDoc]
   );
 
   const loadBootstrap = useCallback(async () => {
@@ -304,7 +360,7 @@ export function useTabletopRoom({
       setConnectionDetail(null);
 
       if (isKeeper) {
-        await persistCurrentDoc(nextDoc);
+        await flushPersistedDoc(nextDoc);
       }
     } catch (error) {
       console.error(error);
@@ -363,7 +419,7 @@ export function useTabletopRoom({
       suppressPersistRef.current = false;
       setIsLoading(false);
     }
-  }, [isKeeper, persistCurrentDoc, roomId, scope]);
+  }, [flushPersistedDoc, isKeeper, roomId, scope]);
 
   useEffect(() => {
     void loadBootstrap();
@@ -381,18 +437,19 @@ export function useTabletopRoom({
       const updateBase64 = encodeTabletopUpdate(update);
       bridgeRef.current?.sendUpdate(updateBase64);
       if (!isKeeper) return;
-      if (persistTimerRef.current) window.clearTimeout(persistTimerRef.current);
-      persistTimerRef.current = window.setTimeout(() => {
-        void persistCurrentDoc(doc, updateBase64);
-      }, 450);
+      schedulePersistedDoc(doc, updateBase64);
     };
 
     doc.on("update", handleDocUpdate);
     return () => {
       doc.off("update", handleDocUpdate);
-      if (persistTimerRef.current) window.clearTimeout(persistTimerRef.current);
+      if (persistTimerRef.current) {
+        window.clearTimeout(persistTimerRef.current);
+        persistTimerRef.current = null;
+      }
+      latestPersistUpdateRef.current = "";
     };
-  }, [doc, isKeeper, persistCurrentDoc, roomId]);
+  }, [doc, isKeeper, roomId, schedulePersistedDoc]);
 
   useEffect(() => {
     if (!backendAvailable) return;
@@ -560,6 +617,13 @@ export function useTabletopRoom({
         updatedAt: new Date().toISOString(),
       }));
       if (!backendAvailableRef.current) return;
+      if (persistTimerRef.current) {
+        window.clearTimeout(persistTimerRef.current);
+        persistTimerRef.current = null;
+      }
+      const pendingUpdate = latestPersistUpdateRef.current;
+      latestPersistUpdateRef.current = "";
+      await flushPersistedDoc(doc, pendingUpdate);
       await setActiveTabletopScene({
         roomId,
         sceneId,
@@ -567,7 +631,7 @@ export function useTabletopRoom({
         snapshotBase64: encodeTabletopDoc(doc),
       });
     },
-    [applyState, doc, isKeeper, roomId]
+    [applyState, doc, flushPersistedDoc, isKeeper, roomId]
   );
 
   const renameActiveScene = useCallback(

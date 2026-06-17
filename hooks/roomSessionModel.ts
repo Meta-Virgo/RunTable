@@ -173,6 +173,17 @@ export interface AppliedRoomSnapshotState {
   musicTrackIndex: number;
 }
 
+export interface RoomSessionBootstrapSnapshot {
+  room: RoomSessionRoom;
+  membership: RoomMembership;
+  characters: Character[];
+  room_members: RoomMembership[];
+  logs: Log[];
+  has_more_logs: boolean;
+  user_id?: string;
+  user_nickname?: string | null;
+}
+
 export function buildAppliedRoomSnapshotState(
   room: RoomSessionRoom,
   activeCharacterId: string,

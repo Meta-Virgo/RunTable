@@ -13,7 +13,7 @@ Fill in `.env` after the script creates it. Keep real secrets out of Git.
 Required local and Vercel variables:
 
 ```env
-VITE_SUPABASE_URL=https://otvlvdjjtuhobeslcvwr.supabase.co
+VITE_SUPABASE_URL=https://ejuwvqjaserearyvohxw.supabase.co
 VITE_SUPABASE_ANON_KEY=...
 VITE_LIVEKIT_URL=...
 LIVEKIT_API_KEY=...
@@ -52,7 +52,7 @@ $env:DEEPSEEK_API_KEY="your_deepseek_api_key"
 .\scripts\deploy_supabase.ps1
 ```
 
-The script links project `otvlvdjjtuhobeslcvwr`, sets the Edge Function secret when available, pushes migrations, and deploys `ask-ai`.
+The script links project `ejuwvqjaserearyvohxw` (`TRPG-Live-Singapore`, `ap-southeast-1`), sets the Edge Function secret when available, pushes migrations, and deploys `ask-ai`.
 
 ## Vercel link and deploy
 

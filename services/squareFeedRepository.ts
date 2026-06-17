@@ -1,5 +1,42 @@
 import { supabase } from "../supabase";
-import type { CreateSquarePostModuleInput } from "../types";
+import type { Channel, CreateSquarePostModuleInput, Post } from "../types";
+
+export interface SquareFeedBootstrap {
+  current_user: any | null;
+  channels: Channel[];
+  active_channel_id: string | null;
+  posts: Post[];
+}
+
+export function isMissingSquareFeedBootstrapError(error: unknown) {
+  const maybeError = error as {
+    code?: string;
+    message?: string;
+    details?: string;
+    hint?: string;
+  } | null;
+  const text = [
+    maybeError?.message,
+    maybeError?.details,
+    maybeError?.hint,
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+
+  return (
+    maybeError?.code === "42883" ||
+    maybeError?.code === "PGRST202" ||
+    text.includes("get_square_feed_bootstrap")
+  );
+}
+
+export async function fetchSquareFeedBootstrap(channelId?: string | null) {
+  return supabase.rpc("get_square_feed_bootstrap", {
+    p_channel_id: channelId || null,
+    p_limit: 30,
+  });
+}
 
 export async function fetchSquareUser() {
   const {
