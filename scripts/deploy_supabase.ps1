@@ -9,16 +9,16 @@ $ErrorActionPreference = "Stop"
 Set-Location "$PSScriptRoot/.."
 
 function Invoke-Supabase {
-    param([Parameter(ValueFromRemainingArguments = $true)][string[]]$Args)
+    param([Parameter(ValueFromRemainingArguments = $true)][string[]]$SupabaseArgs)
 
     if (Get-Command supabase -ErrorAction SilentlyContinue) {
-        & supabase @Args
+        & supabase @SupabaseArgs
     } else {
-        & npx -y supabase@2.67.3 @Args
+        & npx -y supabase@2.67.3 @SupabaseArgs
     }
 
     if ($LASTEXITCODE -ne 0) {
-        throw "Supabase command failed: $($Args -join ' ')"
+        throw "Supabase command failed: $($SupabaseArgs -join ' ')"
     }
 }
 

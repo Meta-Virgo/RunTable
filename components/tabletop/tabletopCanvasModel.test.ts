@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   createFittedTabletopViewport,
+  createMapBoundsFittedTabletopViewport,
   createTabletopDraftRect,
   createTextShapeDraft,
   createZoomedTabletopViewport,
@@ -36,6 +37,15 @@ describe("tabletop canvas model", () => {
     expect(
       projectViewportPointToWorld({ x: 520, y: 420 }, { x: 400, y: 300, scale: 2 })
     ).toEqual({ x: 60, y: 60 });
+  });
+
+  it("fits generated map bounds inside the editor viewport", () => {
+    expect(
+      createMapBoundsFittedTabletopViewport({
+        viewport: { width: 800, height: 420 },
+        map: { width: 1440, height: 960 },
+      })
+    ).toEqual({ x: 85, y: 0, scale: 0.4375 });
   });
 
   it("zooms around the pointer without moving the world point under it", () => {

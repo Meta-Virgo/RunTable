@@ -281,6 +281,127 @@ export type CreateSquarePostModuleInput = Omit<
   "id" | "post_id" | "created_at"
 >;
 
+export interface ModuleTemplate {
+  id: string;
+  slug: string;
+  title: string;
+  summary: string;
+  system: string;
+  cover_image_url?: string | null;
+  tags: string[];
+  recommended_players_min: number;
+  recommended_players_max: number;
+  estimated_minutes_min: number;
+  estimated_minutes_max: number;
+  complexity: "intro" | "standard" | "advanced";
+  tone?: string | null;
+  content_warnings: string[];
+  player_facing_premise: string;
+  keeper_notes?: string | null;
+  default_room_type: "text" | "voice";
+  bg_music_url?: string | null;
+  status: "draft" | "published" | "archived";
+  created_by_user_id?: string | null;
+  author?: {
+    nickname: string | null;
+    avatar_url: string | null;
+  } | null;
+  published_at?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ModuleTemplateCharacter {
+  id: string;
+  template_id: string;
+  template_character_key: string;
+  character_type: Character["type"];
+  payload: Partial<Character> & {
+    info?: Record<string, any>;
+    stats?: Record<string, any>;
+  };
+  display_order: number;
+  created_at: string;
+}
+
+export interface ModuleTemplateScene {
+  id: string;
+  template_id: string;
+  template_scene_key: string;
+  title: string;
+  description: string | null;
+  background_color: string;
+  background_pattern: RoomScene["background_pattern"];
+  tabletop_state?: TabletopState | null;
+  is_default: boolean;
+  marker_payload: Array<{
+    character_key: string;
+    x: number;
+    y: number;
+    is_hidden?: boolean;
+    label?: string | null;
+  }>;
+  display_order: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ModuleTemplateDetail extends ModuleTemplate {
+  module_template_characters?: ModuleTemplateCharacter[];
+  module_template_scenes?: ModuleTemplateScene[];
+}
+
+export interface CreateRoomFromModuleTemplateInput {
+  templateId: string;
+  roomType: "text" | "voice";
+  password?: string | null;
+  coverImageUrl?: string | null;
+}
+
+export interface CreateUserModuleTemplateSceneInput {
+  title: string;
+  description?: string | null;
+  backgroundColor?: string;
+  backgroundPattern?: RoomScene["background_pattern"];
+  tabletopState?: TabletopState | null;
+}
+
+export interface CreateUserModuleTemplateCharacterInput {
+  key?: string;
+  characterType: "npc" | "monster";
+  payload: Partial<Character> & {
+    info?: Record<string, any>;
+    stats?: Record<string, any>;
+  };
+  displayOrder?: number;
+}
+
+export interface CreateUserModuleTemplateInput {
+  title: string;
+  summary: string;
+  system: string;
+  coverImageUrl?: string | null;
+  tags: string[];
+  recommendedPlayersMin: number;
+  recommendedPlayersMax: number;
+  estimatedMinutesMin: number;
+  estimatedMinutesMax: number;
+  complexity: ModuleTemplate["complexity"];
+  tone?: string | null;
+  contentWarnings: string[];
+  playerFacingPremise: string;
+  keeperNotes?: string | null;
+  defaultRoomType: Room["type"];
+  bgMusicUrl?: string | null;
+  characters?: CreateUserModuleTemplateCharacterInput[];
+  scene?: CreateUserModuleTemplateSceneInput | null;
+}
+
+export interface UpdateUserModuleTemplateInput
+  extends CreateUserModuleTemplateInput {
+  templateId: string;
+}
+
 export interface PostComment {
   id: string;
   post_id: string;

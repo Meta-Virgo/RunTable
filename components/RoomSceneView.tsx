@@ -1,20 +1,19 @@
 import React from "react";
 import {
-  Circle,
-  Eye,
-  EyeOff,
-  Map as MapIcon,
   Trash2,
-  MousePointer2,
   Plus,
   RefreshCw,
-  Square,
-  Type,
 } from "lucide-react";
-import type { Character, TabletopMapTile, TabletopShape } from "../types";
+import type { Character } from "../types";
 import { useTabletopRoom } from "../hooks/useTabletopRoom";
 import { Button, cn } from "./UI";
 import { TabletopCanvas } from "./tabletop/TabletopCanvas";
+import {
+  tabletopMapBrushes,
+  tabletopShapeTools,
+  type TabletopMapBrush,
+  type TabletopTool,
+} from "./tabletop/tabletopTools";
 
 interface RoomSceneViewProps {
   roomId: string;
@@ -24,14 +23,6 @@ interface RoomSceneViewProps {
   roomMemberItems?: unknown[];
 }
 
-export type TabletopMapBrush = TabletopMapTile["kind"];
-export type TabletopTool =
-  | "select"
-  | TabletopShape["kind"]
-  | "reveal"
-  | "hide"
-  | "map";
-
 const statusLabels: Record<string, string> = {
   idle: "未连接",
   connecting: "连接中",
@@ -40,27 +31,6 @@ const statusLabels: Record<string, string> = {
   local: "本地模式",
   error: "同步异常",
 };
-
-const shapeTools: Array<{
-  id: TabletopTool;
-  label: string;
-  icon: typeof MousePointer2;
-}> = [
-  { id: "select", label: "选择 / 拖动", icon: MousePointer2 },
-  { id: "rect", label: "拖拽画矩形", icon: Square },
-  { id: "circle", label: "拖拽画圆形", icon: Circle },
-  { id: "text", label: "添加文本", icon: Type },
-  { id: "reveal", label: "揭示可见范围", icon: Eye },
-  { id: "hide", label: "遮蔽可见范围", icon: EyeOff },
-  { id: "map", label: "编辑地图", icon: MapIcon },
-];
-
-const mapBrushes: Array<{ id: TabletopMapBrush; label: string; className: string }> = [
-  { id: "floor", label: "地板", className: "bg-slate-500/70" },
-  { id: "wall", label: "墙", className: "bg-slate-950/90" },
-  { id: "door", label: "门", className: "bg-amber-700/80" },
-  { id: "void", label: "空白", className: "bg-black" },
-];
 
 export const RoomSceneView: React.FC<RoomSceneViewProps> = ({
   roomId,
@@ -193,9 +163,9 @@ export const RoomSceneView: React.FC<RoomSceneViewProps> = ({
   };
 
   const activeToolLabel =
-    shapeTools.find((item) => item.id === tool)?.label || "选择 / 拖动";
+    tabletopShapeTools.find((item) => item.id === tool)?.label || "选择 / 拖动";
   const activeBrushLabel =
-    mapBrushes.find((brush) => brush.id === mapBrush)?.label || "地板";
+    tabletopMapBrushes.find((brush) => brush.id === mapBrush)?.label || "地板";
 
   return (
     <div className="relative flex min-h-[420px] flex-1 overflow-hidden bg-[#0d1322]">
@@ -335,7 +305,7 @@ export const RoomSceneView: React.FC<RoomSceneViewProps> = ({
                 className="flex items-center gap-1 rounded-full border border-dicecho-border/35 bg-dicecho-panel/55 p-1"
                 aria-label="桌面工具"
               >
-                {shapeTools.map((item) => (
+                {tabletopShapeTools.map((item) => (
                   <button
                     key={item.id}
                     type="button"
@@ -383,7 +353,7 @@ export const RoomSceneView: React.FC<RoomSceneViewProps> = ({
                 </span>
               </div>
               <div className="grid grid-cols-2 gap-1.5">
-                {mapBrushes.map((brush) => (
+                {tabletopMapBrushes.map((brush) => (
                   <button
                     key={brush.id}
                     type="button"

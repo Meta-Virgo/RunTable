@@ -25,6 +25,7 @@ import {
 import { HomeHistoryModal } from "./home/HomeHistoryModal";
 import { HomeLobbyView } from "./home/HomeLobbyView";
 import { HomeAccountViews } from "./home/HomeAccountViews";
+import { ModuleMarketplace } from "./moduleMarketplace/ModuleMarketplace";
 import {
   CharacterCardSkeleton,
   FeedSkeletonList,
@@ -203,7 +204,7 @@ export const Home: React.FC<HomeProps> = ({
 
   const handleSelectTab = React.useCallback(
     (tab: HomeTab) => {
-      if (!isAuthenticated && tab !== "rooms") {
+      if (!isAuthenticated && tab !== "rooms" && tab !== "modules") {
         requestLogin();
         return;
       }
@@ -224,7 +225,7 @@ export const Home: React.FC<HomeProps> = ({
   }, [activeTab]);
 
   useEffect(() => {
-    if (!isAuthenticated && activeTab !== "rooms") {
+    if (!isAuthenticated && activeTab !== "rooms" && activeTab !== "modules") {
       setActiveTab("rooms");
     }
   }, [activeTab, isAuthenticated]);
@@ -510,6 +511,14 @@ export const Home: React.FC<HomeProps> = ({
                 onCreateRoom={handleCreateRoom}
                 onRefreshRooms={refreshRooms}
                 onLoginRequest={requestLogin}
+              />
+            ) : activeTab === "modules" ? (
+              <ModuleMarketplace
+                isAuthenticated={isAuthenticated}
+                currentUserId={currentUserId}
+                onLoginRequest={requestLogin}
+                onJoinRoom={onJoinRoom}
+                onRoomCreated={refreshRooms}
               />
             ) : activeTab === "characters" ? (
               <div className="space-y-6">

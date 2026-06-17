@@ -8,6 +8,7 @@ import {
   Mail,
   MessageSquare,
   Settings,
+  Store,
   User,
   Users,
 } from "lucide-react";
@@ -16,6 +17,7 @@ import { Button, cn } from "../UI";
 export type HomeTab =
   | "rooms"
   | "characters"
+  | "modules"
   | "friends"
   | "messages"
   | "profile"
@@ -24,6 +26,7 @@ export type HomeTab =
   | "square";
 
 const HOME_TABS: { id: HomeTab; label: string; icon: React.ElementType }[] = [
+  { id: "modules", label: "模组", icon: Store },
   { id: "rooms", label: "大厅", icon: BookOpen },
   { id: "characters", label: "车卡", icon: Dices },
   { id: "square", label: "广场", icon: MessageSquare },
@@ -61,7 +64,7 @@ export const HomeHeader: React.FC<HomeHeaderProps> = ({
   const [showUserMenu, setShowUserMenu] = React.useState(false);
   const userMenuRef = React.useRef<HTMLDivElement>(null);
   const handleSelectTab = (tab: HomeTab) => {
-    if (!isAuthenticated && tab !== "rooms") {
+    if (!isAuthenticated && tab !== "rooms" && tab !== "modules") {
       onLoginRequest();
       return;
     }
@@ -191,8 +194,6 @@ export const HomeHeader: React.FC<HomeHeaderProps> = ({
                     onClick={openNotifications}
                   />
                   <UserMenuItem icon={Settings} label="设置" onClick={openSettings} />
-                </div>
-                <div className="border-t border-dicecho-border/35 py-2">
                   <UserMenuItem icon={LogOut} label="登出" onClick={handleLogout} />
                 </div>
               </div>
@@ -252,7 +253,7 @@ export const HomeMobileNav: React.FC<HomeMobileNavProps> = ({
   mode,
 }) => {
   const handleSelectTab = (tab: HomeTab) => {
-    if (!isAuthenticated && tab !== "rooms") {
+    if (!isAuthenticated && tab !== "rooms" && tab !== "modules") {
       onLoginRequest();
       return;
     }

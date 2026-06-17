@@ -718,8 +718,8 @@ const App: React.FC = () => {
             className={cn(
               "absolute inset-0 flex min-h-0 transition-opacity duration-150",
               view === "scene"
-                ? "z-10 opacity-100"
-                : "pointer-events-none z-0 opacity-0"
+                ? "visible z-10 opacity-100"
+                : "invisible pointer-events-none z-0 opacity-0"
             )}
           >
             <RoomSceneView
@@ -767,6 +767,7 @@ const App: React.FC = () => {
         <ModuleModal
           info={moduleInfo}
           password={roomPassword}
+          currentUserId={currentUserId}
           onSave={async (info, password) => {
             const result = await updateModuleSettings(info, password);
             if (result.message) {

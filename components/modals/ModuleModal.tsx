@@ -2,13 +2,15 @@ import React, { useState } from "react";
 import { BookOpen } from "lucide-react";
 import { Modal, Input, Textarea, Button } from "../UI";
 import { ModuleInfo } from "../../types";
+import { CoverImageUpload } from "../CoverImageUpload";
 
 export const ModuleModal: React.FC<{
   info: ModuleInfo;
   password?: string;
+  currentUserId: string | null;
   onSave: (info: ModuleInfo, password?: string) => Promise<void>;
   onClose: () => void;
-}> = ({ info, password, onSave, onClose }) => {
+}> = ({ info, password, currentUserId, onSave, onClose }) => {
   const [localInfo, setLocalInfo] = useState(info);
   const [localPassword, setLocalPassword] = useState(password || "");
   const [loading, setLoading] = useState(false);
@@ -37,13 +39,13 @@ export const ModuleModal: React.FC<{
           }
           placeholder="例如：无尽食欲..."
         />
-        <Input
-          label="房间封面 URL"
+        <CoverImageUpload
           value={localInfo.coverImageUrl || ""}
-          onChange={(e) =>
-            setLocalInfo({ ...localInfo, coverImageUrl: e.target.value })
+          onChange={(url) =>
+            setLocalInfo({ ...localInfo, coverImageUrl: url })
           }
-          placeholder="粘贴图片链接，留空则不显示封面"
+          currentUserId={currentUserId}
+          disabled={loading}
         />
         <Input
           label="房间密码 (留空公开)"

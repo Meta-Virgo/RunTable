@@ -220,6 +220,22 @@ export function generateTabletopMap(
   return { config, tiles };
 }
 
+export function createEmptyTabletopMap(
+  input: Partial<GeneratedMapConfig> = {}
+): TabletopGeneratedMap {
+  const config = createGeneratedMapConfig({
+    ...input,
+    roomCount: input.roomCount ?? 1,
+  });
+  const tiles: TabletopMapTile[] = [];
+  for (let y = 0; y < config.height; y += 1) {
+    for (let x = 0; x < config.width; x += 1) {
+      tiles.push({ x, y, kind: "void", revealed: false });
+    }
+  }
+  return { config, tiles };
+}
+
 export function createEmptyTabletopState(roomId: string): TabletopState {
   return {
     roomId,

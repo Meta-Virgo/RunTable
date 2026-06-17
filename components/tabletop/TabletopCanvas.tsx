@@ -11,11 +11,13 @@ import type {
 } from "../../types";
 import {
   clampTabletopCoordinate,
+  getMapPixelSize,
 } from "../../services/tabletopModel";
-import type { TabletopMapBrush, TabletopTool } from "../RoomSceneView";
+import type { TabletopMapBrush, TabletopTool } from "./tabletopTools";
 import { Button, cn } from "../UI";
 import {
   createFittedTabletopViewport,
+  createMapBoundsFittedTabletopViewport,
   createTabletopDraftRect,
   createTextShapeDraft,
   createZoomedTabletopViewport,
@@ -81,6 +83,8 @@ interface TabletopCanvasProps {
   onCreateScene?: () => Promise<void>;
   onScaleChange: (scale: number) => void;
   fitRequest: number;
+  fitToSceneBounds?: boolean;
+  persistViewport?: boolean;
 }
 
 export const TabletopCanvas: React.FC<TabletopCanvasProps> = ({
@@ -107,6 +111,8 @@ export const TabletopCanvas: React.FC<TabletopCanvasProps> = ({
   onCreateScene,
   onScaleChange,
   fitRequest,
+  fitToSceneBounds = false,
+  persistViewport = true,
 }) => {
   const containerRef = React.useRef<HTMLDivElement>(null);
   const stageRef = React.useRef<Konva.Stage>(null);
@@ -130,6 +136,7 @@ export const TabletopCanvas: React.FC<TabletopCanvasProps> = ({
   );
   const [textDraft, setTextDraft] = React.useState("文本");
   const [isPaintingMap, setIsPaintingMap] = React.useState(false);
+  const [isCtrlPressed, setIsCtrlPressed] = React.useState(false);
   const lastPaintedTileRef = React.useRef<string | null>(null);
 
   const gridSize = scene?.map.config.gridSize || 48;
@@ -159,12 +166,28 @@ export const TabletopCanvas: React.FC<TabletopCanvasProps> = ({
   const fitCanvas = React.useCallback(() => {
     const width = containerRef.current?.clientWidth || size.width;
     const height = containerRef.current?.clientHeight || size.height;
-    const next = createFittedTabletopViewport({ width, height });
+    const next =
+      fitToSceneBounds && scene
+        ? createMapBoundsFittedTabletopViewport({
+            viewport: { width, height },
+            map: getMapPixelSize(scene),
+          })
+        : createFittedTabletopViewport({ width, height });
     if (!next) return;
     setStageState(next);
-    writeSavedViewport(viewportStorageKey, next);
+    if (persistViewport) {
+      writeSavedViewport(viewportStorageKey, next);
+    }
     onScaleChange(next.scale);
-  }, [onScaleChange, size.height, size.width, viewportStorageKey]);
+  }, [
+    fitToSceneBounds,
+    onScaleChange,
+    persistViewport,
+    scene,
+    size.height,
+    size.width,
+    viewportStorageKey,
+  ]);
 
   React.useEffect(() => {
     const element = containerRef.current;
@@ -201,7 +224,7 @@ export const TabletopCanvas: React.FC<TabletopCanvasProps> = ({
     if (!scene || !size.width || !size.height) return;
     if (initializedViewportKeyRef.current === viewportStorageKey) return;
 
-    const saved = readSavedViewport(viewportStorageKey);
+    const saved = persistViewport ? readSavedViewport(viewportStorageKey) : null;
     skipNextViewportSaveRef.current = true;
     initializedViewportKeyRef.current = viewportStorageKey;
 
@@ -215,6 +238,7 @@ export const TabletopCanvas: React.FC<TabletopCanvasProps> = ({
   }, [
     fitCanvas,
     onScaleChange,
+    persistViewport,
     scene,
     size.height,
     size.width,
@@ -229,13 +253,14 @@ export const TabletopCanvas: React.FC<TabletopCanvasProps> = ({
 
   React.useEffect(() => {
     if (!scene) return;
+    if (!persistViewport) return;
     if (initializedViewportKeyRef.current !== viewportStorageKey) return;
     if (skipNextViewportSaveRef.current) {
       skipNextViewportSaveRef.current = false;
       return;
     }
     writeSavedViewport(viewportStorageKey, stageState);
-  }, [scene, stageState, viewportStorageKey]);
+  }, [persistViewport, scene, stageState, viewportStorageKey]);
 
   const getWorldPointer = React.useCallback(() => {
     const stage = stageRef.current;
@@ -272,7 +297,9 @@ export const TabletopCanvas: React.FC<TabletopCanvasProps> = ({
       deltaY: event.evt.deltaY,
     });
     setStageState(next);
-    writeSavedViewport(viewportStorageKey, next);
+    if (persistViewport) {
+      writeSavedViewport(viewportStorageKey, next);
+    }
     onScaleChange(next.scale);
   };
 
@@ -292,16 +319,17 @@ export const TabletopCanvas: React.FC<TabletopCanvasProps> = ({
         };
         return nextViewport;
       });
-      if (nextViewport) {
+      if (nextViewport && persistViewport) {
         writeSavedViewport(viewportStorageKey, nextViewport);
       }
     },
-    [viewportStorageKey]
+    [persistViewport, viewportStorageKey]
   );
 
   const isShapeDraftTool = tool === "rect" || tool === "circle";
   const isFogDraftTool = tool === "reveal" || tool === "hide";
   const isMapEditTool = isKeeper && tool === "map";
+  const isMapPanModifierActive = isMapEditTool && isCtrlPressed;
 
   const paintMapTileAtPointer = React.useCallback(() => {
     if (!scene || !isMapEditTool) return;
@@ -355,6 +383,22 @@ export const TabletopCanvas: React.FC<TabletopCanvasProps> = ({
     selectedShapeId,
     selectedTokenId,
   ]);
+
+  React.useEffect(() => {
+    const syncCtrlState = (event: KeyboardEvent) => {
+      setIsCtrlPressed(event.ctrlKey);
+    };
+    const resetCtrlState = () => setIsCtrlPressed(false);
+
+    window.addEventListener("keydown", syncCtrlState);
+    window.addEventListener("keyup", syncCtrlState);
+    window.addEventListener("blur", resetCtrlState);
+    return () => {
+      window.removeEventListener("keydown", syncCtrlState);
+      window.removeEventListener("keyup", syncCtrlState);
+      window.removeEventListener("blur", resetCtrlState);
+    };
+  }, []);
 
   React.useEffect(() => {
     if (!isKeeper || tool !== "text") return;
@@ -415,8 +459,10 @@ export const TabletopCanvas: React.FC<TabletopCanvasProps> = ({
     <div
       ref={containerRef}
       className={cn(
-        "relative min-h-[360px] flex-1 overflow-hidden bg-[#101827]",
-        (isDrawingTool || isTextTool || isMapEditTool) && "cursor-crosshair"
+        "relative h-full min-h-[360px] flex-1 overflow-hidden bg-[#101827]",
+        (isDrawingTool || isTextTool || (isMapEditTool && !isMapPanModifierActive)) &&
+          "cursor-crosshair",
+        isMapPanModifierActive && "cursor-grab"
       )}
     >
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(148,163,184,0.16)_0,transparent_45%)]" />
@@ -499,7 +545,11 @@ export const TabletopCanvas: React.FC<TabletopCanvasProps> = ({
           y={stageState.y}
           scaleX={stageState.scale}
           scaleY={stageState.scale}
-          draggable={!isDrawingTool && !isTextTool && !isMapEditTool}
+          draggable={
+            !isDrawingTool &&
+            !isTextTool &&
+            (!isMapEditTool || isMapPanModifierActive)
+          }
           onWheel={handleWheel}
           onDragMove={(event) => {
             const stage = event.target.getStage();
@@ -514,6 +564,11 @@ export const TabletopCanvas: React.FC<TabletopCanvasProps> = ({
           onMouseDown={(event) => {
             onSelectedTokenChange(null);
             if (isMapEditTool) {
+              if (event.evt.ctrlKey || isCtrlPressed) {
+                setIsPaintingMap(false);
+                lastPaintedTileRef.current = null;
+                return;
+              }
               event.cancelBubble = true;
               lastPaintedTileRef.current = null;
               setIsPaintingMap(true);

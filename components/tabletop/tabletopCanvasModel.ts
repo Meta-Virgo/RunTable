@@ -77,6 +77,35 @@ export function createFittedTabletopViewport(
   };
 }
 
+export function createMapBoundsFittedTabletopViewport(input: {
+  viewport: TabletopViewportSize;
+  map: TabletopViewportSize;
+  padding?: number;
+}): TabletopStageState | null {
+  if (
+    !input.viewport.width ||
+    !input.viewport.height ||
+    !input.map.width ||
+    !input.map.height
+  ) {
+    return null;
+  }
+
+  const padding = Math.max(0, input.padding ?? 0);
+  const availableWidth = Math.max(1, input.viewport.width - padding * 2);
+  const availableHeight = Math.max(1, input.viewport.height - padding * 2);
+  const scale = Math.min(
+    availableWidth / input.map.width,
+    availableHeight / input.map.height
+  );
+
+  return {
+    scale,
+    x: Math.round((input.viewport.width - input.map.width * scale) / 2),
+    y: Math.round((input.viewport.height - input.map.height * scale) / 2),
+  };
+}
+
 export function projectViewportPointToWorld(
   point: TabletopPoint,
   viewport: TabletopStageState
