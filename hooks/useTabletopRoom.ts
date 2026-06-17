@@ -1,6 +1,6 @@
 ﻿import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import * as Y from "yjs";
-import { IndexeddbPersistence } from "y-indexeddb";
+import { IndexeddbPersistence, clearDocument } from "y-indexeddb";
 import { supabase } from "../supabase";
 import type {
   Character,
@@ -117,6 +117,10 @@ function getErrorMessage(error: unknown, fallback: string) {
 function isTokenNotFoundError(error: unknown) {
   const maybeError = error as { message?: string } | null;
   return /Token not found/i.test(maybeError?.message || "");
+}
+
+function getTabletopPersistenceName(roomId: string, scope: TabletopDocumentScope) {
+  return `tabletop:${roomId}:${scope}`;
 }
 
 function getConnectionDetail(error: unknown) {
@@ -238,6 +242,10 @@ export function useTabletopRoom({
     try {
       const { data, error } = await fetchTabletopBootstrap({ roomId, scope });
       if (error) throw error;
+      const hasRemoteDocument = Boolean(
+        data?.snapshot_base64 || data?.state_json
+      );
+      const persistenceName = getTabletopPersistenceName(roomId, scope);
 
       let nextDoc = restoreTabletopDoc({
         roomId,
@@ -278,8 +286,11 @@ export function useTabletopRoom({
       }
 
       indexedPersistenceRef.current?.destroy();
+      if (hasRemoteDocument) {
+        await clearDocument(persistenceName);
+      }
       indexedPersistenceRef.current = new IndexeddbPersistence(
-        `tabletop:${roomId}:${scope}`,
+        persistenceName,
         nextDoc
       );
 
@@ -319,9 +330,10 @@ export function useTabletopRoom({
           });
         }
         const fallbackDoc = createTabletopDoc(fallbackState);
+        const persistenceName = getTabletopPersistenceName(roomId, scope);
         indexedPersistenceRef.current?.destroy();
         indexedPersistenceRef.current = new IndexeddbPersistence(
-          `tabletop:${roomId}:${scope}`,
+          persistenceName,
           fallbackDoc
         );
         setDoc(fallbackDoc);

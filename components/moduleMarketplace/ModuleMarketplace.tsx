@@ -25,7 +25,6 @@ import {
   getModuleTemplatePlayersLabel,
 } from "../../services/moduleMarketplace";
 import { Button, Input, Modal, cn } from "../UI";
-import { CoverImageUpload } from "../CoverImageUpload";
 import { UserModuleUploadDialog } from "./UserModuleUploadDialog";
 
 interface ModuleMarketplaceProps {
@@ -370,7 +369,6 @@ export const ModuleMarketplace: React.FC<ModuleMarketplaceProps> = ({
       {createTarget && (
         <CreateModuleRoomDialog
           template={createTarget}
-          currentUserId={currentUserId}
           isCreating={marketplace.isCreatingRoom}
           onClose={() => setCreateTarget(null)}
           onCreate={async (input) => {
@@ -658,7 +656,6 @@ const ModuleTemplateDetailModal: React.FC<{
 
 const CreateModuleRoomDialog: React.FC<{
   template: ModuleTemplateDetail;
-  currentUserId: string | null;
   isCreating: boolean;
   onClose: () => void;
   onCreate: (input: {
@@ -667,12 +664,9 @@ const CreateModuleRoomDialog: React.FC<{
     password?: string;
     coverImageUrl?: string | null;
   }) => Promise<void>;
-}> = ({ template, currentUserId, isCreating, onClose, onCreate }) => {
+}> = ({ template, isCreating, onClose, onCreate }) => {
   const [roomType, setRoomType] = React.useState<"text" | "voice">("text");
   const [password, setPassword] = React.useState("");
-  const [coverImageUrl, setCoverImageUrl] = React.useState(
-    template.cover_image_url || ""
-  );
   const [error, setError] = React.useState<string | null>(null);
 
   const submit = async () => {
@@ -682,7 +676,6 @@ const CreateModuleRoomDialog: React.FC<{
         templateId: template.id,
         roomType,
         password,
-        coverImageUrl,
       });
     } catch (createError: any) {
       setError(createError?.message || "创建房间失败");
@@ -722,12 +715,6 @@ const CreateModuleRoomDialog: React.FC<{
           value={password}
           onChange={(event) => setPassword(event.target.value)}
           placeholder="留空则公开"
-          disabled={isCreating}
-        />
-        <CoverImageUpload
-          value={coverImageUrl}
-          onChange={setCoverImageUrl}
-          currentUserId={currentUserId}
           disabled={isCreating}
         />
         {error && (
