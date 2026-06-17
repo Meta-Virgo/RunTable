@@ -336,6 +336,24 @@ const RoomCover: React.FC<{
     setFailedCoverUrl(null);
   }, [coverImageUrl]);
 
+  if (!compact) {
+    return (
+      <div className="relative isolate aspect-[3/4] overflow-hidden rounded-lg">
+        {showCoverImage ? (
+          <img
+            src={coverImageUrl}
+            alt={`${room.title} 灏侀潰`}
+            className="absolute inset-0 h-full w-full object-cover"
+            loading="lazy"
+            onError={() => setFailedCoverUrl(coverImageUrl || null)}
+          />
+        ) : (
+          <div className={cn("absolute inset-0 bg-gradient-to-br", gradient)} />
+        )}
+      </div>
+    );
+  }
+
   return (
     <div
       className={cn(
