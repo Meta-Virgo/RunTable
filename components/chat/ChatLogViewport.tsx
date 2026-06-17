@@ -30,7 +30,6 @@ interface ChatLogViewportProps {
   hasMore: boolean;
   isLoading: boolean;
   logsContainerRef: React.RefObject<HTMLDivElement>;
-  contentRef: React.RefObject<HTMLDivElement>;
   logsEndRef: React.RefObject<HTMLDivElement>;
   activeMessageId: string | null;
   profileLoadingUserId: string | null;
@@ -55,7 +54,6 @@ export const ChatLogViewport: React.FC<ChatLogViewportProps> = ({
   hasMore,
   isLoading,
   logsContainerRef,
-  contentRef,
   logsEndRef,
   activeMessageId,
   profileLoadingUserId,
@@ -71,9 +69,9 @@ export const ChatLogViewport: React.FC<ChatLogViewportProps> = ({
   <div
     ref={logsContainerRef}
     onScroll={onScroll}
-    className="flex-1 overflow-y-auto px-3 md:px-8 py-4 pt-4 pb-48 custom-scrollbar overscroll-y-none bg-dicecho-bg/35"
+    className="flex-1 overflow-y-auto px-3 md:px-8 py-4 pt-4 pb-48 custom-scrollbar overscroll-contain scroll-smooth bg-dicecho-bg/35"
   >
-    <div ref={contentRef} className="space-y-6 min-h-full">
+    <div className="space-y-6 min-h-full">
       {hasMore && (
         <div className="flex justify-center py-2 shrink-0">
           {isLoading ? (

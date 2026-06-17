@@ -1,6 +1,5 @@
 import React, { useRef, useEffect, useState } from "react";
 import { Log, Character, ModuleInfo, Profile } from "../types";
-import { useElasticScroll } from "../hooks/useElasticScroll";
 import { fetchProfileDetails } from "../services/profiles";
 import { ChatComposer } from "./chat/ChatComposer";
 import { ChatLogViewport } from "./chat/ChatLogViewport";
@@ -86,8 +85,6 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
 
   const logsEndRef = useRef<HTMLDivElement>(null);
   const logsContainerRef = useRef<HTMLDivElement>(null);
-  const contentRef = useRef<HTMLDivElement>(null);
-  useElasticScroll(logsContainerRef, contentRef, { enabled: true });
 
   const [isAutoScroll, setIsAutoScroll] = useState(true);
   const [prevScrollHeight, setPrevScrollHeight] = useState(0);
@@ -158,7 +155,6 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
         hasMore={hasMore}
         isLoading={isLoading}
         logsContainerRef={logsContainerRef}
-        contentRef={contentRef}
         logsEndRef={logsEndRef}
         activeMessageId={activeMessageId}
         profileLoadingUserId={profileLoadingUserId}

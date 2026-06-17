@@ -8,7 +8,7 @@ import {
 } from "../../services/squareProfileModel";
 import { AvatarUpload } from "../AvatarUpload";
 import { Modal } from "../UI";
-import { HistorySkeletonList, StaggeredItem } from "../Skeleton";
+import { HistorySkeletonList } from "../Skeleton";
 import { FriendRequestButton } from "../profile/FriendRequestButton";
 import { themeRgb } from "../../utils/theme";
 
@@ -176,12 +176,11 @@ const PlayerHistoryList: React.FC<{
     {playerHistory.length === 0 && (
       <div className="text-center py-8 text-dicecho-muted text-sm">暂无记录</div>
     )}
-    {playerHistory.map((item, index) => {
+    {playerHistory.map((item) => {
       const characterDisplay = getSquareHistoryCharacterDisplay(item);
       return (
-        <StaggeredItem
+        <div
           key={item.id}
-          index={index}
           className={`relative p-3 rounded-lg border transition-colors duration-150 ${
             characterDisplay.isDead
               ? "bg-dicecho-panel/50 border-dicecho-border/30 grayscale"
@@ -232,7 +231,7 @@ const PlayerHistoryList: React.FC<{
               </div>
             </div>
           </div>
-        </StaggeredItem>
+        </div>
       );
     })}
   </div>
@@ -245,10 +244,9 @@ const KpHistoryList: React.FC<{ kpHistory: GameHistory[] }> = ({
     {kpHistory.length === 0 && (
       <div className="text-center py-8 text-dicecho-muted text-sm">暂无记录</div>
     )}
-    {kpHistory.map((history, index) => (
-      <StaggeredItem
+    {kpHistory.map((history) => (
+      <div
         key={history.id}
-        index={index}
         className="bg-dicecho-card/70 border border-dicecho-border/40 p-3 rounded-lg hover:border-dicecho-primary/40 transition-colors duration-150"
       >
         <div className="flex justify-between items-start mb-1">
@@ -261,7 +259,7 @@ const KpHistoryList: React.FC<{ kpHistory: GameHistory[] }> = ({
           <Crown size={10} className="text-yellow-500" />
           <span>主持人 (KP)</span>
         </div>
-      </StaggeredItem>
+      </div>
     ))}
   </div>
 );

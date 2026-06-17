@@ -12,17 +12,6 @@ export const SkeletonBlock: React.FC<{
   />
 );
 
-export const StaggeredItem: React.FC<
-  React.HTMLAttributes<HTMLDivElement> & {
-    index: number;
-    children: React.ReactNode;
-  }
-> = ({ index: _index, className, children, style, ...props }) => (
-  <div className={className} style={style} {...props}>
-    {children}
-  </div>
-);
-
 export const FeedCardSkeleton: React.FC<{ compact?: boolean }> = ({
   compact = false,
 }) => (
@@ -54,9 +43,9 @@ export const FeedSkeletonList: React.FC<{ count?: number }> = ({
 }) => (
   <div className="space-y-6">
     {Array.from({ length: count }).map((_, index) => (
-      <StaggeredItem key={index} index={index}>
+      <div key={index}>
         <FeedCardSkeleton compact={index > 0} />
-      </StaggeredItem>
+      </div>
     ))}
   </div>
 );
@@ -153,9 +142,9 @@ export const RoomGridSkeleton: React.FC<{ count?: number }> = ({
 }) => (
   <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
     {Array.from({ length: count }).map((_, index) => (
-      <StaggeredItem key={index} index={index}>
+      <div key={index}>
         <RoomCardSkeleton />
-      </StaggeredItem>
+      </div>
     ))}
   </div>
 );
@@ -184,9 +173,9 @@ export const HistorySkeletonList: React.FC<{ count?: number }> = ({
 }) => (
   <div className="space-y-3">
     {Array.from({ length: count }).map((_, index) => (
-      <StaggeredItem key={index} index={index}>
+      <div key={index}>
         <HistoryCardSkeleton />
-      </StaggeredItem>
+      </div>
     ))}
   </div>
 );

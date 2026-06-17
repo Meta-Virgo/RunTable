@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { Character } from "../types";
+import { supabase } from "../supabase";
 import { getCurrentUser } from "../services/auth";
 import {
   createCharacter,
@@ -44,6 +45,18 @@ export function useInvestigatorLibrary() {
 
   useEffect(() => {
     refreshMyCharacters();
+  }, [refreshMyCharacters]);
+
+  useEffect(() => {
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(() => {
+      refreshMyCharacters();
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
   }, [refreshMyCharacters]);
 
   const saveInvestigator = useCallback(

@@ -3,7 +3,6 @@ import {
   AlertCircle,
   BookOpen,
   BookPlus,
-  Check,
   ChevronDown,
   Edit3,
   Filter,
@@ -25,6 +24,7 @@ import {
   getModuleTemplatePlayersLabel,
 } from "../../services/moduleMarketplace";
 import { Button, Input, Modal, cn } from "../UI";
+import { SkeletonBlock } from "../Skeleton";
 import { UserModuleUploadDialog } from "./UserModuleUploadDialog";
 
 interface ModuleMarketplaceProps {
@@ -890,7 +890,7 @@ const ModuleSelect: React.FC<{
       {isOpen && (
         <div
           role="listbox"
-          className="absolute left-0 top-[calc(100%+0.35rem)] z-30 w-full rounded-lg border border-dicecho-border/45 bg-dicecho-card p-1 shadow-lg shadow-black/20"
+          className="absolute left-0 top-[calc(100%+0.35rem)] z-30 w-full space-y-1 rounded-lg border border-dicecho-border/45 bg-dicecho-card p-1.5 shadow-lg shadow-black/20"
         >
           {options.map((option) => {
             const isSelected = option.value === value;
@@ -905,16 +905,13 @@ const ModuleSelect: React.FC<{
                   setIsOpen(false);
                 }}
                 className={cn(
-                  "flex h-9 w-full items-center justify-between gap-3 rounded-lg px-3 text-left text-sm font-medium transition-all",
+                  "flex h-9 w-full items-center rounded-lg px-3 text-left text-sm font-medium transition-all",
                   isSelected
                     ? "bg-dicecho-primary/20 text-white"
                     : "text-dicecho-muted hover:bg-white/10 hover:text-white"
                 )}
               >
                 <span className="truncate">{option.label}</span>
-                {isSelected && (
-                  <Check size={14} className="shrink-0 text-dicecho-primary" />
-                )}
               </button>
             );
           })}
@@ -1084,12 +1081,24 @@ const RoomTypeButton: React.FC<{
 );
 
 const ModuleMarketplaceLoading = () => (
-  <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
-    {Array.from({ length: 3 }).map((_, index) => (
-      <div
-        key={index}
-        className="h-96 animate-pulse rounded-lg border border-dicecho-border/35 bg-dicecho-panel/55"
-      />
+  <div className="grid grid-cols-2 gap-x-5 gap-y-8 sm:grid-cols-[repeat(auto-fill,minmax(11.5rem,13rem))] sm:justify-start">
+    {Array.from({ length: 4 }).map((_, index) => (
+      <article key={index} className="min-w-0">
+        <div className="rounded-lg border border-dicecho-border/40 bg-dicecho-card/80 p-2 shadow-sm dicecho-card-shadow">
+          <div className="relative aspect-[3/4] w-full overflow-hidden rounded-lg bg-dicecho-card">
+            <SkeletonBlock className="absolute inset-0 rounded-none bg-dicecho-border/18" />
+            <SkeletonBlock className="absolute left-2 top-2 h-7 w-12 rounded-md bg-dicecho-border/35" />
+            <SkeletonBlock className="absolute right-2 top-2 h-7 w-10 rounded-md bg-dicecho-border/35" />
+          </div>
+          <div className="mt-2 space-y-2 px-0.5 pb-0.5">
+            <SkeletonBlock className="h-4 w-3/4 bg-dicecho-border/35" />
+            <div className="flex items-center gap-1.5">
+              <SkeletonBlock className="h-4 w-4 rounded-full bg-dicecho-border/35" />
+              <SkeletonBlock className="h-3 w-16 bg-dicecho-border/30" />
+            </div>
+          </div>
+        </div>
+      </article>
     ))}
   </div>
 );

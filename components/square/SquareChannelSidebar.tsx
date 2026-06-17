@@ -1,7 +1,6 @@
 import React from "react";
 import { Hash, MessageSquare, X } from "lucide-react";
 import type { Channel } from "../../types";
-import { useElasticScroll } from "../../hooks/useElasticScroll";
 import { cn } from "../UI";
 import { ChannelSkeletonList } from "../Skeleton";
 
@@ -24,10 +23,6 @@ export const SquareChannelSidebar: React.FC<SquareChannelSidebarProps> = ({
   onClose,
   onSelectChannel,
 }) => {
-  const channelScrollRef = React.useRef<HTMLDivElement>(null);
-  const channelContentRef = React.useRef<HTMLDivElement>(null);
-  useElasticScroll(channelScrollRef, channelContentRef);
-
   return (
     <>
       {showMobileSidebar && (
@@ -57,11 +52,8 @@ export const SquareChannelSidebar: React.FC<SquareChannelSidebarProps> = ({
           </button>
         </div>
 
-        <div
-          ref={channelScrollRef}
-          className="flex-1 overflow-y-auto p-3 custom-scrollbar overscroll-y-none"
-        >
-          <div ref={channelContentRef} className="space-y-6">
+        <div className="flex-1 overflow-y-auto p-3 custom-scrollbar overscroll-contain">
+          <div className="space-y-6">
             {loadingChannels ? (
               <ChannelSkeletonList />
             ) : (

@@ -14,22 +14,29 @@ import {
   Users,
 } from "lucide-react";
 import type {
-  CreateUserModuleTemplateCharacterInput,
   CreateUserModuleTemplateInput,
-  ModuleTemplate,
   ModuleTemplateDetail,
-  ModuleTemplateCharacter,
-  RoomScene,
-  TabletopState,
-  Character,
 } from "../../types";
 import { Button, Input, Modal, Textarea, cn } from "../UI";
 import { CoverImageUpload } from "../CoverImageUpload";
 import {
-  createModuleSceneTabletopState,
   getModuleSceneFormFromTabletopState,
   ModuleSceneCanvasEditor,
 } from "./ModuleSceneCanvasEditor";
+import {
+  buildModuleSceneCharacters,
+  buildUserModuleTemplateInput,
+  createModuleCharacterDraft,
+  getInitialUserModuleUploadForm,
+  patchModuleCharacterStat,
+  setModuleCharacterType,
+  splitModuleListText,
+  validateUserModuleUploadForm,
+  validateUserModuleUploadStep,
+  type ModuleCharacterDraft,
+  type UserModuleUploadForm,
+  type UserModuleUploadStep,
+} from "./userModuleUploadModel";
 
 interface UserModuleUploadDialogProps {
   currentUserId: string | null;
@@ -41,51 +48,8 @@ interface UserModuleUploadDialogProps {
   isDeleting?: boolean;
 }
 
-type UploadStep = 0 | 1 | 2 | 3;
-
-type UploadFormState = {
-  title: string;
-  system: string;
-  coverImageUrl: string;
-  tagsText: string;
-  recommendedPlayersMin: number;
-  recommendedPlayersMax: number;
-  estimatedHoursMin: number;
-  estimatedHoursMax: number;
-  complexity: ModuleTemplate["complexity"];
-  playerFacingPremise: string;
-  keeperNotes: string;
-  bgMusicUrl: string;
-  sceneBackgroundColor: string;
-  sceneBackgroundPattern: RoomScene["background_pattern"];
-  sceneTabletopState: TabletopState;
-  characters: ModuleCharacterDraft[];
-};
-
-type ModuleCharacterDraft = {
-  id: string;
-  key?: string;
-  characterType: "npc" | "monster";
-  name: string;
-  role: string;
-  avatarUrl: string;
-  themeColor: string;
-  job: string;
-  notes: string;
-  backstory: string;
-  stats: {
-    str: number;
-    con: number;
-    siz: number;
-    dex: number;
-    app: number;
-    int: number;
-    pow: number;
-    edu: number;
-    hp: number;
-    mp: number;
-  };
-};
+type UploadStep = UserModuleUploadStep;
+type UploadFormState = UserModuleUploadForm;
 
 const STEPS = [
   { label: "标题" },
@@ -93,279 +57,6 @@ const STEPS = [
   { label: "详细信息" },
   { label: "预览" },
 ] as const;
-
-const DEFAULT_STATS: ModuleCharacterDraft["stats"] = {
-  str: 50,
-  con: 50,
-  siz: 50,
-  dex: 50,
-  app: 50,
-  int: 50,
-  pow: 50,
-  edu: 50,
-  hp: 10,
-  mp: 10,
-};
-
-const INITIAL_FORM: UploadFormState = {
-  title: "",
-  system: "coc",
-  coverImageUrl: "",
-  tagsText: "",
-  recommendedPlayersMin: 2,
-  recommendedPlayersMax: 4,
-  estimatedHoursMin: 2,
-  estimatedHoursMax: 3,
-  complexity: "standard",
-  playerFacingPremise: "",
-  keeperNotes: "",
-  bgMusicUrl: "",
-  sceneBackgroundColor: "#182033",
-  sceneBackgroundPattern: "grid",
-  sceneTabletopState: createModuleSceneTabletopState({
-    title: "起始场景",
-  }),
-  characters: [],
-};
-
-function splitListText(value: string) {
-  return value
-    .split(/[,，、\n]/)
-    .map((item) => item.trim())
-    .filter(Boolean);
-}
-
-function clampInteger(value: number, min: number, max: number) {
-  if (!Number.isFinite(value)) return min;
-  return Math.min(max, Math.max(min, Math.round(value)));
-}
-
-function toMinutes(hours: number) {
-  return clampInteger(hours, 1, 48) * 60;
-}
-
-function toHours(minutes: number) {
-  return clampInteger(Math.round(minutes / 60), 1, 48);
-}
-
-function joinListText(value: string[] | null | undefined) {
-  return (value || []).join("，");
-}
-
-function createDraftId() {
-  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
-    return crypto.randomUUID();
-  }
-  return `draft-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-}
-
-function createCharacterKey(name: string, fallback: string) {
-  const source = name.trim() || fallback;
-  const key = source
-    .toLowerCase()
-    .replace(/[^a-z0-9\u4e00-\u9fa5]+/g, "-")
-    .replace(/^-+|-+$/g, "");
-  return key || fallback;
-}
-
-function createCharacterDraft(
-  characterType: "npc" | "monster" = "npc"
-): ModuleCharacterDraft {
-  const id = createDraftId();
-  return {
-    id,
-    key: id,
-    characterType,
-    name: "",
-    role: characterType === "monster" ? "怪物" : "NPC",
-    avatarUrl: "",
-    themeColor: characterType === "monster" ? "#fb7185" : "#22d3ee",
-    job: "",
-    notes: "",
-    backstory: "",
-    stats: {
-      ...DEFAULT_STATS,
-      str: characterType === "monster" ? 70 : 50,
-      pow: characterType === "monster" ? 70 : 50,
-    },
-  };
-}
-
-function moduleCharacterToDraft(
-  character: ModuleTemplateCharacter
-): ModuleCharacterDraft {
-  const payload = character.payload || {};
-  const info = payload.info || {};
-  const stats = payload.stats || {};
-  const characterType = character.character_type === "monster" ? "monster" : "npc";
-  return {
-    id: character.id || createDraftId(),
-    key: character.template_character_key,
-    characterType,
-    name: String(payload.name || ""),
-    role: String(payload.role || (characterType === "monster" ? "怪物" : "NPC")),
-    avatarUrl: String(payload.avatar_url || ""),
-    themeColor: String(
-      payload.theme_color || (characterType === "monster" ? "#fb7185" : "#22d3ee")
-    ),
-    job: String(info.job || ""),
-    notes: String(info.notes || ""),
-    backstory: String(info.backstory || ""),
-    stats: {
-      str: clampInteger(Number(stats.str ?? DEFAULT_STATS.str), 0, 999),
-      con: clampInteger(Number(stats.con ?? DEFAULT_STATS.con), 0, 999),
-      siz: clampInteger(Number(stats.siz ?? DEFAULT_STATS.siz), 0, 999),
-      dex: clampInteger(Number(stats.dex ?? DEFAULT_STATS.dex), 0, 999),
-      app: clampInteger(Number(stats.app ?? DEFAULT_STATS.app), 0, 999),
-      int: clampInteger(Number(stats.int ?? DEFAULT_STATS.int), 0, 999),
-      pow: clampInteger(Number(stats.pow ?? DEFAULT_STATS.pow), 0, 999),
-      edu: clampInteger(Number(stats.edu ?? DEFAULT_STATS.edu), 0, 999),
-      hp: clampInteger(Number(stats.hp ?? DEFAULT_STATS.hp), 1, 999),
-      mp: clampInteger(Number(stats.mp ?? DEFAULT_STATS.mp), 0, 999),
-    },
-  };
-}
-
-function characterDraftToInput(
-  draft: ModuleCharacterDraft,
-  index: number
-): CreateUserModuleTemplateCharacterInput {
-  const fallbackKey = `${draft.characterType}-${index + 1}`;
-  return {
-    key: draft.key || createCharacterKey(draft.name, fallbackKey),
-    characterType: draft.characterType,
-    displayOrder: index + 1,
-    payload: {
-      name:
-        draft.name.trim() ||
-        (draft.characterType === "monster" ? "未命名怪物" : "未命名 NPC"),
-      role: draft.role.trim() || (draft.characterType === "monster" ? "怪物" : "NPC"),
-      type: draft.characterType,
-      theme_color: draft.themeColor,
-      avatar_url: draft.avatarUrl.trim() || null,
-      info: {
-        job: draft.job.trim(),
-        notes: draft.notes.trim(),
-        backstory: draft.backstory.trim(),
-      },
-      stats: draft.stats,
-    },
-  };
-}
-
-function characterDraftToCharacter(
-  draft: ModuleCharacterDraft,
-  index: number
-): Character {
-  const fallbackKey = `${draft.characterType}-${index + 1}`;
-  const key = draft.key || createCharacterKey(draft.name, fallbackKey);
-  return {
-    id: `module-character:${key}`,
-    name:
-      draft.name.trim() ||
-      (draft.characterType === "monster" ? "未命名怪物" : "未命名 NPC"),
-    role: draft.role.trim() || (draft.characterType === "monster" ? "怪物" : "NPC"),
-    type: draft.characterType,
-    theme_color: draft.themeColor,
-    avatar_url: draft.avatarUrl.trim() || null,
-    room_id: null,
-    user_id: undefined,
-    inventory: null,
-    info: {
-      job: draft.job.trim(),
-      notes: draft.notes.trim(),
-      backstory: draft.backstory.trim(),
-    },
-    stats: draft.stats,
-    job: draft.job.trim(),
-    age: "",
-    sex: "",
-    str: draft.stats.str,
-    con: draft.stats.con,
-    siz: draft.stats.siz,
-    dex: draft.stats.dex,
-    app: draft.stats.app,
-    int: draft.stats.int,
-    pow: draft.stats.pow,
-    edu: draft.stats.edu,
-    luck: 0,
-    hp: draft.stats.hp,
-    san: 0,
-    mp: draft.stats.mp,
-    notes: draft.notes.trim(),
-    backstory: draft.backstory.trim(),
-    skills: {},
-  };
-}
-
-function getInitialForm(template?: ModuleTemplateDetail | null): UploadFormState {
-  if (!template) return INITIAL_FORM;
-
-  const defaultScene =
-    template.module_template_scenes?.find((scene) => scene.is_default) ||
-    template.module_template_scenes?.[0];
-  const characters = (template.module_template_characters || [])
-    .filter((character) => character.character_type !== "investigator")
-    .sort((left, right) => left.display_order - right.display_order)
-    .map(moduleCharacterToDraft);
-  const characterIds = characters.map((character, index) => {
-    const fallbackKey = `${character.characterType}-${index + 1}`;
-    return `module-character:${character.key || createCharacterKey(character.name, fallbackKey)}`;
-  });
-
-  return {
-    title: template.title,
-    system: template.system,
-    coverImageUrl: template.cover_image_url || "",
-    tagsText: joinListText(template.tags),
-    recommendedPlayersMin: template.recommended_players_min,
-    recommendedPlayersMax: template.recommended_players_max,
-    estimatedHoursMin: toHours(template.estimated_minutes_min),
-    estimatedHoursMax: toHours(template.estimated_minutes_max),
-    complexity: template.complexity,
-    playerFacingPremise: template.player_facing_premise || template.summary,
-    keeperNotes: template.keeper_notes || "",
-    bgMusicUrl: template.bg_music_url || "",
-    sceneBackgroundColor: defaultScene?.background_color || "#182033",
-    sceneBackgroundPattern: defaultScene?.background_pattern || "grid",
-    sceneTabletopState: createModuleSceneTabletopState({
-      title: defaultScene?.title || "起始场景",
-      description: defaultScene?.description || null,
-      state: defaultScene?.tabletop_state || null,
-      characterIds,
-    }),
-    characters,
-  };
-}
-
-function validateStep(form: UploadFormState, step: UploadStep) {
-  if (step === 0 && !form.title.trim()) return "请填写模组标题";
-  if (step === 1) {
-    if (!form.system.trim()) return "请填写规则系统";
-    if (form.recommendedPlayersMin > form.recommendedPlayersMax) {
-      return "推荐人数下限不能大于上限";
-    }
-    if (form.estimatedHoursMin > form.estimatedHoursMax) {
-      return "预计时长下限不能大于上限";
-    }
-  }
-  if (step === 2) {
-    if (!form.playerFacingPremise.trim()) return "请填写玩家可见背景";
-    if (!form.sceneTabletopState.scenes.length) return "请创建至少一个场景";
-  }
-  return null;
-}
-
-function validateForm(form: UploadFormState) {
-  for (const step of [0, 1, 2] as UploadStep[]) {
-    const error = validateStep(form, step);
-    if (error) return error;
-  }
-  if (!/^#[0-9A-Fa-f]{6}$/.test(form.sceneBackgroundColor)) {
-    return "场景底色需要使用 #RRGGBB 格式";
-  }
-  return null;
-}
 
 export const UserModuleUploadDialog: React.FC<UserModuleUploadDialogProps> = ({
   currentUserId,
@@ -379,7 +70,7 @@ export const UserModuleUploadDialog: React.FC<UserModuleUploadDialogProps> = ({
   const isEditing = Boolean(initialTemplate);
   const isWorking = isPublishing || isDeleting;
   const [form, setForm] = React.useState<UploadFormState>(() =>
-    getInitialForm(initialTemplate)
+    getInitialUserModuleUploadForm(initialTemplate)
   );
   const [step, setStep] = React.useState<UploadStep>(0);
   const [error, setError] = React.useState<string | null>(null);
@@ -389,7 +80,7 @@ export const UserModuleUploadDialog: React.FC<UserModuleUploadDialogProps> = ({
     form.sceneTabletopState
   );
   const moduleSceneCharacters = React.useMemo(
-    () => form.characters.map(characterDraftToCharacter),
+    () => buildModuleSceneCharacters(form.characters),
     [form.characters]
   );
 
@@ -415,7 +106,7 @@ export const UserModuleUploadDialog: React.FC<UserModuleUploadDialogProps> = ({
   const addCharacter = (characterType: "npc" | "monster") => {
     setForm((current) => ({
       ...current,
-      characters: [...current.characters, createCharacterDraft(characterType)],
+      characters: [...current.characters, createModuleCharacterDraft(characterType)],
     }));
   };
 
@@ -427,7 +118,7 @@ export const UserModuleUploadDialog: React.FC<UserModuleUploadDialogProps> = ({
   };
 
   const goNext = () => {
-    const validationError = validateStep(form, step);
+    const validationError = validateUserModuleUploadStep(form, step);
     if (validationError) {
       setError(validationError);
       return;
@@ -442,7 +133,7 @@ export const UserModuleUploadDialog: React.FC<UserModuleUploadDialogProps> = ({
   };
 
   const submit = async () => {
-    const validationError = validateForm(form);
+    const validationError = validateUserModuleUploadForm(form);
     if (validationError) {
       setError(validationError);
       return;
@@ -450,37 +141,7 @@ export const UserModuleUploadDialog: React.FC<UserModuleUploadDialogProps> = ({
 
     setError(null);
     try {
-      const sceneForm = getModuleSceneFormFromTabletopState(
-        form.sceneTabletopState
-      );
-      await onPublish({
-        title: form.title.trim(),
-        summary: form.playerFacingPremise.trim(),
-        system: form.system.trim().toLowerCase(),
-        coverImageUrl: form.coverImageUrl.trim() || null,
-        tags: splitListText(form.tagsText),
-        recommendedPlayersMin: clampInteger(form.recommendedPlayersMin, 1, 12),
-        recommendedPlayersMax: clampInteger(form.recommendedPlayersMax, 1, 12),
-        estimatedMinutesMin: toMinutes(form.estimatedHoursMin),
-        estimatedMinutesMax: toMinutes(form.estimatedHoursMax),
-        complexity: form.complexity,
-        tone: null,
-        contentWarnings: [],
-        playerFacingPremise: form.playerFacingPremise.trim(),
-        keeperNotes: form.keeperNotes.trim() || null,
-        defaultRoomType: "text",
-        bgMusicUrl: form.bgMusicUrl.trim() || null,
-        characters: form.characters.map(characterDraftToInput),
-        scene: sceneForm.title.trim()
-          ? {
-              title: sceneForm.title.trim(),
-              description: sceneForm.description.trim() || null,
-              backgroundColor: form.sceneBackgroundColor,
-              backgroundPattern: form.sceneBackgroundPattern,
-              tabletopState: form.sceneTabletopState,
-            }
-          : null,
-      });
+      await onPublish(buildUserModuleTemplateInput(form));
       onClose();
     } catch (publishError: any) {
       setError(publishError?.message || "上传模组失败");
@@ -929,13 +590,9 @@ const CharacterDraftCard: React.FC<{
     key: keyof ModuleCharacterDraft["stats"],
     value: number
   ) => {
-    updateCharacter(character.id, (draft) => ({
-      ...draft,
-      stats: {
-        ...draft.stats,
-        [key]: clampInteger(value, key === "hp" ? 1 : 0, 999),
-      },
-    }));
+    updateCharacter(character.id, (draft) =>
+      patchModuleCharacterStat(draft, key, value)
+    );
   };
   const Icon = character.characterType === "monster" ? Skull : User;
 
@@ -982,10 +639,9 @@ const CharacterDraftCard: React.FC<{
               active={character.characterType === "npc"}
               disabled={disabled}
               onClick={() =>
-                patch({
-                  characterType: "npc",
-                  role: character.role === "怪物" ? "NPC" : character.role,
-                })
+                updateCharacter(character.id, (draft) =>
+                  setModuleCharacterType(draft, "npc")
+                )
               }
             >
               NPC
@@ -994,10 +650,9 @@ const CharacterDraftCard: React.FC<{
               active={character.characterType === "monster"}
               disabled={disabled}
               onClick={() =>
-                patch({
-                  characterType: "monster",
-                  role: character.role === "NPC" ? "怪物" : character.role,
-                })
+                updateCharacter(character.id, (draft) =>
+                  setModuleCharacterType(draft, "monster")
+                )
               }
             >
               怪物
@@ -1066,7 +721,7 @@ const CharacterDraftCard: React.FC<{
 };
 
 const PreviewStep: React.FC<{ form: UploadFormState }> = ({ form }) => {
-  const tags = splitListText(form.tagsText);
+  const tags = splitModuleListText(form.tagsText);
   return (
     <div className="grid gap-6 lg:grid-cols-[16rem_minmax(0,1fr)]">
       <div className="overflow-hidden rounded-lg border border-dicecho-border/40 bg-dicecho-panel/55">

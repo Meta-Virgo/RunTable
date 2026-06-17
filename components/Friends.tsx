@@ -13,20 +13,18 @@ import {
   Trash2,
 } from "lucide-react";
 import { AvatarUpload } from "./AvatarUpload";
-import { useElasticScroll } from "../hooks/useElasticScroll";
 import { HomeHistoryModal } from "./home/HomeHistoryModal";
 import { FriendRequestButton } from "./profile/FriendRequestButton";
 import {
   FriendCardSkeleton,
   HistorySkeletonList,
-  StaggeredItem,
 } from "./Skeleton";
 import { themeRgb } from "../utils/theme";
 import {
-  fetchFriendsProfileHistory,
-  getFriendsHistoryCharacterDisplay,
-  type FriendsPlayerHistoryItem,
-} from "../services/friendsProfileModel";
+  fetchHomeProfileHistory,
+  getHomeHistoryCharacterDisplay,
+  type HomePlayerHistoryItem,
+} from "../services/homeProfileModel";
 import {
   fetchFriendsOverview,
   requestFriendship,
@@ -60,7 +58,7 @@ export const Friends: React.FC<FriendsProps> = ({
   const [showHistoryModal, setShowHistoryModal] = useState(false); // Added for standalone history modal
   const [kpHistory, setKpHistory] = useState<GameHistory[]>([]);
   const [playerHistory, setPlayerHistory] = useState<
-    FriendsPlayerHistoryItem[]
+    HomePlayerHistoryItem[]
   >([]);
   const [historyTab, setHistoryTab] = useState<"kp" | "player">("player");
   const [historyLoading, setHistoryLoading] = useState(false);
@@ -68,10 +66,6 @@ export const Friends: React.FC<FriendsProps> = ({
   // Delete Modal State
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
-
-  const resumeScrollRef = React.useRef<HTMLDivElement>(null);
-  const resumeContentRef = React.useRef<HTMLDivElement>(null);
-  useElasticScroll(resumeScrollRef, resumeContentRef);
 
   useEffect(() => {
     fetchFriendsOverviewForUser();
@@ -168,7 +162,7 @@ export const Friends: React.FC<FriendsProps> = ({
   const fetchUserHistory = async (userId: string) => {
     setHistoryLoading(true);
     try {
-      const history = await fetchFriendsProfileHistory({
+      const history = await fetchHomeProfileHistory({
         userId,
         repository: friendsProfileRepository,
       });
@@ -258,9 +252,9 @@ export const Friends: React.FC<FriendsProps> = ({
                 </h3>
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
                   {Array.from({ length: 3 }).map((_, index) => (
-                    <StaggeredItem key={index} index={index}>
+                    <div key={index}>
                       <FriendCardSkeleton />
-                    </StaggeredItem>
+                    </div>
                   ))}
                 </div>
               </div>
@@ -269,10 +263,9 @@ export const Friends: React.FC<FriendsProps> = ({
                 <h3 className="text-white font-bold text-lg border-l-4 border-dicecho-primary pl-3">
                   搜索结果
                 </h3>
-                {searchResults.map((user, index) => (
-                  <StaggeredItem
+                {searchResults.map((user) => (
+                  <div
                     key={user.id}
-                    index={index}
                     className="bg-dicecho-card/70 border border-dicecho-border/45 p-6 rounded-lg flex items-center gap-6 shadow-sm"
                   >
                     <div
@@ -316,7 +309,7 @@ export const Friends: React.FC<FriendsProps> = ({
                         </Button>
                       </div>
                     </div>
-                  </StaggeredItem>
+                  </div>
                 ))}
               </div>
             )}
@@ -337,17 +330,16 @@ export const Friends: React.FC<FriendsProps> = ({
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {isLoadingOverview ? (
                   Array.from({ length: 1 }).map((_, index) => (
-                    <StaggeredItem key={index} index={index}>
+                    <div key={index}>
                       <FriendCardSkeleton />
-                    </StaggeredItem>
+                    </div>
                   ))
                 ) : (
-                  friends.map((f, index) => {
+                  friends.map((f) => {
                     const profile = f.friend_profile!;
                     return (
-                      <StaggeredItem
+                      <div
                         key={f.id}
-                        index={index}
                         className="bg-dicecho-card/70 border border-dicecho-border/45 p-4 rounded-lg flex items-center gap-4 hover:bg-dicecho-raised/70 transition-colors group cursor-pointer shadow-sm"
                         onClick={() => openResume(profile)}
                       >
@@ -401,7 +393,7 @@ export const Friends: React.FC<FriendsProps> = ({
                             <Trash2 size={18} />
                           </Button>
                         </div>
-                      </StaggeredItem>
+                      </div>
                     );
                   })
                 )}
@@ -421,12 +413,11 @@ export const Friends: React.FC<FriendsProps> = ({
             {isLoadingOverview ? (
               <HistorySkeletonList count={3} />
             ) : (
-              requests.map((r, index) => {
+              requests.map((r) => {
                 const profile = r.friend_profile!;
                 return (
-                  <StaggeredItem
+                  <div
                     key={r.id}
-                    index={index}
                     className="bg-dicecho-card/70 border border-dicecho-primary/30 p-4 rounded-lg flex items-center gap-4 shadow-sm"
                   >
                     <AvatarUpload
@@ -461,7 +452,7 @@ export const Friends: React.FC<FriendsProps> = ({
                         拒绝
                       </Button>
                     </div>
-                  </StaggeredItem>
+                  </div>
                 );
               })
             )}
@@ -612,10 +603,9 @@ export const Friends: React.FC<FriendsProps> = ({
 
             {/* History List */}
             <div
-              ref={resumeScrollRef}
-              className="bg-dicecho-panel/70 border-t border-dicecho-border/40 p-4 max-h-[40vh] overflow-y-auto custom-scrollbar overscroll-y-none"
+              className="bg-dicecho-panel/70 border-t border-dicecho-border/40 p-4 max-h-[40vh] overflow-y-auto custom-scrollbar overscroll-contain"
             >
-              <div ref={resumeContentRef}>
+              <div>
                 {historyLoading ? (
                   <HistorySkeletonList count={3} />
                 ) : historyTab === "player" ? (
@@ -625,14 +615,13 @@ export const Friends: React.FC<FriendsProps> = ({
                         暂无记录
                       </div>
                     )}
-                    {playerHistory.map((item, index) => {
+                    {playerHistory.map((item) => {
                       const characterDisplay =
-                        getFriendsHistoryCharacterDisplay(item);
+                        getHomeHistoryCharacterDisplay(item);
 
                       return (
-                        <StaggeredItem
+                        <div
                           key={item.id}
-                          index={index}
                           className={`relative p-3 rounded-lg border transition-colors duration-150 ${
                             characterDisplay.isDead
                               ? "bg-dicecho-panel/50 border-dicecho-border/30 grayscale"
@@ -686,7 +675,7 @@ export const Friends: React.FC<FriendsProps> = ({
                               </div>
                             </div>
                           </div>
-                        </StaggeredItem>
+                        </div>
                       );
                     })}
                   </div>
@@ -697,10 +686,9 @@ export const Friends: React.FC<FriendsProps> = ({
                         暂无记录
                       </div>
                     )}
-                    {kpHistory.map((history, index) => (
-                      <StaggeredItem
+                    {kpHistory.map((history) => (
+                      <div
                         key={history.id}
-                        index={index}
                         className="bg-dicecho-card/70 border border-dicecho-border/40 p-3 rounded-lg hover:border-dicecho-primary/40 transition-colors duration-150"
                       >
                         <div className="flex justify-between items-start mb-1">
@@ -715,7 +703,7 @@ export const Friends: React.FC<FriendsProps> = ({
                           <Crown size={10} className="text-yellow-500" />
                           <span>主持人 (KP)</span>
                         </div>
-                      </StaggeredItem>
+                      </div>
                     ))}
                   </div>
                 )}

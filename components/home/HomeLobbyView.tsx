@@ -15,7 +15,7 @@ import type { Character, Room } from "../../types";
 import { Button, Input, Textarea, cn } from "../UI";
 import { CoverImageUpload } from "../CoverImageUpload";
 import { RoomCard } from "../RoomCard";
-import { RoomGridSkeleton, StaggeredItem } from "../Skeleton";
+import { RoomGridSkeleton } from "../Skeleton";
 import type { LobbySortMode } from "../../hooks/useLobbyCatalog";
 
 type RoomFilter = "all" | "mine" | "created" | "kp_online";
@@ -236,8 +236,8 @@ export const HomeLobbyView: React.FC<HomeLobbyViewProps> = ({
             </div>
           ) : (
             <div className="grid grid-cols-1 gap-5 animate-fade-in md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
-              {filteredRooms.map((room, index) => (
-                <StaggeredItem key={room.id} index={index}>
+              {filteredRooms.map((room) => (
+                <div key={room.id}>
                   <RoomCard
                     room={room}
                     isAuthenticated={isAuthenticated}
@@ -247,7 +247,7 @@ export const HomeLobbyView: React.FC<HomeLobbyViewProps> = ({
                     onJoinRoom={onJoinRoom}
                     onLoginRequest={onLoginRequest}
                   />
-                </StaggeredItem>
+                </div>
               ))}
               {filteredRooms.length === 0 && (
                 <div className="col-span-full rounded-lg border border-dashed border-dicecho-border/40 bg-dicecho-panel/40 py-16 text-center text-dicecho-muted">

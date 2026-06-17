@@ -46,6 +46,7 @@ import {
 import {
   deleteTabletopToken,
   fetchTabletopBootstrap,
+  getTabletopRealtimeConnection,
   isMissingTabletopBatchPersistError,
   moveTabletopToken,
   persistTabletopUpdateBatch,
@@ -472,9 +473,11 @@ export function useTabletopRoom({
           upsertTabletopTokenLocally(getTabletopDocState(doc, roomId), payload.token)
         );
       },
-      onStatusChange: (status) => {
+      onStatusChange: (status, error) => {
         if (!backendAvailableRef.current) return;
-        setConnectionStatus(status === "SUBSCRIBED" ? "connected" : "reconnecting");
+        const nextConnection = getTabletopRealtimeConnection({ status, error });
+        setConnectionStatus(nextConnection.status);
+        setConnectionDetail(nextConnection.detail);
       },
     });
     bridge.connect();

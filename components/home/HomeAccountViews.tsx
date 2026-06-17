@@ -12,7 +12,6 @@ import type { HomePlayerHistoryItem } from "../../services/homeProfileModel";
 import { summarizeMarkdown } from "../../services/squareMarkdown";
 import { AvatarUpload } from "../AvatarUpload";
 import { Messages } from "../Messages";
-import { StaggeredItem } from "../Skeleton";
 import { Button, Input, Textarea, cn } from "../UI";
 import type { HomeTab } from "./HomeNavigation";
 
@@ -383,14 +382,14 @@ const NotificationsCenter: React.FC<{
             <p className="mt-4 text-sm text-dicecho-muted">暂无消息</p>
           </div>
         ) : (
-          notifications.map((notification, index) => (
-            <StaggeredItem key={notification.id} index={index}>
+          notifications.map((notification) => (
+            <div key={notification.id}>
               <NotificationRow
                 notification={notification}
                 onMarkRead={onMarkNotificationRead}
                 onDelete={onDeleteNotification}
               />
-            </StaggeredItem>
+            </div>
           ))
         )}
       </div>

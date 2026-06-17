@@ -4,7 +4,6 @@ import { Trash2 } from "lucide-react";
 import type { Notification } from "../../types";
 import { summarizeMarkdown } from "../../services/squareMarkdown";
 import { cn } from "../UI";
-import { StaggeredItem } from "../Skeleton";
 
 interface SquareNotificationsMenuProps {
   show: boolean;
@@ -55,10 +54,9 @@ export const SquareNotificationsMenu: React.FC<
               暂无通知
             </div>
           ) : (
-            notifications.map((notification, index) => (
-              <StaggeredItem
+            notifications.map((notification) => (
+              <div
                 key={notification.id}
-                index={index}
                 className={cn(
                   "p-3 border-b transition-colors cursor-pointer group",
                   "border-dicecho-border/30 hover:bg-white/10",
@@ -113,7 +111,7 @@ export const SquareNotificationsMenu: React.FC<
                     </button>
                   </div>
                 </div>
-              </StaggeredItem>
+              </div>
             ))
           )}
         </div>

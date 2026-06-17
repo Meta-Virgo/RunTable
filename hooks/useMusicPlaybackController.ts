@@ -22,7 +22,6 @@ import {
   type MusicPlayMode,
 } from "../services/musicPlayback";
 import { useDraggable } from "./useDraggable";
-import { useElasticScroll } from "./useElasticScroll";
 
 interface UseMusicPlaybackControllerOptions {
   url: string | null;
@@ -79,15 +78,12 @@ export function useMusicPlaybackController({
   const previousPlaylistIdRef = useRef<string | null>(null);
   const activeTrackRef = useRef<HTMLDivElement>(null);
   const playlistScrollRef = useRef<HTMLDivElement>(null);
-  const playlistContentRef = useRef<HTMLDivElement>(null);
   const loadMoreRef = useRef<HTMLDivElement>(null);
   const isLoadingMoreRef = useRef(false);
   const { position, handleMouseDown, hasMoved } = useDraggable(
     null,
     "music_player_pos"
   );
-
-  useElasticScroll(playlistScrollRef, playlistContentRef, { enabled: false });
 
   useEffect(() => {
     if (!isKP) {
@@ -619,7 +615,6 @@ export function useMusicPlaybackController({
     setIsCollapsed,
     activeTrackRef,
     playlistScrollRef,
-    playlistContentRef,
     loadMoreRef,
     position,
     handleMouseDown,

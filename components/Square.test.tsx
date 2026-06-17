@@ -2,10 +2,6 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import { Square } from "./Square";
 
-vi.mock("../hooks/useElasticScroll", () => ({
-  useElasticScroll: vi.fn(),
-}));
-
 vi.mock("../hooks/useSquareNotifications", () => ({
   useSquareNotifications: () => ({
     notifications: [],

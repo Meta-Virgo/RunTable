@@ -4,7 +4,7 @@ import type { Post } from "../../types";
 import { getSquareModuleSearchText } from "../../services/squarePostModules";
 import { summarizeMarkdown } from "../../services/squareMarkdown";
 import { cn } from "../UI";
-import { FeedSkeletonList, StaggeredItem } from "../Skeleton";
+import { FeedSkeletonList } from "../Skeleton";
 import { SquareMarkdown } from "../SquareMarkdown";
 import { SquarePostModules } from "./SquarePostModules";
 import { formatSquareTime } from "./squareTime";
@@ -90,10 +90,9 @@ export const SquarePostList: React.FC<SquarePostListProps> = ({
 
   return (
     <>
-      {visiblePosts.map((post, index) => (
-        <StaggeredItem
+      {visiblePosts.map((post) => (
+        <div
           key={post.id}
-          index={index}
           className="group flex gap-4 rounded-lg border border-dicecho-border/40 bg-dicecho-card/80 p-4 shadow-sm dicecho-card-shadow"
         >
           <div className="w-10 h-10 rounded-full bg-dicecho-panel flex items-center justify-center text-slate-300 font-bold shrink-0 overflow-hidden border border-dicecho-border/40">
@@ -252,7 +251,7 @@ export const SquarePostList: React.FC<SquarePostListProps> = ({
               </>
             )}
           </div>
-        </StaggeredItem>
+        </div>
       ))}
     </>
   );

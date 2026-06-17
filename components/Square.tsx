@@ -8,7 +8,6 @@ import {
   Menu,
 } from "lucide-react";
 import { Button, cn } from "./UI";
-import { useElasticScroll } from "../hooks/useElasticScroll";
 import { useSquareExperience } from "../hooks/useSquareExperience";
 import { SquareChannelSidebar } from "./square/SquareChannelSidebar";
 import { SquareComposer } from "./square/SquareComposer";
@@ -86,9 +85,6 @@ export const Square: React.FC = () => {
 
   const [showBackToTop, setShowBackToTop] = useState(false);
   const scrollContainerRef = React.useRef<HTMLDivElement>(null);
-  const contentRef = React.useRef<HTMLDivElement>(null);
-  useElasticScroll(scrollContainerRef, contentRef);
-
   useEffect(() => {
     const handleScroll = () => {
       if (scrollContainerRef.current) {
@@ -203,11 +199,10 @@ export const Square: React.FC = () => {
 
         {/* Post List */}
         <div
-          className="flex-1 overflow-y-auto p-4 md:p-6 custom-scrollbar overscroll-y-none"
+          className="flex-1 overflow-y-auto p-4 md:p-6 custom-scrollbar overscroll-contain scroll-smooth"
           ref={scrollContainerRef}
         >
           <div
-            ref={contentRef}
             className="max-w-4xl mx-auto space-y-6 min-h-full"
           >
             <SquareComposer

@@ -169,9 +169,12 @@ export function useSquareExperience() {
   const openPost = useCallback(
     (postId: string) => {
       comments.setSelectedPostId(postId);
-      void comments.fetchComments(postId);
+      const post = feed.posts.find((item) => item.id === postId);
+      if ((post?.comment_count || 0) > 0) {
+        void comments.fetchComments(postId);
+      }
     },
-    [comments]
+    [comments, feed.posts]
   );
 
   const closePost = useCallback(() => {
@@ -255,10 +258,10 @@ export function useSquareExperience() {
 
   const selectChannel = useCallback(
     (channelId: string) => {
-      feed.setActiveChannelId(channelId);
+      feed.selectChannel(channelId);
       setShowMobileSidebar(false);
     },
-    [feed]
+    [feed.selectChannel]
   );
 
   return {

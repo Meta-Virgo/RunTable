@@ -12,7 +12,6 @@ import { CharacterModal } from "./modals/CharacterModal";
 import { AvatarUpload } from "./AvatarUpload";
 import { CoverImageUpload } from "./CoverImageUpload";
 import { Friends } from "./Friends";
-import { useElasticScroll } from "../hooks/useElasticScroll";
 import { useLobbyCatalog } from "../hooks/useLobbyCatalog";
 import { useHomeProfileData } from "../hooks/useHomeProfileData";
 import { useSocialMessageBadges } from "../hooks/useSocialMessages";
@@ -29,7 +28,6 @@ import { ModuleMarketplace } from "./moduleMarketplace/ModuleMarketplace";
 import {
   CharacterCardSkeleton,
   FeedSkeletonList,
-  StaggeredItem,
 } from "./Skeleton";
 import {
   createRoom,
@@ -100,6 +98,7 @@ export const Home: React.FC<HomeProps> = ({
   levelInfo,
 }) => {
   const [activeTab, setActiveTab] = useState<HomeTab>("rooms");
+  const [hasOpenedSquare, setHasOpenedSquare] = useState(false);
   const [loading, setLoading] = useState(false);
 
   // Rooms State
@@ -140,7 +139,6 @@ export const Home: React.FC<HomeProps> = ({
   // Friend Requests Count
   const [showBackToTop, setShowBackToTop] = useState(false);
   const mainRef = React.useRef<HTMLElement>(null);
-  const mainContentRef = React.useRef<HTMLDivElement>(null);
   const {
     currentUserId,
     userCode,
@@ -216,12 +214,12 @@ export const Home: React.FC<HomeProps> = ({
     [isAuthenticated, requestLogin]
   );
 
-  useElasticScroll(mainRef, mainContentRef, {
-    disabled: activeTab === "square",
-  });
-
   useEffect(() => {
     setShowBackToTop(false);
+  }, [activeTab]);
+
+  useEffect(() => {
+    if (activeTab === "square") setHasOpenedSquare(true);
   }, [activeTab]);
 
   useEffect(() => {
@@ -432,14 +430,14 @@ export const Home: React.FC<HomeProps> = ({
 
       <main
         ref={mainRef}
-        className={`flex-1 w-full overscroll-y-none ${
+        className={`flex-1 w-full overscroll-contain ${
           activeTab === "square"
             ? "overflow-hidden flex flex-col"
             : "overflow-y-auto custom-scrollbar"
         }`}
       >
-        {activeTab === "square" ? (
-          <>
+        {hasOpenedSquare && (
+          <div className={activeTab === "square" ? "flex flex-1 min-h-0 flex-col" : "hidden"}>
             <HomeMobileNav
               activeTab={activeTab}
               friendRequestCount={friendRequestCount}
@@ -449,7 +447,7 @@ export const Home: React.FC<HomeProps> = ({
               onLoginRequest={requestLogin}
               mode="square"
             />
-            <div className="flex-1 min-h-0 relative">
+            <div className="relative flex-1 min-h-0">
               <Suspense
                 fallback={
                   <div className="h-full overflow-hidden p-4 md:p-6">
@@ -462,10 +460,11 @@ export const Home: React.FC<HomeProps> = ({
                 <Square />
               </Suspense>
             </div>
-          </>
-        ) : (
+          </div>
+        )}
+
+        <div className={activeTab === "square" ? "hidden" : undefined}>
           <div
-            ref={mainContentRef}
             className="container mx-auto max-w-screen-2xl p-4 md:p-8"
           >
             {/* Mobile Nav */}
@@ -538,15 +537,14 @@ export const Home: React.FC<HomeProps> = ({
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   {isLoadingCharacters ? (
                     Array.from({ length: 6 }).map((_, index) => (
-                      <StaggeredItem key={index} index={index}>
+                      <div key={index}>
                         <CharacterCardSkeleton />
-                      </StaggeredItem>
+                      </div>
                     ))
                   ) : (
-                    myCharacters.map((char, index) => (
-                      <StaggeredItem
+                    myCharacters.map((char) => (
+                      <div
                         key={char.id}
-                        index={index}
                         className="bg-dicecho-card/80 border border-dicecho-border/40 hover:border-dicecho-primary/50 rounded-lg p-5 transition-all group relative overflow-hidden shadow-sm"
                       >
                         <div className="flex gap-4 mb-3">
@@ -602,7 +600,7 @@ export const Home: React.FC<HomeProps> = ({
                             编辑档案
                           </Button>
                         </div>
-                      </StaggeredItem>
+                      </div>
                     ))
                   )}
                   {!isLoadingCharacters && myCharacters.length === 0 && (
@@ -698,7 +696,7 @@ export const Home: React.FC<HomeProps> = ({
               />
             )}
           </div>
-        )}
+        </div>
       </main>
 
       {/* Back to Top Button */}

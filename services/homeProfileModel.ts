@@ -1,8 +1,6 @@
 import type { Character, GameHistory, GameHistoryParticipant } from "../types";
 import {
   buildPlayerHistoryWithLatestCharacters,
-  buildProfileHistoryCharacterMap,
-  getProfileHistoryCharacterDisplay,
   getPlayerHistoryCharacterIds,
 } from "./profileHistoryModel";
 
@@ -11,24 +9,14 @@ export type HomePlayerHistoryItem = GameHistoryParticipant & {
   latest_character?: Character;
 };
 
-export function getHomePlayerHistoryCharacterIds(participants: any[]) {
-  return getPlayerHistoryCharacterIds(participants);
-}
+export {
+  getPlayerHistoryCharacterIds as getHomePlayerHistoryCharacterIds,
+  getProfileHistoryCharacterDisplay as getHomeHistoryCharacterDisplay,
+} from "./profileHistoryModel";
 
-export function buildHomeCharacterMap(characters: any[] | null | undefined) {
-  return buildProfileHistoryCharacterMap(characters);
-}
-
-export function buildHomePlayerHistory(input: {
-  participants: any[];
-  latestCharacters: any[] | null | undefined;
-}): HomePlayerHistoryItem[] {
-  return buildPlayerHistoryWithLatestCharacters(input);
-}
-
-export function getHomeHistoryCharacterDisplay(item: HomePlayerHistoryItem) {
-  return getProfileHistoryCharacterDisplay(item);
-}
+export {
+  buildPlayerHistoryWithLatestCharacters as buildHomePlayerHistory,
+} from "./profileHistoryModel";
 
 export interface HomeProfileHistoryRepository {
   fetchKpHistory: (userId: string) => Promise<{ data?: any[] | null }>;
@@ -47,7 +35,7 @@ export async function fetchHomeProfileHistory(input: {
     input.userId
   );
 
-  const characterIds = getHomePlayerHistoryCharacterIds(playerHistory || []);
+  const characterIds = getPlayerHistoryCharacterIds(playerHistory || []);
   const { data: latestCharacters } =
     characterIds.length > 0
       ? await input.repository.fetchCharactersByIds(characterIds)
@@ -55,9 +43,9 @@ export async function fetchHomeProfileHistory(input: {
 
   return {
     kpHistory: (kpHistory || []) as GameHistory[],
-    playerHistory: buildHomePlayerHistory({
+    playerHistory: buildPlayerHistoryWithLatestCharacters({
       participants: playerHistory || [],
       latestCharacters,
-    }),
+    }) as HomePlayerHistoryItem[],
   };
 }

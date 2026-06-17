@@ -1,11 +1,7 @@
 import type { Character, GameHistory, GameHistoryParticipant } from "../types";
 import {
-  attachLatestCharactersToPlayerHistory,
   buildPlayerHistoryWithLatestCharacters,
-  buildProfileHistoryCharacterMap,
-  getProfileHistoryCharacterDisplay,
   getPlayerHistoryCharacterIds,
-  sortPlayerHistoryByRecency,
 } from "./profileHistoryModel";
 
 export type SquareProfileHistoryTab = "player" | "kp";
@@ -20,39 +16,17 @@ export interface SquareProfileHistory {
   playerHistory: SquarePlayerHistoryItem[];
 }
 
-export function getSquarePlayerHistoryCharacterIds(participants: any[]) {
-  return getPlayerHistoryCharacterIds(participants);
-}
+export {
+  getPlayerHistoryCharacterIds as getSquarePlayerHistoryCharacterIds,
+  buildProfileHistoryCharacterMap as buildSquareCharacterMap,
+  attachLatestCharactersToPlayerHistory as attachLatestSquareCharacters,
+  sortPlayerHistoryByRecency as sortSquarePlayerHistory,
+  buildPlayerHistoryWithLatestCharacters as buildSquarePlayerHistory,
+} from "./profileHistoryModel";
 
-export function buildSquareCharacterMap(characters: any[] | null | undefined) {
-  return buildProfileHistoryCharacterMap(characters);
-}
-
-export function attachLatestSquareCharacters(input: {
-  participants: any[];
-  characterMap: Map<string, Character>;
-}) {
-  return attachLatestCharactersToPlayerHistory(input) as SquarePlayerHistoryItem[];
-}
-
-export function sortSquarePlayerHistory(
-  participants: SquarePlayerHistoryItem[]
-) {
-  return sortPlayerHistoryByRecency(participants) as SquarePlayerHistoryItem[];
-}
-
-export function buildSquarePlayerHistory(input: {
-  participants: any[];
-  latestCharacters: any[] | null | undefined;
-}) {
-  return buildPlayerHistoryWithLatestCharacters(input) as SquarePlayerHistoryItem[];
-}
-
-export function getSquareHistoryCharacterDisplay(
-  item: SquarePlayerHistoryItem
-) {
-  return getProfileHistoryCharacterDisplay(item);
-}
+export {
+  getProfileHistoryCharacterDisplay as getSquareHistoryCharacterDisplay,
+} from "./profileHistoryModel";
 
 export interface SquareProfileRepository {
   fetchProfileById: (userId: string) => Promise<{ data?: any | null }>;
@@ -79,7 +53,7 @@ export async function fetchSquareProfilePanelData(input: {
 
   let latestCharacters: any[] = [];
   if (playerData && playerData.length > 0) {
-    const characterIds = getSquarePlayerHistoryCharacterIds(playerData);
+    const characterIds = getPlayerHistoryCharacterIds(playerData);
     if (characterIds.length > 0) {
       const { data } = await input.repository.fetchCharactersByIds(characterIds);
       latestCharacters = data || [];
@@ -89,9 +63,9 @@ export async function fetchSquareProfilePanelData(input: {
   return {
     profile,
     kpHistory: (kpData || []) as GameHistory[],
-    playerHistory: buildSquarePlayerHistory({
+    playerHistory: buildPlayerHistoryWithLatestCharacters({
       participants: playerData || [],
       latestCharacters,
-    }),
+    }) as SquarePlayerHistoryItem[],
   };
 }

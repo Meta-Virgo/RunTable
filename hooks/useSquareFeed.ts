@@ -33,6 +33,7 @@ export function useSquareFeed() {
   const [currentUser, setCurrentUser] = useState<any>(null);
   const useBootstrapRef = useRef(true);
   const skipNextPostRefreshRef = useRef(false);
+  const postRequestIdRef = useRef(0);
   const feedContextRef = useRef({
     activeChannelId: null as string | null,
     currentUser: null as any,
@@ -72,8 +73,32 @@ export function useSquareFeed() {
 
   useEffect(() => {
     let cancelled = false;
+    let eagerChannels: Channel[] = [];
+
+    const applyDefaultChannel = (nextChannels: Channel[]) => {
+      if (feedContextRef.current.activeChannelId) return;
+      const defaultChannel =
+        nextChannels.find((channel) => channel.name === DEFAULT_CHANNEL_NAME) ||
+        nextChannels[0];
+      if (defaultChannel) setActiveChannelId(defaultChannel.id);
+    };
+
+    const loadChannelsFirst = async () => {
+      try {
+        const { data } = await fetchChannels();
+        if (cancelled) return;
+
+        eagerChannels = data || [];
+        if (data) setChannels(data);
+      } catch (error) {
+        console.error("Failed to preload square channels:", error);
+      } finally {
+        if (!cancelled) setLoadingChannels(false);
+      }
+    };
 
     const applyBootstrap = async (channelId: string | null = null) => {
+      const requestId = ++postRequestIdRef.current;
       const { data, error } = await fetchSquareFeedBootstrap(channelId);
 
       if (error) {
@@ -86,20 +111,33 @@ export function useSquareFeed() {
       }
 
       if (cancelled) return true;
+      if (requestId !== postRequestIdRef.current) return true;
 
       const bootstrap = data as any;
       const bootstrapChannels = (bootstrap?.channels || []) as Channel[];
-      setCurrentUser(bootstrap?.current_user || null);
+      const bootstrapPosts = (bootstrap?.posts || []) as Post[];
+      const nextActiveChannelId = bootstrap?.active_channel_id || null;
+      const nextCurrentUser = bootstrap?.current_user || null;
+
+      feedContextRef.current = {
+        activeChannelId: nextActiveChannelId,
+        currentUser: nextCurrentUser,
+        posts: bootstrapPosts,
+      };
+
+      setCurrentUser(nextCurrentUser);
       setChannels(bootstrapChannels);
       skipNextPostRefreshRef.current = Boolean(bootstrap?.active_channel_id);
-      setActiveChannelId(bootstrap?.active_channel_id || null);
-      setPosts((bootstrap?.posts || []) as Post[]);
+      setActiveChannelId(nextActiveChannelId);
+      setPosts(bootstrapPosts);
       setLoadingChannels(false);
       setLoadingPosts(false);
       return true;
     };
 
     const init = async () => {
+      const channelsPromise = loadChannelsFirst();
+
       if (useBootstrapRef.current) {
         try {
           const loaded = await applyBootstrap();
@@ -114,16 +152,9 @@ export function useSquareFeed() {
       if (cancelled) return;
       setCurrentUser(user || null);
 
-      const { data } = await fetchChannels();
+      await channelsPromise;
       if (cancelled) return;
-      if (data) {
-        setChannels(data);
-        const defaultChannel =
-          data.find((channel) => channel.name === DEFAULT_CHANNEL_NAME) ||
-          data[0];
-        if (defaultChannel) setActiveChannelId(defaultChannel.id);
-      }
-
+      applyDefaultChannel(eagerChannels);
       setLoadingChannels(false);
     };
 
@@ -141,40 +172,73 @@ export function useSquareFeed() {
       return;
     }
 
+    const channelId = activeChannelId;
+    const requestId = ++postRequestIdRef.current;
+    const isCurrentRequest = () =>
+      requestId === postRequestIdRef.current &&
+      feedContextRef.current.activeChannelId === channelId;
+
     setLoadingPosts(true);
 
-    if (useBootstrapRef.current) {
-      try {
-        const { data, error } = await fetchSquareFeedBootstrap(activeChannelId);
+    try {
+      if (useBootstrapRef.current) {
+        try {
+          const { data, error } = await fetchSquareFeedBootstrap(channelId);
 
-        if (error) {
-          if (isMissingSquareFeedBootstrapError(error)) {
-            useBootstrapRef.current = false;
+          if (!isCurrentRequest()) return;
+
+          if (error) {
+            if (isMissingSquareFeedBootstrapError(error)) {
+              useBootstrapRef.current = false;
+            } else {
+              throw error;
+            }
           } else {
-            throw error;
+            const bootstrap = data as any;
+            setCurrentUser(bootstrap?.current_user || null);
+            if (bootstrap?.channels) setChannels(bootstrap.channels as Channel[]);
+            setPosts((bootstrap?.posts || []) as Post[]);
+            return;
           }
-        } else {
-          const bootstrap = data as any;
-          setCurrentUser(bootstrap?.current_user || null);
-          if (bootstrap?.channels) setChannels(bootstrap.channels as Channel[]);
-          setPosts((bootstrap?.posts || []) as Post[]);
-          setLoadingPosts(false);
-          return;
+        } catch (error) {
+          if (!isCurrentRequest()) return;
+          console.error("Failed to refresh square feed bootstrap:", error);
+          useBootstrapRef.current = false;
         }
-      } catch (error) {
-        console.error("Failed to refresh square feed bootstrap:", error);
-        useBootstrapRef.current = false;
       }
+
+      const { data } = await fetchPostsForChannel(channelId);
+
+      if (!isCurrentRequest()) return;
+
+      if (data) {
+        const formattedPosts = await feedExecutor.formatPosts(data);
+        if (isCurrentRequest()) setPosts(formattedPosts);
+      }
+    } catch (error) {
+      if (isCurrentRequest()) {
+        console.error("Failed to refresh square posts:", error);
+      }
+    } finally {
+      if (isCurrentRequest()) setLoadingPosts(false);
     }
-
-    const { data } = await fetchPostsForChannel(activeChannelId);
-
-    if (data) {
-      setPosts(await feedExecutor.formatPosts(data));
-    }
-
-    setLoadingPosts(false);
   }, [activeChannelId, feedExecutor]);
+
+  const selectChannel = useCallback((channelId: string) => {
+    if (feedContextRef.current.activeChannelId === channelId) return;
+
+    postRequestIdRef.current += 1;
+    skipNextPostRefreshRef.current = false;
+    feedContextRef.current = {
+      ...feedContextRef.current,
+      activeChannelId: channelId,
+      posts: [],
+    };
+
+    setActiveChannelId(channelId);
+    setPosts([]);
+    setLoadingPosts(true);
+  }, []);
 
   useEffect(() => {
     refreshPosts();
@@ -185,9 +249,17 @@ export function useSquareFeed() {
     if (posts.length === 0) return;
 
     let cancelled = false;
+    const channelId = activeChannelId;
+    const requestId = postRequestIdRef.current;
 
     feedExecutor.attachCommentPreviews(posts).then((nextPosts) => {
-      if (!cancelled) setPosts(nextPosts);
+      if (
+        !cancelled &&
+        requestId === postRequestIdRef.current &&
+        feedContextRef.current.activeChannelId === channelId
+      ) {
+        setPosts(nextPosts);
+      }
     });
 
     return () => {
@@ -209,7 +281,10 @@ export function useSquareFeed() {
           filter: `channel_id=eq.${activeChannelId}`,
         },
         async (payload) => {
-          await feedExecutor.prependRealtimePost(payload.new.id);
+          await feedExecutor.prependRealtimePost(
+            payload.new.id,
+            () => feedContextRef.current.activeChannelId === activeChannelId
+          );
         }
       )
       .subscribe();
@@ -243,6 +318,7 @@ export function useSquareFeed() {
   return {
     activeChannelId,
     setActiveChannelId,
+    selectChannel,
     channels,
     posts,
     setPosts,

@@ -131,7 +131,6 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
     setIsCollapsed,
     activeTrackRef,
     playlistScrollRef,
-    playlistContentRef,
     loadMoreRef,
     position,
     handleMouseDown,
@@ -503,9 +502,9 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
                   {parsedType === 0 && (
                     <div
                       ref={playlistScrollRef}
-                      className="flex-1 overflow-y-auto custom-scrollbar bg-dicecho-card/45 border-t border-dicecho-border/40 overscroll-y-none"
+                      className="flex-1 overflow-y-auto custom-scrollbar bg-dicecho-card/45 border-t border-dicecho-border/40 overscroll-contain"
                     >
-                      <div ref={playlistContentRef}>
+                      <div>
                         {isLoadingPlaylist ? (
                           <PlaylistSkeleton />
                         ) : playlistTracks.length > 0 ? (

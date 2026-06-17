@@ -22,7 +22,7 @@ The remaining large files are mostly orchestration modules or dense view impleme
 | Done | 房间会话动作 | `hooks/roomSessionRemoteAdapters.ts`, `hooks/useRoomSessionState.ts` | Remote adapters are created at one seam instead of being wired directly across the session hook. |
 | Done | 房间会话 Chat Surface | `components/ChatArea.tsx`, `components/chat/*` | Message log rendering, composer behavior, AI assistant, and profile display now sit behind focused view modules. |
 | Done | 房间辅助弹窗 | `components/modals/*`, `components/AppLazyComponents.ts` | Room information, character editing, status, story report, and conclusion modals now live in independent lazy-loaded modules instead of a broad modal drawer. |
-| Done | 好友 / 个人资料 Social Surface | `components/Friends.tsx`, `services/friendsModel.ts`, `services/friendsRepository.ts`, `services/friendsProfileModel.ts`, `services/friendsProfileRepository.ts` | Friend profile history reuses the shared 个人大厅摘要 history model and view; friend search/request/delete behavior now sits behind a tested social model and repository. |
+| Done | 好友 / 个人资料 Social Surface | `components/Friends.tsx`, `services/friendsModel.ts`, `services/friendsRepository.ts`, `services/homeProfileModel.ts`, `services/friendsProfileRepository.ts` | Friend profile history reuses the shared 个人大厅摘要 history model directly; friend search/request/delete behavior now sits behind a tested social model and repository. |
 | Done | 角色生命周期 Import Model | `services/characterImportModel.ts`, `components/modals/CharacterModal.tsx` | `.st` import aliases and skill/stat parsing now have one tested model instead of living inside the character modal JSX. |
 | Done | 桌面 / 地图画布 Interaction Model | `components/tabletop/TabletopCanvas.tsx`, `components/tabletop/tabletopCanvasModel.ts` | Viewport restore, pointer projection, anchored zoom, draft shape geometry, text sizing, and map tile targeting now have one pure interface and direct tests. |
 | Done | Supabase Public API / Schema Hardening | `supabase/migrations/20260616070439_harden_public_api_and_indexes.sql` | Advisor-driven foreign-key indexes, clue wall RLS performance shape, storage listing policy removal, and SECURITY DEFINER execute grants are recorded in schema history. |
@@ -177,7 +177,7 @@ Status: Done for this pass.
 
 Progress:
 
-- 2026-06-09: Added `services/friendsProfileModel.ts` and `services/friendsProfileRepository.ts` as a small adapter over the shared 个人大厅摘要 history model. `components/Friends.tsx` now loads profile history through one interface and reuses `components/home/HomeHistoryModal.tsx` for the standalone history modal.
+- 2026-06-09: Added `services/friendsProfileRepository.ts` over the shared 个人大厅摘要 history repository. `components/Friends.tsx` now loads profile history through `services/homeProfileModel.ts` and reuses `components/home/HomeHistoryModal.tsx` for the standalone history modal.
 - 2026-06-10: Added `services/friendsModel.ts`, `services/friendsRepository.ts`, and `services/friendsModel.test.ts`. Friend list normalization, incoming request normalization, profile search, request cooldowns, existing-friendship notices, and friend request creation now have a tested interface outside the UI. `components/Friends.tsx` is now about 712 lines, down from about 1045.
 
 ### 3. 音乐目录 Playback Surface

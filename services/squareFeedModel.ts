@@ -284,13 +284,20 @@ export function createSquareFeedExecutor(input: {
     });
   };
 
-  const prependRealtimePost = async (postId: string) => {
+  const prependRealtimePost = async (
+    postId: string,
+    shouldApply = () => true
+  ) => {
+    if (!shouldApply()) return;
+
     const { data: postData } = await input.repository.fetchPostWithCounts(postId);
-    if (!postData) return;
+    if (!postData || !shouldApply()) return;
 
     const { data: profileData } = await input.repository.fetchProfileById(
       postData.user_id
     );
+    if (!shouldApply()) return;
+
     const formattedPost = formatRealtimeSquarePost({ postData, profileData });
 
     input.localState.replacePosts((previous) =>

@@ -23,7 +23,6 @@ import {
 } from "@livekit/components-react";
 import { cn } from "./UI";
 import { Character } from "../types";
-import { useElasticScroll } from "../hooks/useElasticScroll";
 import type { RoomMemberPanelItem } from "../services/roomMembers";
 
 interface SidebarProps {
@@ -177,11 +176,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const npcCharacters = characters.filter((c) =>
     ["NPC", "怪物"].includes(c.role)
   );
-
-  const scrollContainerRef = React.useRef<HTMLDivElement>(null);
-  const contentRef = React.useRef<HTMLDivElement>(null);
-
-  useElasticScroll(scrollContainerRef, contentRef);
 
   const getCharIcon = (role: string, size = 18) => {
     if (role === "Keeper") return <Crown size={size} />;
@@ -439,10 +433,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
         {/* Character/Role Lists */}
         <div
-          ref={scrollContainerRef}
-          className="flex-1 overflow-y-auto custom-scrollbar px-3 pb-4 overscroll-y-none"
+          className="flex-1 overflow-y-auto custom-scrollbar px-3 pb-4 overscroll-contain"
         >
-          <div ref={contentRef} className="space-y-6">
+          <div className="space-y-6">
             {/* --- KP VIEW --- */}
             {isKP && (
               <>

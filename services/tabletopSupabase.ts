@@ -10,6 +10,11 @@ import type {
 export const TABLETOP_DOC_EVENT = "tabletop-y-update";
 export const TABLETOP_INPUT_EVENT = "tabletop-input";
 
+export type TabletopRealtimeConnectionStatus =
+  | "connected"
+  | "reconnecting"
+  | "error";
+
 export interface TabletopYUpdatePayload {
   roomId: string;
   scope: TabletopDocumentScope;
@@ -45,6 +50,30 @@ export function getTabletopDocChannelName(
 
 export function getTabletopInputChannelName(roomId: string) {
   return `tabletop-input:${roomId}`;
+}
+
+export function getTabletopRealtimeConnection(input: {
+  status: string;
+  error?: Error;
+}): { status: TabletopRealtimeConnectionStatus; detail: string | null } {
+  if (input.status === "SUBSCRIBED") {
+    return { status: "connected", detail: null };
+  }
+  if (input.status === "CLOSED") {
+    return { status: "reconnecting", detail: "实时连接已断开，正在重连。" };
+  }
+  if (input.status === "TIMED_OUT") {
+    return { status: "error", detail: "实时连接超时，请刷新或检查网络。" };
+  }
+  if (input.status === "CHANNEL_ERROR") {
+    return {
+      status: "error",
+      detail: input.error?.message
+        ? `实时连接失败：${input.error.message}`
+        : "实时连接失败，请刷新或检查房间权限。",
+    };
+  }
+  return { status: "reconnecting", detail: "实时连接状态变化，正在重连。" };
 }
 
 export async function fetchTabletopBootstrap(input: {
@@ -205,6 +234,7 @@ export function isTabletopTokenCommitPayload(input: unknown) {
 
 export class SupabaseYBridge {
   private channel: RealtimeChannel | null = null;
+  private isActive = false;
 
   constructor(
     private readonly input: {
@@ -213,7 +243,7 @@ export class SupabaseYBridge {
       clientId: number;
       onRemoteUpdate: (payload: TabletopYUpdatePayload) => void;
       onTokenCommit: (payload: TabletopTokenCommitPayload) => void;
-      onStatusChange?: (status: string) => void;
+      onStatusChange?: (status: string, error?: Error) => void;
     }
   ) {}
 
@@ -228,21 +258,25 @@ export class SupabaseYBridge {
         if (message.payload.clientId === this.input.clientId) return;
         this.input.onRemoteUpdate(message.payload);
       })
-      .subscribe((status) => {
-        this.input.onStatusChange?.(status);
+      .subscribe((status, error) => {
+        if (!this.isActive || this.channel !== channel) return;
+        this.input.onStatusChange?.(status, error);
       });
     this.channel = channel;
+    this.isActive = true;
   }
 
   disconnect() {
     if (!this.channel) return;
-    void supabase.removeChannel(this.channel);
+    const channel = this.channel;
+    this.isActive = false;
     this.channel = null;
+    void supabase.removeChannel(channel);
   }
 
   sendUpdate(updateBase64: string, state?: TabletopState) {
     const channel = this.channel;
-    if (!channel) return;
+    if (!channel || !this.isActive) return;
     void channel.send({
       type: "broadcast",
       event: TABLETOP_DOC_EVENT,
