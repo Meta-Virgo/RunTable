@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   Check,
   Crown,
@@ -53,6 +53,33 @@ const normalizeCoverImageUrl = (value?: string | null) => {
       : undefined;
   } catch {
     return undefined;
+  }
+};
+
+export const getRoomCoverImageVariantUrl = (
+  value: string | undefined,
+  options: { width: number; height: number; quality: number }
+) => {
+  if (!value) return value;
+
+  try {
+    const url = new URL(value);
+    const publicObjectPath = "/storage/v1/object/public/";
+
+    if (!url.pathname.startsWith(publicObjectPath)) return value;
+
+    url.pathname = url.pathname.replace(
+      publicObjectPath,
+      "/storage/v1/render/image/public/"
+    );
+    url.searchParams.set("width", String(options.width));
+    url.searchParams.set("height", String(options.height));
+    url.searchParams.set("resize", "cover");
+    url.searchParams.set("quality", String(options.quality));
+
+    return url.toString();
+  } catch {
+    return value;
   }
 };
 
@@ -327,29 +354,45 @@ const RoomCover: React.FC<{
   description,
   compact,
 }) => {
+  const imageRef = useRef<HTMLImageElement | null>(null);
   const [failedCoverUrl, setFailedCoverUrl] = useState<string | null>(null);
+  const [coverLoaded, setCoverLoaded] = useState(false);
+  const imageUrl = compact
+    ? getRoomCoverImageVariantUrl(coverImageUrl, {
+        width: 420,
+        height: 560,
+        quality: 70,
+      })
+    : coverImageUrl;
   const showCoverImage = Boolean(
-    coverImageUrl && failedCoverUrl !== coverImageUrl
+    imageUrl && failedCoverUrl !== imageUrl
   );
+  const showCoverLoader = showCoverImage && !coverLoaded;
 
   useEffect(() => {
     setFailedCoverUrl(null);
-  }, [coverImageUrl]);
+    setCoverLoaded(Boolean(imageRef.current?.complete));
+  }, [imageUrl]);
 
   if (!compact) {
     return (
       <div className="relative isolate h-full min-h-[28rem] overflow-hidden rounded-l-lg">
+        <div className={cn("absolute inset-0 bg-gradient-to-br", gradient)} />
         {showCoverImage ? (
           <img
-            src={coverImageUrl}
+            src={imageUrl}
+            ref={imageRef}
             alt={`${room.title} 灏侀潰`}
-            className="absolute inset-0 h-full w-full object-cover"
+            className={cn(
+              "absolute inset-0 h-full w-full object-cover transition-opacity duration-200",
+              coverLoaded ? "opacity-100" : "opacity-0"
+            )}
             loading="lazy"
-            onError={() => setFailedCoverUrl(coverImageUrl || null)}
+            onLoad={() => setCoverLoaded(true)}
+            onError={() => setFailedCoverUrl(imageUrl || null)}
           />
-        ) : (
-          <div className={cn("absolute inset-0 bg-gradient-to-br", gradient)} />
-        )}
+        ) : null}
+        {showCoverLoader ? <CoverPreloadAnimation /> : null}
       </div>
     );
   }
@@ -361,17 +404,22 @@ const RoomCover: React.FC<{
         compact && "mb-0"
       )}
     >
+      <div className={cn("absolute inset-0 bg-gradient-to-br", gradient)} />
       {showCoverImage ? (
         <img
-          src={coverImageUrl}
+          src={imageUrl}
+          ref={imageRef}
           alt={`${room.title} 封面`}
-          className="absolute inset-0 h-full w-full object-cover"
-          loading="lazy"
-          onError={() => setFailedCoverUrl(coverImageUrl || null)}
+          className={cn(
+            "absolute inset-0 h-full w-full object-cover transition-opacity duration-200",
+            coverLoaded ? "opacity-100" : "opacity-0"
+          )}
+          loading={compact ? "eager" : "lazy"}
+          onLoad={() => setCoverLoaded(true)}
+          onError={() => setFailedCoverUrl(imageUrl || null)}
         />
-      ) : (
-        <div className={cn("absolute inset-0 bg-gradient-to-br", gradient)} />
-      )}
+      ) : null}
+      {showCoverLoader ? <CoverPreloadAnimation /> : null}
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_28%_22%,rgba(255,255,255,0.18),transparent_24%),linear-gradient(180deg,rgba(15,20,32,0.04)_0%,rgba(15,20,32,0.18)_48%,rgba(15,20,32,0.46)_100%)]" />
       <div className="absolute left-2 top-2 inline-flex items-center gap-1 rounded-full border border-white/10 bg-black/35 px-2 py-0.5 text-[11px] font-semibold text-white backdrop-blur-sm">
         #{room.room_number || "???"}
@@ -394,6 +442,13 @@ const RoomCover: React.FC<{
     </div>
   );
 };
+
+const CoverPreloadAnimation: React.FC = () => (
+  <div className="pointer-events-none absolute inset-0 overflow-hidden">
+    <div className="absolute inset-0 animate-pulse bg-white/5" />
+    <div className="absolute left-1/2 top-1/2 h-8 w-8 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white/25 border-t-white/80 animate-spin" />
+  </div>
+);
 
 const RoomMetric: React.FC<{
   icon: React.ElementType;
