@@ -1,9 +1,14 @@
 import { supabase } from "../supabase";
+import type { Character, Log, ModuleInfo } from "../types";
 
 export interface AIMessage {
   role: "system" | "user" | "assistant";
   content: string;
 }
+
+const MAX_RECENT_LOGS = 20;
+const MAX_LOG_CONTEXT_CHARS = 6000;
+const MAX_LOG_CONTENT_CHARS = 600;
 
 export async function callDeepSeekAI(messages: AIMessage[]) {
   try {
@@ -28,7 +33,69 @@ export async function callDeepSeekAI(messages: AIMessage[]) {
   }
 }
 
-export function buildContext(moduleInfo: any, logs: any[], characters: any[]) {
+function clipText(value: unknown, maxLength: number) {
+  const text = String(value || "").trim();
+  if (text.length <= maxLength) return text;
+  return `${text.slice(0, maxLength)}...`;
+}
+
+function formatCharacterForAI(character: Character) {
+  return [
+    `${character.name} (${character.role}, ${character.type})`,
+    `HP ${character.hp}`,
+    `SAN ${character.san}`,
+    `MP ${character.mp}`,
+  ].join(" / ");
+}
+
+function formatLogForAI(log: Log) {
+  const labels = [
+    log.recipientId ? "私聊" : "公开",
+    log.type === "dice_secret" ? "暗骰" : null,
+    log.type === "dice" ? "投骰" : null,
+    log.type === "system" ? "系统" : null,
+    log.type === "status" ? "状态" : null,
+  ].filter(Boolean);
+
+  if (log.type === "image") {
+    return `[${labels.join("/") || "公开"}] ${log.charName}: [图片]`;
+  }
+
+  let content = log.content;
+  if (log.type === "dice" || log.type === "dice_secret") {
+    try {
+      const dice = JSON.parse(log.content);
+      content = `[投骰] ${dice.count}D${dice.type}: ${dice.total}`;
+    } catch {
+      content = log.content;
+    }
+  }
+
+  return `[${labels.join("/") || "公开"}] ${log.charName}: ${clipText(
+    content,
+    MAX_LOG_CONTENT_CHARS
+  )}`;
+}
+
+function takeRecentLogLines(logs: Log[]) {
+  const lines: string[] = [];
+  let totalLength = 0;
+
+  for (const log of logs.slice(-MAX_RECENT_LOGS).reverse()) {
+    const line = formatLogForAI(log);
+    if (totalLength + line.length > MAX_LOG_CONTEXT_CHARS) continue;
+    lines.push(line);
+    totalLength += line.length + 1;
+  }
+
+  return lines.reverse();
+}
+
+export function buildContext(
+  moduleInfo: ModuleInfo,
+  logs: Log[],
+  characters: Character[]
+) {
   const systemPrompt = `你是一个专业的TRPG（克苏鲁的呼唤 CoC）跑团辅助AI。
 你的任务是根据当前的模组信息、角色信息和聊天记录，协助守秘人（KP）生成剧情描述、NPC对话或环境描写。
 请保持神秘、恐怖或悬疑的氛围，符合CoC的风格。
@@ -44,27 +111,14 @@ export function buildContext(moduleInfo: any, logs: any[], characters: any[]) {
 
   const activeChars = characters
     .filter((c) => c.isOnline)
-    .map((c) => `${c.name} (${c.role})`)
-    .join(", ");
+    .map(formatCharacterForAI)
+    .join("\n");
   const charContext = `
 [当前在线角色]
 ${activeChars || "无"}
 `;
 
-  // Get last 20 logs
-  const recentLogs = logs
-    .slice(-20)
-    .map((l) => {
-      let content = l.content;
-      if (l.type === "dice") {
-        try {
-          const d = JSON.parse(l.content);
-          content = `[投骰] ${d.count}D${d.type}: ${d.total}`;
-        } catch (e) {}
-      }
-      return `${l.charName}: ${content}`;
-    })
-    .join("\n");
+  const recentLogs = takeRecentLogLines(logs).join("\n");
 
   const logContext = `
 [最近聊天记录]
