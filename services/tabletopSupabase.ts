@@ -52,6 +52,31 @@ export function getTabletopInputChannelName(roomId: string) {
   return `tabletop-input:${roomId}`;
 }
 
+export function mapTabletopTokenRow(row: unknown): TabletopToken | null {
+  const token = row as Partial<TabletopToken> & Record<string, any> | null;
+  if (!token) return null;
+  if (token.characterId) return token as TabletopToken;
+  if (!token.id || !token.room_id || !token.scene_id || !token.character_id) {
+    return null;
+  }
+
+  return {
+    id: String(token.id),
+    roomId: String(token.room_id),
+    sceneId: String(token.scene_id),
+    characterId: String(token.character_id),
+    x: Number(token.x || 0),
+    y: Number(token.y || 0),
+    size: Number(token.size || 42),
+    rotation: Number(token.rotation || 0),
+    zIndex: Number(token.z_index || 1),
+    isHidden: Boolean(token.is_hidden),
+    isLocked: Boolean(token.is_locked),
+    label: token.label || null,
+    updatedAt: token.updated_at,
+  };
+}
+
 export function getTabletopRealtimeConnection(input: {
   status: string;
   error?: Error;

@@ -16,6 +16,7 @@ import type {
 import {
   applyRevealedRect,
   canMoveTabletopToken,
+  clampTabletopCoordinate,
   createEmptyTabletopState,
   createInitialTabletopScene,
   createTabletopShape,
@@ -48,6 +49,7 @@ import {
   fetchTabletopBootstrap,
   getTabletopRealtimeConnection,
   isMissingTabletopBatchPersistError,
+  mapTabletopTokenRow,
   moveTabletopToken,
   persistTabletopUpdateBatch,
   persistTabletopUpdate,
@@ -527,8 +529,7 @@ export function useTabletopRoom({
             );
             return;
           }
-          const row = payload.new as any;
-          const token = mapTabletopTokenRow(row);
+          const token = mapTabletopTokenRow(payload.new);
           if (!token) return;
           setTabletopDocState(
             doc,
@@ -713,10 +714,10 @@ export function useTabletopRoom({
       await applyState((current) =>
         upsertTabletopShapeLocally(current, {
           ...shape,
-          x: clampShapeNumber(shape.x),
-          y: clampShapeNumber(shape.y),
-          width: clampShapeNumber(shape.width, 1),
-          height: clampShapeNumber(shape.height, 1),
+          x: clampTabletopCoordinate(shape.x),
+          y: clampTabletopCoordinate(shape.y),
+          width: clampTabletopCoordinate(shape.width, 1),
+          height: clampTabletopCoordinate(shape.height, 1),
           updatedAt: new Date().toISOString(),
         })
       );
@@ -878,31 +879,5 @@ export function useTabletopRoom({
     revealRect: (rect) => applyFogRect(rect, true),
     hideRect: (rect) => applyFogRect(rect, false),
     refresh: loadBootstrap,
-  };
-}
-
-function clampShapeNumber(value: number, min = -100000) {
-  if (!Number.isFinite(value)) return min;
-  return Math.min(100000, Math.max(min, Math.round(value)));
-}
-
-function mapTabletopTokenRow(row: any): TabletopToken | null {
-  if (!row) return null;
-  if (row.characterId) return row as TabletopToken;
-  if (!row.id || !row.room_id || !row.scene_id || !row.character_id) return null;
-  return {
-    id: row.id,
-    roomId: row.room_id,
-    sceneId: row.scene_id,
-    characterId: row.character_id,
-    x: Number(row.x || 0),
-    y: Number(row.y || 0),
-    size: Number(row.size || 42),
-    rotation: Number(row.rotation || 0),
-    zIndex: Number(row.z_index || 1),
-    isHidden: Boolean(row.is_hidden),
-    isLocked: Boolean(row.is_locked),
-    label: row.label || null,
-    updatedAt: row.updated_at,
   };
 }
