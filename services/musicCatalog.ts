@@ -4,8 +4,26 @@ export type MusicInputType = "song" | "playlist";
 interface MusicFetchEndpoint<T> {
   name: string;
   url: string;
+  headers?: Record<string, string>;
   parse: (data: any) => T;
 }
+
+const getMusicProxyEndpoint = (params: Record<string, string>) => {
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL?.trim();
+  if (!supabaseUrl) return null;
+
+  const query = new URLSearchParams(params).toString();
+  const headers: Record<string, string> = {};
+  const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY?.trim();
+  if (anonKey) {
+    headers.apikey = anonKey;
+  }
+
+  return {
+    url: `${supabaseUrl.replace(/\/+$/, "")}/functions/v1/music-proxy?${query}`,
+    headers,
+  };
+};
 
 const proxied = (target: string) => [
   `https://corsproxy.io/?${encodeURIComponent(target)}`,
@@ -17,7 +35,10 @@ const fetchFirst = async <T>(endpoints: MusicFetchEndpoint<T>[]) => {
 
   for (const endpoint of endpoints) {
     try {
-      const response = await fetch(endpoint.url);
+      const response = await fetch(
+        endpoint.url,
+        endpoint.headers ? { headers: endpoint.headers } : undefined
+      );
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       return endpoint.parse(await response.json());
     } catch (error) {
@@ -90,46 +111,94 @@ export const formatMusicSource = (
 export async function fetchSongDetails(songIds: string[]) {
   if (songIds.length === 0) return [];
 
-  const ids = `[${songIds.join(",")}]`;
+  const joinedIds = songIds.join(",");
+  const ids = `[${joinedIds}]`;
+  const proxy = getMusicProxyEndpoint({
+    action: "song-detail",
+    ids: joinedIds,
+  });
   const urls = proxied(`https://music.163.com/api/song/detail?ids=${ids}`);
-  return fetchFirst(
-    urls.map((url, index) => ({
+  const endpoints: MusicFetchEndpoint<any[]>[] = [
+    ...(proxy
+      ? [
+          {
+            name: "supabase-music-proxy-song-detail",
+            url: proxy.url,
+            headers: proxy.headers,
+            parse: (data: any) => data.songs || [],
+          },
+        ]
+      : []),
+    ...urls.map((url, index) => ({
       name: index === 0 ? "corsproxy-song-detail" : "codetabs-song-detail",
       url,
-      parse: (data) => data.songs || [],
-    }))
-  );
+      parse: (data: any) => data.songs || [],
+    })),
+  ];
+  return fetchFirst(endpoints);
 }
 
 export async function fetchPlaylistDetails(playlistId: string) {
+  const proxy = getMusicProxyEndpoint({
+    action: "playlist-detail",
+    id: playlistId,
+  });
   const urls = proxied(
     `https://music.163.com/api/v6/playlist/detail?id=${playlistId}&n=1000&s=8`
   );
-  return fetchFirst(
-    urls.map((url, index) => ({
+  const parsePlaylist = (data: any) => ({
+    tracks: data.playlist?.tracks || [],
+    trackIds: data.playlist?.trackIds || [],
+  });
+  const endpoints: MusicFetchEndpoint<{ tracks: any[]; trackIds: any[] }>[] = [
+    ...(proxy
+      ? [
+          {
+            name: "supabase-music-proxy-playlist",
+            url: proxy.url,
+            headers: proxy.headers,
+            parse: parsePlaylist,
+          },
+        ]
+      : []),
+    ...urls.map((url, index) => ({
       name: index === 0 ? "corsproxy-playlist" : "codetabs-playlist",
       url,
-      parse: (data) => ({
-        tracks: data.playlist?.tracks || [],
-        trackIds: data.playlist?.trackIds || [],
-      }),
-    }))
-  );
+      parse: parsePlaylist,
+    })),
+  ];
+  return fetchFirst(endpoints);
 }
 
 export async function fetchPlayableSongUrl(songId: string) {
+  const proxy = getMusicProxyEndpoint({
+    action: "player-url",
+    id: songId,
+  });
   const urls = proxied(
     `https://music.163.com/api/song/enhance/player/url?ids=[${songId}]&br=320000`
   );
+  const parseUrl = (data: any) => data.data?.[0]?.url || "";
 
   try {
-    const url = await fetchFirst(
-      urls.map((endpointUrl, index) => ({
+    const endpoints: MusicFetchEndpoint<string>[] = [
+      ...(proxy
+        ? [
+            {
+              name: "supabase-music-proxy-player-url",
+              url: proxy.url,
+              headers: proxy.headers,
+              parse: parseUrl,
+            },
+          ]
+        : []),
+      ...urls.map((endpointUrl, index) => ({
         name: index === 0 ? "corsproxy-player-url" : "codetabs-player-url",
         url: endpointUrl,
-        parse: (data) => data.data?.[0]?.url || "",
-      }))
-    );
+        parse: parseUrl,
+      })),
+    ];
+    const url = await fetchFirst(endpoints);
 
     if (url) return url.replace(/^http:/, "https:");
   } catch (error) {

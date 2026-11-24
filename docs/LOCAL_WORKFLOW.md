@@ -1,6 +1,6 @@
 # RunTable local workflow
 
-This repo is wired for a local edit -> build check -> push to GitHub main -> Vercel deployment flow.
+This repo is wired for a local edit -> typecheck/test/build -> push to GitHub `main` -> GitHub Actions auto-deploy to `Line_00` (`https://trpgtool.monocanto.com`) + Supabase Edge Functions (`ask-ai`, `livekit-token`).
 
 ## First-time setup
 
@@ -10,7 +10,7 @@ This repo is wired for a local edit -> build check -> push to GitHub main -> Ver
 
 Fill in `.env` after the script creates it. Keep real secrets out of Git.
 
-Required local and Vercel variables:
+Required local variables (frontend build secrets are configured in GitHub Actions):
 
 ```env
 VITE_SUPABASE_URL=https://ejuwvqjaserearyvohxw.supabase.co
@@ -18,15 +18,19 @@ VITE_SUPABASE_ANON_KEY=...
 VITE_LIVEKIT_URL=...
 LIVEKIT_API_KEY=...
 LIVEKIT_API_SECRET=...
-APP_ORIGIN=http://localhost:5173
+APP_ORIGIN=https://trpgtool.monocanto.com
+DEEPSEEK_API_KEY=...
 ```
 
-Use the Supabase publishable key for `VITE_SUPABASE_ANON_KEY`; do not put a secret/service role key in any `VITE_` variable. In Vercel, set `APP_ORIGIN` to the production URL, for example `https://your-domain.com`. You can use a comma-separated list when you need both preview and production origins.
+Use the Supabase publishable key for `VITE_SUPABASE_ANON_KEY`; do not put a secret/service role key in any `VITE_` variable. Voice room tokens are minted by the Supabase Edge Function `livekit-token` (override with `VITE_VOICE_TOKEN_ENDPOINT=/api/token` only if testing the local Vite middleware).
 
-Required Supabase Edge Function secret:
+Required Supabase Edge Function secrets:
 
 ```env
 DEEPSEEK_API_KEY=...
+LIVEKIT_API_KEY=...
+LIVEKIT_API_SECRET=...
+APP_ORIGIN=https://trpgtool.monocanto.com
 ```
 
 ## Daily development

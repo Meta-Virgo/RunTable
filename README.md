@@ -74,8 +74,8 @@ Follow these instructions to get a copy of the project running on your local mac
    VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
    ```
 
-4. **Database Setup**
-   Run the SQL commands provided in `db_schema.sql` in your Supabase SQL Editor to set up the necessary tables (Profiles, Rooms, Characters, Messages) and security policies.
+4. **Database & Edge Functions Setup**
+   Run `.\scripts\deploy_supabase.ps1` (or `supabase db push` + `supabase functions deploy`) to apply all migrations under `supabase/migrations/` and deploy the Edge Functions (`ask-ai`, `livekit-token`, `music-proxy`).
 
 5. **Run the Application**
    ```bash
@@ -178,8 +178,8 @@ This project is intended for educational and personal use.
    VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
    ```
 
-4. **数据库设置**
-   在 Supabase SQL 编辑器中运行 `db_schema.sql` 中的 SQL 命令，以创建必要的表结构（Profiles, Rooms, Characters, Messages）和安全策略。
+4. **数据库与 Edge Functions 设置**
+   运行 `.\scripts\deploy_supabase.ps1`（或 `supabase db push` 与 `supabase functions deploy`），应用 `supabase/migrations/` 中的全部迁移并部署 Edge Functions（`ask-ai`、`livekit-token`、`music-proxy`）。
 
 5. **运行应用**
    ```bash

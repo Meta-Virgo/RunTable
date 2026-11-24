@@ -33,6 +33,56 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
 
   return {
+    build: {
+      rollupOptions: {
+        output: {
+          manualChunks(id) {
+            if (!id.includes("node_modules")) return;
+            if (
+              id.includes("livekit-client") ||
+              id.includes("@livekit/")
+            ) {
+              return "vendor-livekit";
+            }
+            if (
+              id.includes("konva") ||
+              id.includes("react-konva") ||
+              id.includes("yjs") ||
+              id.includes("y-indexeddb") ||
+              id.includes("lib0")
+            ) {
+              return "vendor-tabletop";
+            }
+            if (id.includes("@supabase/")) {
+              return "vendor-supabase";
+            }
+            if (
+              id.includes("react-markdown") ||
+              id.includes("remark-") ||
+              id.includes("rehype-") ||
+              id.includes("micromark") ||
+              id.includes("mdast-") ||
+              id.includes("hast-") ||
+              id.includes("unified")
+            ) {
+              return "vendor-markdown";
+            }
+            if (id.includes("lucide-react")) {
+              return "vendor-icons";
+            }
+            if (
+              id.includes("/react/") ||
+              id.includes("\\react\\") ||
+              id.includes("/react-dom/") ||
+              id.includes("\\react-dom\\") ||
+              id.includes("scheduler")
+            ) {
+              return "vendor-react";
+            }
+          },
+        },
+      },
+    },
     plugins: [
       react(),
       {

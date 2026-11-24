@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   getVoiceParticipantName,
+  getVoiceTokenEndpoint,
   requestVoiceToken,
 } from "./livekit";
 import type { Character } from "../types";
@@ -15,6 +16,7 @@ const tokenRequest = {
 describe("livekit service", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
   });
 
   it("uses keeper or character names for voice participants", () => {
@@ -27,7 +29,20 @@ describe("livekit service", () => {
     expect(getVoiceParticipantName("missing", "", characters)).toBe("未知用户");
   });
 
+  it("resolves the Supabase Edge Function endpoint when VITE_SUPABASE_URL is set", () => {
+    vi.stubEnv("VITE_SUPABASE_URL", "https://example.supabase.co/");
+    vi.stubEnv("VITE_VOICE_TOKEN_ENDPOINT", "");
+
+    expect(getVoiceTokenEndpoint()).toBe(
+      "https://example.supabase.co/functions/v1/livekit-token"
+    );
+  });
+
   it("returns a token from the voice token endpoint", async () => {
+    vi.stubEnv("VITE_SUPABASE_URL", "https://example.supabase.co");
+    vi.stubEnv("VITE_SUPABASE_ANON_KEY", "anon-key");
+    vi.stubEnv("VITE_VOICE_TOKEN_ENDPOINT", "");
+
     const fetchMock = vi.fn(async () =>
       new Response(JSON.stringify({ token: "voice-token" }), { status: 200 })
     );
@@ -35,11 +50,12 @@ describe("livekit service", () => {
 
     await expect(requestVoiceToken(tokenRequest)).resolves.toBe("voice-token");
     expect(fetchMock).toHaveBeenCalledWith(
-      "/api/token",
+      "https://example.supabase.co/functions/v1/livekit-token",
       expect.objectContaining({
         method: "POST",
         headers: expect.objectContaining({
           Authorization: "Bearer access-token",
+          apikey: "anon-key",
         }),
       })
     );

@@ -2,3 +2,9 @@ project_id = "runtable"
 
 [functions.ask-ai]
 verify_jwt = false
+
+[functions.livekit-token]
+verify_jwt = false
+
+[functions.music-proxy]
+verify_jwt = false

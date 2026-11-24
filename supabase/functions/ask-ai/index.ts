@@ -1,16 +1,57 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
+const DEFAULT_ALLOWED_ORIGINS = [
+  "https://trpgtool.monocanto.com",
+  "https://trpgtool.maoyiwei.com",
+  "http://localhost:5173",
+  "http://127.0.0.1:5173",
+  "http://localhost:5174",
+  "http://127.0.0.1:5174",
+];
+
+const getAllowedOrigins = () => {
+  const configured = (Deno.env.get("APP_ORIGIN") ?? "")
+    .split(",")
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+
+  return new Set([...DEFAULT_ALLOWED_ORIGINS, ...configured]);
+};
+
+const buildCorsHeaders = (origin: string | null) => {
+  const headers: Record<string, string> = {
+    "Access-Control-Allow-Methods": "OPTIONS,POST",
+    "Access-Control-Allow-Headers":
+      "authorization, x-client-info, apikey, content-type",
+    Vary: "Origin",
+  };
+
+  if (origin && getAllowedOrigins().has(origin)) {
+    headers["Access-Control-Allow-Origin"] = origin;
+  }
+
+  return headers;
 };
 
 serve(async (req: any) => {
+  const origin = req.headers.get("origin");
+  const corsHeaders = buildCorsHeaders(origin);
+  const allowedOrigin = !origin || getAllowedOrigins().has(origin);
+
   // Handle CORS preflight requests
   if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
+    return new Response("ok", {
+      status: allowedOrigin ? 200 : 403,
+      headers: corsHeaders,
+    });
+  }
+
+  if (!allowedOrigin) {
+    return new Response(JSON.stringify({ error: "Origin not allowed" }), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      status: 403,
+    });
   }
 
   try {
@@ -59,6 +100,8 @@ serve(async (req: any) => {
       throw new Error("Missing DeepSeek API Key");
     }
 
+    const model = Deno.env.get("DEEPSEEK_MODEL")?.trim() || "deepseek-v4-flash";
+
     const response = await fetch("https://api.deepseek.com/chat/completions", {
       method: "POST",
       headers: {
@@ -66,7 +109,7 @@ serve(async (req: any) => {
         Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: "deepseek-v4-flash",
+        model,
         messages: messages,
         temperature: 0.7,
         max_tokens: 2000,

@@ -45,16 +45,23 @@ if (!$SkipLogin) {
 Write-Host "Linking Supabase project $ProjectRef..."
 Invoke-Supabase link --project-ref $ProjectRef
 
-$deepseekKey = $env:DEEPSEEK_API_KEY
-if (!$deepseekKey) {
-    $deepseekKey = Read-DotEnvValue "DEEPSEEK_API_KEY"
+$secretsToSet = @()
+
+foreach ($secretName in @("DEEPSEEK_API_KEY", "DEEPSEEK_MODEL", "LIVEKIT_API_KEY", "LIVEKIT_API_SECRET", "APP_ORIGIN")) {
+    $value = [Environment]::GetEnvironmentVariable($secretName)
+    if (!$value) {
+        $value = Read-DotEnvValue $secretName
+    }
+    if ($value -and $value -notmatch "^replace_with_") {
+        $secretsToSet += "$secretName=$value"
+    }
 }
 
-if ($deepseekKey -and $deepseekKey -notmatch "^replace_with_") {
-    Write-Host "Setting DEEPSEEK_API_KEY as a Supabase Edge Function secret..."
-    Invoke-Supabase secrets set "DEEPSEEK_API_KEY=$deepseekKey"
+if ($secretsToSet.Count -gt 0) {
+    Write-Host "Setting Supabase Edge Function secrets..."
+    Invoke-Supabase secrets set @secretsToSet
 } else {
-    Write-Host "Skipping DEEPSEEK_API_KEY secret. Set `$env:DEEPSEEK_API_KEY or add it to .env, then rerun this script."
+    Write-Host "Skipping Edge Function secrets. Set DEEPSEEK_API_KEY / LIVEKIT_API_KEY / LIVEKIT_API_SECRET in env or .env, then rerun."
 }
 
 if (!$SkipDbPush) {
@@ -65,6 +72,12 @@ if (!$SkipDbPush) {
 if (!$SkipFunctionDeploy) {
     Write-Host "Deploying ask-ai Edge Function..."
     Invoke-Supabase functions deploy ask-ai --no-verify-jwt
+
+    Write-Host "Deploying livekit-token Edge Function..."
+    Invoke-Supabase functions deploy livekit-token --no-verify-jwt
+
+    Write-Host "Deploying music-proxy Edge Function..."
+    Invoke-Supabase functions deploy music-proxy --no-verify-jwt
 }
 
 Write-Host "Supabase deployment flow complete."

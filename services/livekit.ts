@@ -63,18 +63,40 @@ export async function ensureMicrophonePermission() {
   }
 }
 
+export function getVoiceTokenEndpoint() {
+  const customEndpoint = import.meta.env.VITE_VOICE_TOKEN_ENDPOINT?.trim();
+  if (customEndpoint) {
+    return customEndpoint;
+  }
+
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL?.trim();
+  if (supabaseUrl) {
+    return `${supabaseUrl.replace(/\/+$/, "")}/functions/v1/livekit-token`;
+  }
+
+  return "/api/token";
+}
+
 export async function requestVoiceToken({
   accessToken,
   roomId,
   activeCharId,
   participantName,
 }: VoiceTokenRequest) {
-  const response = await fetch("/api/token", {
+  const endpoint = getVoiceTokenEndpoint();
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    Authorization: `Bearer ${accessToken}`,
+  };
+
+  const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY?.trim();
+  if (supabaseAnonKey && endpoint.includes("/functions/v1/")) {
+    headers.apikey = supabaseAnonKey;
+  }
+
+  const response = await fetch(endpoint, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${accessToken}`,
-    },
+    headers,
     body: JSON.stringify({
       roomName: roomId,
       participantName,

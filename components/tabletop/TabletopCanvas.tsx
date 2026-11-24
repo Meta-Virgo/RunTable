@@ -28,6 +28,9 @@ import {
   type TabletopStageState,
 } from "./tabletopCanvasModel";
 
+const useIsomorphicLayoutEffect =
+  typeof window !== "undefined" ? React.useLayoutEffect : React.useEffect;
+
 const MIN_SHAPE_SIZE = 16;
 const MAJOR_GRID_INTERVAL = 5;
 const TOKEN_NODE_NAME = "tabletop-token";
@@ -220,7 +223,7 @@ export const TabletopCanvas: React.FC<TabletopCanvasProps> = ({
     return () => observer.disconnect();
   }, [scene?.id]);
 
-  React.useLayoutEffect(() => {
+  useIsomorphicLayoutEffect(() => {
     if (!scene || !size.width || !size.height) return;
     if (initializedViewportKeyRef.current === viewportStorageKey) return;
 
