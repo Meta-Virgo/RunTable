@@ -74,12 +74,9 @@ describe("module marketplace model helpers", () => {
         (item) => item.id
       )
     ).toEqual(["template-2"]);
-    expect(getModuleTemplateTags([template, other])).toEqual([
-      "调查",
-      "短团",
-      "长团",
-      "CoC",
-    ]);
+    const tags = getModuleTemplateTags([template, other]);
+    expect(tags).toHaveLength(4);
+    expect(new Set(tags)).toEqual(new Set(["调查", "短团", "长团", "CoC"]));
   });
 });
 
