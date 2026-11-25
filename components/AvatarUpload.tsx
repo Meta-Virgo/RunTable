@@ -21,6 +21,11 @@ export const AvatarUpload: React.FC<AvatarUploadProps> = ({
 }) => {
   const [uploading, setUploading] = useState(false);
   const [imageSrc, setImageSrc] = useState<string | null>(null);
+  const [imgFailed, setImgFailed] = useState(false);
+
+  React.useEffect(() => {
+    setImgFailed(false);
+  }, [url]);
 
   const releaseImageSrc = React.useCallback((src: string | null) => {
     if (src?.startsWith("blob:")) {
@@ -91,8 +96,13 @@ export const AvatarUpload: React.FC<AvatarUploadProps> = ({
             editable && "transition-colors hover:border-dicecho-primary/70"
           )}
         >
-          {url ? (
-            <img src={url} alt="Avatar" className="h-full w-full object-cover" />
+          {url && !imgFailed ? (
+            <img
+              src={url}
+              alt="Avatar"
+              className="h-full w-full object-cover"
+              onError={() => setImgFailed(true)}
+            />
           ) : (
             <User size={size * 0.5} className="text-dicecho-muted" />
           )}
