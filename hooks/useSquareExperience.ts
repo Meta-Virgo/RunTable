@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ClipboardEvent, DragEvent, MouseEvent } from "react";
 import type { Character, CreateSquarePostModuleInput } from "../types";
 import { fetchUserInvestigators } from "../services/characters";
@@ -22,14 +22,30 @@ type DeleteTarget =
 
 const idleDeleteTarget: DeleteTarget = { open: false, type: null };
 
+const CATEGORY_ORDER: Record<string, number> = {
+  常规: 0,
+  资源: 1,
+  官方: 2,
+};
+
 interface UseSquareExperienceOptions {
   onLoginRequest?: () => void;
+  isActive?: boolean;
 }
 
 export function useSquareExperience({
   onLoginRequest,
+  isActive = true,
 }: UseSquareExperienceOptions = {}) {
   const feed = useSquareFeed();
+  const wasActiveRef = useRef(isActive);
+
+  useEffect(() => {
+    if (isActive && !wasActiveRef.current) {
+      feed.selectDefaultChannel?.();
+    }
+    wasActiveRef.current = isActive;
+  }, [feed.selectDefaultChannel, isActive]);
   const [searchQuery, setSearchQuery] = useState("");
   const [newPostContent, setNewPostContent] = useState("");
   const [posting, setPosting] = useState(false);
@@ -61,9 +77,25 @@ export function useSquareExperience({
     () => feed.channels.find((channel) => channel.id === feed.activeChannelId),
     [feed.activeChannelId, feed.channels]
   );
-  const categories = useMemo(
-    () => Array.from(new Set(feed.channels.map((channel) => channel.category))),
+  const sortedChannels = useMemo(
+    () =>
+      [...feed.channels].sort((a, b) => {
+        if (a.name === "闲聊大厅" && b.name !== "闲聊大厅") return -1;
+        if (b.name === "闲聊大厅" && a.name !== "闲聊大厅") return 1;
+        return 0;
+      }),
     [feed.channels]
+  );
+  const categories = useMemo(
+    () =>
+      Array.from(new Set(sortedChannels.map((channel) => channel.category))).sort(
+        (left, right) => {
+          const leftOrder = CATEGORY_ORDER[left] ?? 99;
+          const rightOrder = CATEGORY_ORDER[right] ?? 99;
+          return leftOrder - rightOrder;
+        }
+      ),
+    [sortedChannels]
   );
   const selectedPost = useMemo(
     () =>
@@ -299,7 +331,7 @@ export function useSquareExperience({
       activeChannelId: feed.activeChannelId,
       activeChannel,
       categories,
-      channels: feed.channels,
+      channels: sortedChannels,
       posts: feed.posts,
       loadingChannels: feed.loadingChannels,
       loadingPosts: feed.loadingPosts,

@@ -510,7 +510,10 @@ export const Home: React.FC<HomeProps> = ({
                   </div>
                 }
               >
-                <Square onLoginRequest={requestLogin} />
+                <Square
+                  onLoginRequest={requestLogin}
+                  isActive={activeTab === "square"}
+                />
               </Suspense>
             </div>
           </div>

@@ -24,6 +24,14 @@ import { createSquareFeedExecutor } from "../services/squareFeedModel";
 
 const DEFAULT_CHANNEL_NAME = "闲聊大厅";
 
+function pickDefaultChannel(channels: Channel[]) {
+  return (
+    channels.find((channel) => channel.name === DEFAULT_CHANNEL_NAME) ||
+    channels[0] ||
+    null
+  );
+}
+
 export function useSquareFeed() {
   const [activeChannelId, setActiveChannelId] = useState<string | null>(null);
   const [channels, setChannels] = useState<Channel[]>([]);
@@ -77,9 +85,7 @@ export function useSquareFeed() {
 
     const applyDefaultChannel = (nextChannels: Channel[]) => {
       if (feedContextRef.current.activeChannelId) return;
-      const defaultChannel =
-        nextChannels.find((channel) => channel.name === DEFAULT_CHANNEL_NAME) ||
-        nextChannels[0];
+      const defaultChannel = pickDefaultChannel(nextChannels);
       if (defaultChannel) setActiveChannelId(defaultChannel.id);
     };
 
@@ -116,22 +122,30 @@ export function useSquareFeed() {
       const bootstrap = data as any;
       const bootstrapChannels = (bootstrap?.channels || []) as Channel[];
       const bootstrapPosts = (bootstrap?.posts || []) as Post[];
-      const nextActiveChannelId = bootstrap?.active_channel_id || null;
+      const defaultChannel = pickDefaultChannel(bootstrapChannels);
+      const nextActiveChannelId =
+        channelId ||
+        defaultChannel?.id ||
+        bootstrap?.active_channel_id ||
+        null;
+      const bootstrapMatchedChannel =
+        Boolean(nextActiveChannelId) &&
+        bootstrap?.active_channel_id === nextActiveChannelId;
       const nextCurrentUser = bootstrap?.current_user || null;
 
       feedContextRef.current = {
         activeChannelId: nextActiveChannelId,
         currentUser: nextCurrentUser,
-        posts: bootstrapPosts,
+        posts: bootstrapMatchedChannel ? bootstrapPosts : [],
       };
 
       setCurrentUser(nextCurrentUser);
       setChannels(bootstrapChannels);
-      skipNextPostRefreshRef.current = Boolean(bootstrap?.active_channel_id);
+      skipNextPostRefreshRef.current = bootstrapMatchedChannel;
       setActiveChannelId(nextActiveChannelId);
-      setPosts(bootstrapPosts);
+      setPosts(bootstrapMatchedChannel ? bootstrapPosts : []);
       setLoadingChannels(false);
-      setLoadingPosts(false);
+      setLoadingPosts(!bootstrapMatchedChannel && Boolean(nextActiveChannelId));
       return true;
     };
 
@@ -315,10 +329,17 @@ export function useSquareFeed() {
     [feedExecutor]
   );
 
+  const selectDefaultChannel = useCallback(() => {
+    const defaultChannel = pickDefaultChannel(channels);
+    if (!defaultChannel) return;
+    selectChannel(defaultChannel.id);
+  }, [channels, selectChannel]);
+
   return {
     activeChannelId,
     setActiveChannelId,
     selectChannel,
+    selectDefaultChannel,
     channels,
     posts,
     setPosts,

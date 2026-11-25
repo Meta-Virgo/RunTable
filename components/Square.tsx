@@ -22,9 +22,13 @@ import type { Profile } from "../types";
 
 interface SquareProps {
   onLoginRequest?: () => void;
+  isActive?: boolean;
 }
 
-export const Square: React.FC<SquareProps> = ({ onLoginRequest }) => {
+export const Square: React.FC<SquareProps> = ({
+  onLoginRequest,
+  isActive = true,
+}) => {
   const {
     feed,
     composer,
@@ -33,7 +37,7 @@ export const Square: React.FC<SquareProps> = ({ onLoginRequest }) => {
     mobileSidebar,
     profilePanel,
     deletion,
-  } = useSquareExperience({ onLoginRequest });
+  } = useSquareExperience({ onLoginRequest, isActive });
   const {
     activeChannelId,
     activeChannel,
