@@ -168,7 +168,7 @@ export const RoomSceneView: React.FC<RoomSceneViewProps> = ({
     tabletopMapBrushes.find((brush) => brush.id === mapBrush)?.label || "地板";
 
   return (
-    <div className="relative flex min-h-[420px] flex-1 overflow-hidden bg-[#0d1322]">
+    <div className="relative flex min-h-[420px] flex-1 overflow-hidden bg-[#242a38]">
       <div className="pointer-events-none absolute inset-x-3 top-3 z-30 flex justify-center">
         <div
           aria-label="场景操作"
@@ -484,6 +484,8 @@ export const RoomSceneView: React.FC<RoomSceneViewProps> = ({
         onToggleTokenHidden={tabletop.toggleTokenHidden}
         onRevealRect={tabletop.revealRect}
         onHideRect={tabletop.hideRect}
+        onUpdateFogRegion={tabletop.updateFogRegion}
+        onDeleteFogRegion={tabletop.deleteFogRegion}
         canCreateScene={isKP}
         onCreateScene={tabletop.createScene}
         fitRequest={fitRequest}

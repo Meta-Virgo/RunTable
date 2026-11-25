@@ -22,7 +22,13 @@ type DeleteTarget =
 
 const idleDeleteTarget: DeleteTarget = { open: false, type: null };
 
-export function useSquareExperience() {
+interface UseSquareExperienceOptions {
+  onLoginRequest?: () => void;
+}
+
+export function useSquareExperience({
+  onLoginRequest,
+}: UseSquareExperienceOptions = {}) {
   const feed = useSquareFeed();
   const [searchQuery, setSearchQuery] = useState("");
   const [newPostContent, setNewPostContent] = useState("");
@@ -132,6 +138,10 @@ export function useSquareExperience() {
   );
 
   const handlePost = useCallback(async () => {
+    if (!feed.currentUser?.id) {
+      onLoginRequest?.();
+      return;
+    }
     setPosting(true);
     try {
       const result = await feed.publishPost(
@@ -151,7 +161,14 @@ export function useSquareExperience() {
     } finally {
       setPosting(false);
     }
-  }, [feed.publishPost, newPostContent, pendingImage?.file, pendingModules]);
+  }, [
+    feed.currentUser?.id,
+    feed.publishPost,
+    newPostContent,
+    onLoginRequest,
+    pendingImage?.file,
+    pendingModules,
+  ]);
 
   const addCharacterModule = useCallback((character: Character) => {
     setPendingModules((previous) => [
@@ -193,23 +210,36 @@ export function useSquareExperience() {
   );
 
   const handleSendComment = useCallback(
-    (postId: string, content?: string, quoteId?: string) =>
-      comments.sendComment(postId, content || "", quoteId),
-    [comments]
+    (postId: string, content?: string, quoteId?: string) => {
+      if (!feed.currentUser?.id) {
+        onLoginRequest?.();
+        return Promise.resolve(false);
+      }
+      return comments.sendComment(postId, content || "", quoteId);
+    },
+    [comments, feed.currentUser?.id, onLoginRequest]
   );
 
   const handleLikePost = useCallback(
     async (postId: string) => {
+      if (!feed.currentUser?.id) {
+        onLoginRequest?.();
+        return;
+      }
       await feed.togglePostLike(postId);
     },
-    [feed]
+    [feed, onLoginRequest]
   );
 
   const handleLikeComment = useCallback(
     async (commentId: string) => {
+      if (!feed.currentUser?.id) {
+        onLoginRequest?.();
+        return;
+      }
       await comments.toggleCommentLike(commentId);
     },
-    [comments]
+    [comments, feed.currentUser?.id, onLoginRequest]
   );
 
   const handleDeletePost = useCallback(
@@ -308,8 +338,13 @@ export function useSquareExperience() {
       showNotifications,
       openNotifications: () => setShowNotifications(true),
       closeNotifications: () => setShowNotifications(false),
-      toggleNotifications: () =>
-        setShowNotifications((previous) => !previous),
+      toggleNotifications: () => {
+        if (!feed.currentUser?.id) {
+          onLoginRequest?.();
+          return;
+        }
+        setShowNotifications((previous) => !previous);
+      },
       notifications: notifications.notifications,
       unreadCount: notifications.unreadCount,
       markAsRead: notifications.markAsRead,

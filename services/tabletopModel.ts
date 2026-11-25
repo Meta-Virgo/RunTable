@@ -302,7 +302,12 @@ export function projectTabletopStateForViewer(input: {
   if (input.isKeeper) return source;
 
   const revealedByScene = new Map<string, Set<string>>();
+  const hasTileGeometryByScene = new Map<string, boolean>();
   for (const scene of source.scenes) {
+    hasTileGeometryByScene.set(
+      scene.id,
+      scene.map.tiles.some((tile) => tile.kind !== "void")
+    );
     revealedByScene.set(
       scene.id,
       new Set(
@@ -311,6 +316,14 @@ export function projectTabletopStateForViewer(input: {
           .map((tile) => `${tile.x}:${tile.y}`)
       )
     );
+  }
+
+  const hiddenFogByScene = new Map<string, TabletopState["fogRegions"]>();
+  for (const region of source.fogRegions) {
+    if (region.mode !== "hidden") continue;
+    const list = hiddenFogByScene.get(region.sceneId) || [];
+    list.push(region);
+    hiddenFogByScene.set(region.sceneId, list);
   }
 
   return normalizeTabletopState({
@@ -326,6 +339,23 @@ export function projectTabletopStateForViewer(input: {
     })),
     tokens: source.tokens.filter((token) => {
       if (token.isHidden) return false;
+      const hiddenRegions = hiddenFogByScene.get(token.sceneId) || [];
+      const insideHiddenFog = hiddenRegions.some((region) => {
+        if (region.shape !== "rect" || region.points.length < 4) return false;
+        const [rx, ry, rw, rh] = region.points;
+        return (
+          token.x >= rx &&
+          token.x <= rx + rw &&
+          token.y >= ry &&
+          token.y <= ry + rh
+        );
+      });
+      if (insideHiddenFog) return false;
+
+      if (!hasTileGeometryByScene.get(token.sceneId)) {
+        return true;
+      }
+
       const visibleTiles = revealedByScene.get(token.sceneId);
       if (!visibleTiles) return true;
       const scene = source.scenes.find((item) => item.id === token.sceneId);
@@ -336,7 +366,7 @@ export function projectTabletopStateForViewer(input: {
     }),
     shapes: source.shapes,
     fogRegions: source.fogRegions.filter(
-      (region) => region.mode === "revealed"
+      (region) => region.mode === "revealed" || region.mode === "hidden"
     ),
   });
 }
@@ -559,6 +589,95 @@ export function mergeTabletopTokensFromBootstrap(
   });
 }
 
+export function applyBlueprintFogRect(input: {
+  state: TabletopState;
+  sceneId: string;
+  rect: { x: number; y: number; width: number; height: number };
+  reveal: boolean;
+}): TabletopState {
+  const tileUpdated = applyRevealedRect(input);
+  const { x, y, width, height } = input.rect;
+
+  if (input.reveal) {
+    const remainingFog = tileUpdated.fogRegions.filter((region) => {
+      if (region.sceneId !== input.sceneId || region.mode !== "hidden") {
+        return true;
+      }
+      if (region.shape !== "rect" || region.points.length < 4) return true;
+      const [rx, ry, rw, rh] = region.points;
+      const overlaps =
+        rx < x + width &&
+        rx + rw > x &&
+        ry < y + height &&
+        ry + rh > y;
+      return !overlaps;
+    });
+    return normalizeTabletopState({
+      ...tileUpdated,
+      fogRegions: remainingFog,
+      updatedAt: new Date().toISOString(),
+    });
+  }
+
+  return normalizeTabletopState({
+    ...tileUpdated,
+    fogRegions: [
+      ...tileUpdated.fogRegions,
+      {
+        id:
+          typeof crypto !== "undefined" && "randomUUID" in crypto
+            ? crypto.randomUUID()
+            : createSeed("fog"),
+        sceneId: input.sceneId,
+        shape: "rect",
+        points: [
+          clampTabletopCoordinate(x),
+          clampTabletopCoordinate(y),
+          clampTabletopCoordinate(width, 1),
+          clampTabletopCoordinate(height, 1),
+        ],
+        mode: "hidden",
+      },
+    ],
+    updatedAt: new Date().toISOString(),
+  });
+}
+
+export function upsertTabletopFogRegionLocally(
+  state: TabletopState,
+  region: TabletopState["fogRegions"][number]
+): TabletopState {
+  return normalizeTabletopState({
+    ...state,
+    fogRegions: state.fogRegions.some((item) => item.id === region.id)
+      ? state.fogRegions.map((item) => (item.id === region.id ? region : item))
+      : [...state.fogRegions, region],
+    updatedAt: new Date().toISOString(),
+  });
+}
+
+export function removeTabletopFogRegionLocally(
+  state: TabletopState,
+  regionId: string
+): TabletopState {
+  const removed = state.fogRegions.find((item) => item.id === regionId);
+  let nextState = state;
+  if (removed && removed.shape === "rect" && removed.points.length >= 4) {
+    const [x, y, width, height] = removed.points;
+    nextState = applyRevealedRect({
+      state,
+      sceneId: removed.sceneId,
+      rect: { x, y, width, height },
+      reveal: true,
+    });
+  }
+  return normalizeTabletopState({
+    ...nextState,
+    fogRegions: nextState.fogRegions.filter((item) => item.id !== regionId),
+    updatedAt: new Date().toISOString(),
+  });
+}
+
 export function createTabletopShape(input: {
   sceneId: string;
   kind: TabletopShape["kind"];
@@ -567,9 +686,15 @@ export function createTabletopShape(input: {
   width: number;
   height: number;
   text?: string;
+  cornerRadius?: number;
+  points?: number[];
+  curvature?: number;
+  dashed?: boolean;
+  arrowEnd?: boolean;
 }): TabletopShape {
   const now = new Date().toISOString();
   const isText = input.kind === "text";
+  const isLine = input.kind === "line";
   return {
     id:
       typeof crypto !== "undefined" && "randomUUID" in crypto
@@ -581,20 +706,22 @@ export function createTabletopShape(input: {
     y: clampTabletopCoordinate(input.y),
     width: clampTabletopCoordinate(input.width || (isText ? 160 : 1), 1),
     height: clampTabletopCoordinate(input.height || (isText ? 32 : 1), 1),
-    text: isText ? input.text || "文本" : undefined,
-    fill:
-      input.kind === "text"
-        ? "#e2e8f0"
-        : input.kind === "circle"
-        ? "rgba(59,130,246,0.16)"
-        : "rgba(16,185,129,0.14)",
-    stroke:
-      input.kind === "text"
-        ? "rgba(226,232,240,0.28)"
-        : input.kind === "circle"
-          ? "#60a5fa"
-          : "#34d399",
-    strokeWidth: isText ? 1 : 2,
+    text: isText ? input.text || "区域标注" : undefined,
+    cornerRadius:
+      input.kind === "rect" ? input.cornerRadius : undefined,
+    points: isLine
+      ? input.points || [0, 0, input.width || 120, input.height || 0]
+      : undefined,
+    curvature: isLine ? input.curvature ?? 0 : undefined,
+    dashed: input.dashed,
+    arrowEnd: isLine ? input.arrowEnd ?? false : undefined,
+    fill: isText
+      ? "#e4e5eb"
+      : isLine
+        ? "transparent"
+        : "rgba(147,150,247,0.04)",
+    stroke: isText ? "rgba(147,150,247,0.35)" : "rgba(147,150,247,0.58)",
+    strokeWidth: isText ? 1 : 1.6,
     zIndex: 1,
     createdAt: now,
     updatedAt: now,
@@ -634,6 +761,43 @@ export function updateTabletopMapTileLocally(
               kind: tileUpdate.kind,
               roomId:
                 tileUpdate.kind === "wall" || tileUpdate.kind === "void"
+                  ? undefined
+                  : tile.roomId,
+            };
+          }),
+        },
+        updatedAt: new Date().toISOString(),
+      };
+    }),
+    updatedAt: new Date().toISOString(),
+  });
+}
+
+export function updateTabletopMapTilesLocally(
+  state: TabletopState,
+  sceneId: string,
+  tileUpdates: Array<Pick<TabletopMapTile, "x" | "y" | "kind">>
+) {
+  if (tileUpdates.length === 0) return state;
+  const updatesByCoord = new Map(
+    tileUpdates.map((tile) => [`${tile.x}:${tile.y}`, tile.kind])
+  );
+  return normalizeTabletopState({
+    ...state,
+    scenes: state.scenes.map((scene) => {
+      if (scene.id !== sceneId) return scene;
+      return {
+        ...scene,
+        map: {
+          ...scene.map,
+          tiles: scene.map.tiles.map((tile) => {
+            const nextKind = updatesByCoord.get(`${tile.x}:${tile.y}`);
+            if (!nextKind) return tile;
+            return {
+              ...tile,
+              kind: nextKind,
+              roomId:
+                nextKind === "wall" || nextKind === "void"
                   ? undefined
                   : tile.roomId,
             };

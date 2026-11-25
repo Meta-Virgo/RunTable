@@ -9,7 +9,18 @@ import { LoadingScreen } from "./components/LoadingScreen";
 import { Button, cn } from "./components/UI";
 import "@livekit/components-styles";
 import { Character } from "./types"; // Removed AppData as it might not be used anymore
-import { Edit2, Menu, LogOut, Volume2, VolumeX } from "lucide-react";
+import {
+  Columns,
+  Edit2,
+  Map as MapIcon,
+  Menu,
+  MessageSquare,
+  LogOut,
+  Users,
+  Volume2,
+  VolumeX,
+  Wrench,
+} from "lucide-react";
 import {
   CharacterModal,
   ChatArea,
@@ -207,6 +218,7 @@ const App: React.FC = () => {
 
   // Application State
   const [view, setView] = useState("main");
+  const [isSplitSceneMode, setIsSplitSceneMode] = useState(false);
   const [hasOpenedSceneView, setHasOpenedSceneView] = useState(false);
   const [isPageHidden, setIsPageHidden] = useState(() =>
     typeof document === "undefined" ? false : document.visibilityState === "hidden"
@@ -542,7 +554,9 @@ const App: React.FC = () => {
         voiceConnectionStatus === "disconnected"
       ? "bg-rose-500"
       : "bg-amber-400 animate-pulse";
-  const shouldRenderSceneView = hasOpenedSceneView || view === "scene";
+  const isDesktopSplitActive = isSplitSceneMode && view === "main" && !isMobile;
+  const shouldRenderSceneView =
+    hasOpenedSceneView || view === "scene" || isDesktopSplitActive;
 
   const appContent = (
     <Suspense fallback={<LoadingScreen />}>
@@ -606,7 +620,86 @@ const App: React.FC = () => {
               </p>
             </button>
           </div>
-          <div className="flex items-center gap-2 md:gap-3">
+          <div className="hidden xl:flex items-center rounded-lg border border-dicecho-border/55 bg-dicecho-bg/65 p-0.5 text-xs">
+            <button
+              type="button"
+              onClick={() => {
+                setView("main");
+                setIsSplitSceneMode(true);
+                setHasOpenedSceneView(true);
+              }}
+              className={cn(
+                "inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 font-medium transition-colors",
+                isDesktopSplitActive
+                  ? "bg-dicecho-primary text-white"
+                  : "text-dicecho-muted hover:text-white"
+              )}
+            >
+              <Columns size={13} />
+              双栏分屏
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setView("main");
+                setIsSplitSceneMode(false);
+              }}
+              className={cn(
+                "inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 font-medium transition-colors",
+                view === "main" && !isDesktopSplitActive
+                  ? "bg-dicecho-primary text-white"
+                  : "text-dicecho-muted hover:text-white"
+              )}
+            >
+              <MessageSquare size={13} />
+              纯聊天日志
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setIsSplitSceneMode(false);
+                setHasOpenedSceneView(true);
+                setView("scene");
+              }}
+              className={cn(
+                "inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 font-medium transition-colors",
+                view === "scene"
+                  ? "bg-dicecho-primary text-white"
+                  : "text-dicecho-muted hover:text-white"
+              )}
+            >
+              <MapIcon size={13} />
+              战术桌布
+            </button>
+          </div>
+
+          <div className="flex items-center gap-1.5 md:gap-2">
+            <button
+              type="button"
+              onClick={() => setView(view === "setup" ? "main" : "setup")}
+              className={cn(
+                "hidden lg:inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-colors",
+                view === "setup"
+                  ? "border-dicecho-primary/60 bg-dicecho-primary/20 text-white"
+                  : "border-dicecho-border/55 bg-dicecho-card/60 text-dicecho-muted hover:border-dicecho-primary/45 hover:text-white"
+              )}
+            >
+              <Users size={13} />
+              角色档案
+            </button>
+            <button
+              type="button"
+              onClick={() => setView(view === "tools" ? "main" : "tools")}
+              className={cn(
+                "hidden lg:inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-colors",
+                view === "tools"
+                  ? "border-dicecho-primary/60 bg-dicecho-primary/20 text-white"
+                  : "border-dicecho-border/55 bg-dicecho-card/60 text-dicecho-muted hover:border-dicecho-primary/45 hover:text-white"
+              )}
+            >
+              <Wrench size={13} />
+              线索与工具
+            </button>
             {roomType !== "voice" && (
               <LocalMusicVolumeControl
                 volume={localMusicVolume}
@@ -646,7 +739,12 @@ const App: React.FC = () => {
         view !== "music" &&
         view !== "tools" &&
         view !== "scene" ? (
-          <div className="absolute inset-0 flex min-h-0 flex-col">
+          <div
+            className={cn(
+              "absolute inset-0 flex min-h-0 flex-col",
+              isDesktopSplitActive && "xl:right-[44%]"
+            )}
+          >
             <ChatArea
               logs={logs}
               activeChar={activeChar}
@@ -714,12 +812,14 @@ const App: React.FC = () => {
 
         {shouldRenderSceneView && (
           <div
-            aria-hidden={view !== "scene"}
+            aria-hidden={view !== "scene" && !isDesktopSplitActive}
             className={cn(
               "absolute inset-0 flex min-h-0 transition-opacity duration-150",
               view === "scene"
                 ? "visible z-10 opacity-100"
-                : "invisible pointer-events-none z-0 opacity-0"
+                : isDesktopSplitActive
+                  ? "invisible pointer-events-none z-0 opacity-0 xl:visible xl:pointer-events-auto xl:left-[56%] xl:z-10 xl:border-l xl:border-dicecho-border/45 xl:opacity-100"
+                  : "invisible pointer-events-none z-0 opacity-0"
             )}
           >
             <RoomSceneView

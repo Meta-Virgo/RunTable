@@ -26,15 +26,17 @@ export type HomeTab =
   | "square";
 
 const HOME_TABS: { id: HomeTab; label: string; icon: React.ElementType }[] = [
-  { id: "modules", label: "模组", icon: Store },
   { id: "rooms", label: "大厅", icon: BookOpen },
+  { id: "modules", label: "模组", icon: Store },
   { id: "characters", label: "车卡", icon: Dices },
   { id: "square", label: "广场", icon: MessageSquare },
   { id: "friends", label: "好友", icon: Users },
   { id: "messages", label: "消息", icon: Mail },
 ];
 
-const PRIMARY_HOME_TABS = HOME_TABS.filter((tab) => tab.id !== "messages");
+const PRIMARY_HOME_TABS = HOME_TABS.filter(
+  (tab) => tab.id !== "messages" && tab.id !== "friends"
+);
 
 interface HomeHeaderProps {
   activeTab: HomeTab;
@@ -42,6 +44,8 @@ interface HomeHeaderProps {
   socialMessageCount?: number;
   notificationUnreadCount?: number;
   onSelectTab: (tab: HomeTab) => void;
+  onOpenSocialDrawer?: () => void;
+  isSocialDrawerOpen?: boolean;
   isAuthenticated: boolean;
   userAvatar?: string | null;
   userNickname?: string | null;
@@ -55,6 +59,8 @@ export const HomeHeader: React.FC<HomeHeaderProps> = ({
   socialMessageCount = 0,
   notificationUnreadCount = 0,
   onSelectTab,
+  onOpenSocialDrawer,
+  isSocialDrawerOpen = false,
   isAuthenticated,
   userAvatar,
   userNickname,
@@ -63,12 +69,30 @@ export const HomeHeader: React.FC<HomeHeaderProps> = ({
 }) => {
   const [showUserMenu, setShowUserMenu] = React.useState(false);
   const userMenuRef = React.useRef<HTMLDivElement>(null);
+  const socialUnreadTotal = friendRequestCount + socialMessageCount;
   const handleSelectTab = (tab: HomeTab) => {
-    if (!isAuthenticated && tab !== "rooms" && tab !== "modules") {
+    if (
+      !isAuthenticated &&
+      tab !== "rooms" &&
+      tab !== "modules" &&
+      tab !== "characters" &&
+      tab !== "square"
+    ) {
       onLoginRequest();
       return;
     }
     onSelectTab(tab);
+  };
+  const handleSocialDrawerClick = () => {
+    if (!isAuthenticated) {
+      onLoginRequest();
+      return;
+    }
+    if (onOpenSocialDrawer) {
+      onOpenSocialDrawer();
+    } else {
+      onSelectTab("friends");
+    }
   };
 
   React.useEffect(() => {
@@ -153,12 +177,32 @@ export const HomeHeader: React.FC<HomeHeaderProps> = ({
             })}
           </nav>
         </div>
-        {!isAuthenticated ? (
-          <Button variant="primary" icon={LogIn} onClick={onAuthAction}>
-            登录
-          </Button>
-        ) : (
-          <div className="relative" ref={userMenuRef}>
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={handleSocialDrawerClick}
+            className={cn(
+              "inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 text-xs font-semibold transition-all",
+              isSocialDrawerOpen || activeTab === "friends" || activeTab === "messages"
+                ? "border-dicecho-primary/60 bg-dicecho-primary/20 text-white"
+                : "border-dicecho-border/60 bg-dicecho-card/70 text-dicecho-muted hover:border-dicecho-primary/50 hover:bg-dicecho-primary/15 hover:text-white"
+            )}
+          >
+            <Users size={15} />
+            <span className="hidden sm:inline">好友与私信</span>
+            {socialUnreadTotal > 0 && (
+              <span className="rounded-full bg-dicecho-primary px-1.5 py-0.5 text-[10px] font-bold leading-none text-white">
+                {socialUnreadTotal > 99 ? "99+" : socialUnreadTotal}
+              </span>
+            )}
+          </button>
+
+          {!isAuthenticated ? (
+            <Button variant="primary" icon={LogIn} onClick={onAuthAction}>
+              登录
+            </Button>
+          ) : (
+            <div className="relative" ref={userMenuRef}>
             <button
               type="button"
               onClick={() => setShowUserMenu((previous) => !previous)}
@@ -199,7 +243,8 @@ export const HomeHeader: React.FC<HomeHeaderProps> = ({
               </div>
             )}
           </div>
-        )}
+          )}
+        </div>
       </div>
     </header>
   );
@@ -253,7 +298,13 @@ export const HomeMobileNav: React.FC<HomeMobileNavProps> = ({
   mode,
 }) => {
   const handleSelectTab = (tab: HomeTab) => {
-    if (!isAuthenticated && tab !== "rooms" && tab !== "modules") {
+    if (
+      !isAuthenticated &&
+      tab !== "rooms" &&
+      tab !== "modules" &&
+      tab !== "characters" &&
+      tab !== "square"
+    ) {
       onLoginRequest();
       return;
     }

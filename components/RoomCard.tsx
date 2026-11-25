@@ -357,13 +357,8 @@ const RoomCover: React.FC<{
   const imageRef = useRef<HTMLImageElement | null>(null);
   const [failedCoverUrl, setFailedCoverUrl] = useState<string | null>(null);
   const [coverLoaded, setCoverLoaded] = useState(false);
-  const imageUrl = compact
-    ? getRoomCoverImageVariantUrl(coverImageUrl, {
-        width: 420,
-        height: 560,
-        quality: 70,
-      })
-    : coverImageUrl;
+  // Load original public storage URL directly (Supabase Free Tier returns 403 on /render/image/)
+  const imageUrl = coverImageUrl;
   const showCoverImage = Boolean(
     imageUrl && failedCoverUrl !== imageUrl
   );
@@ -371,7 +366,7 @@ const RoomCover: React.FC<{
 
   useEffect(() => {
     setFailedCoverUrl(null);
-    setCoverLoaded(Boolean(imageRef.current?.complete));
+    setCoverLoaded(Boolean(imageRef.current?.complete && imageRef.current?.naturalWidth > 0));
   }, [imageUrl]);
 
   if (!compact) {
@@ -382,7 +377,7 @@ const RoomCover: React.FC<{
           <img
             src={imageUrl}
             ref={imageRef}
-            alt={`${room.title} 灏侀潰`}
+            alt={`${room.title} 封面`}
             className={cn(
               "absolute inset-0 h-full w-full object-cover transition-opacity duration-200",
               coverLoaded ? "opacity-100" : "opacity-0"

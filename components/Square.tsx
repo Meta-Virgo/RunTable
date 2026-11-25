@@ -20,7 +20,11 @@ import { requestFriendship } from "../services/friendsModel";
 import * as friendsRepository from "../services/friendsRepository";
 import type { Profile } from "../types";
 
-export const Square: React.FC = () => {
+interface SquareProps {
+  onLoginRequest?: () => void;
+}
+
+export const Square: React.FC<SquareProps> = ({ onLoginRequest }) => {
   const {
     feed,
     composer,
@@ -29,7 +33,7 @@ export const Square: React.FC = () => {
     mobileSidebar,
     profilePanel,
     deletion,
-  } = useSquareExperience();
+  } = useSquareExperience({ onLoginRequest });
   const {
     activeChannelId,
     activeChannel,
@@ -112,7 +116,10 @@ export const Square: React.FC = () => {
 
   const handleRequestFriend = React.useCallback(
     async (profile: Profile) => {
-      if (!currentUser?.id) return;
+      if (!currentUser?.id) {
+        onLoginRequest?.();
+        return;
+      }
 
       const result = await requestFriendship({
         currentUserId: currentUser.id,
@@ -122,7 +129,7 @@ export const Square: React.FC = () => {
       });
       alert(result.message);
     },
-    [currentUser?.id]
+    [currentUser?.id, onLoginRequest]
   );
 
   return (

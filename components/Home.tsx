@@ -1,5 +1,5 @@
 import React, { Suspense, useState, useEffect } from "react";
-import { Room, Character } from "../types";
+import { Room, Character, type ModuleTemplate } from "../types";
 import { Button, Input, Textarea, Modal, cn } from "./UI";
 import {
   Plus,
@@ -7,11 +7,14 @@ import {
   Edit2,
   BookOpen,
   ArrowUp,
+  X,
 } from "lucide-react";
 import { CharacterModal } from "./modals/CharacterModal";
 import { AvatarUpload } from "./AvatarUpload";
 import { CoverImageUpload } from "./CoverImageUpload";
 import { Friends } from "./Friends";
+import { Messages } from "./Messages";
+import { fetchModuleTemplates } from "../services/moduleMarketplace";
 import { useLobbyCatalog } from "../hooks/useLobbyCatalog";
 import { useHomeProfileData } from "../hooks/useHomeProfileData";
 import { useSocialMessageBadges } from "../hooks/useSocialMessages";
@@ -100,6 +103,14 @@ export const Home: React.FC<HomeProps> = ({
   const [activeTab, setActiveTab] = useState<HomeTab>("rooms");
   const [hasOpenedSquare, setHasOpenedSquare] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [showSocialDrawer, setShowSocialDrawer] = useState(false);
+  const [socialDrawerTab, setSocialDrawerTab] = useState<"friends" | "messages">(
+    "friends"
+  );
+  const [featuredModule, setFeaturedModule] = useState<ModuleTemplate | null>(
+    null
+  );
+  const [isLoadingFeaturedModule, setIsLoadingFeaturedModule] = useState(true);
 
   // Rooms State
   const [showCreateRoom, setShowCreateRoom] = useState(false);
@@ -202,7 +213,13 @@ export const Home: React.FC<HomeProps> = ({
 
   const handleSelectTab = React.useCallback(
     (tab: HomeTab) => {
-      if (!isAuthenticated && tab !== "rooms" && tab !== "modules") {
+      if (
+        !isAuthenticated &&
+        tab !== "rooms" &&
+        tab !== "modules" &&
+        tab !== "characters" &&
+        tab !== "square"
+      ) {
         requestLogin();
         return;
       }
@@ -215,6 +232,34 @@ export const Home: React.FC<HomeProps> = ({
   );
 
   useEffect(() => {
+    let active = true;
+    fetchModuleTemplates()
+      .then(({ data }) => {
+        if (active && data && data.length > 0) {
+          setFeaturedModule(data[0]);
+        }
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (active) setIsLoadingFeaturedModule(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!showSocialDrawer) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setShowSocialDrawer(false);
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [showSocialDrawer]);
+
+  useEffect(() => {
     setShowBackToTop(false);
   }, [activeTab]);
 
@@ -223,7 +268,13 @@ export const Home: React.FC<HomeProps> = ({
   }, [activeTab]);
 
   useEffect(() => {
-    if (!isAuthenticated && activeTab !== "rooms" && activeTab !== "modules") {
+    if (
+      !isAuthenticated &&
+      activeTab !== "rooms" &&
+      activeTab !== "modules" &&
+      activeTab !== "characters" &&
+      activeTab !== "square"
+    ) {
       setActiveTab("rooms");
     }
   }, [activeTab, isAuthenticated]);
@@ -421,6 +472,8 @@ export const Home: React.FC<HomeProps> = ({
         socialMessageCount={socialBadges.total}
         notificationUnreadCount={unreadCount + socialBadges.total}
         onSelectTab={handleSelectTab}
+        onOpenSocialDrawer={() => setShowSocialDrawer((prev) => !prev)}
+        isSocialDrawerOpen={showSocialDrawer}
         isAuthenticated={isAuthenticated}
         userAvatar={userAvatar}
         userNickname={userNickname}
@@ -457,7 +510,7 @@ export const Home: React.FC<HomeProps> = ({
                   </div>
                 }
               >
-                <Square />
+                <Square onLoginRequest={requestLogin} />
               </Suspense>
             </div>
           </div>
@@ -510,6 +563,22 @@ export const Home: React.FC<HomeProps> = ({
                 onCreateRoom={handleCreateRoom}
                 onRefreshRooms={refreshRooms}
                 onLoginRequest={requestLogin}
+                featuredModule={featuredModule}
+                isLoadingFeaturedModule={isLoadingFeaturedModule}
+                onOpenModulesTab={() => handleSelectTab("modules")}
+                onOpenCharactersTab={() => handleSelectTab("characters")}
+                onCreateCharacter={() => {
+                  if (!isAuthenticated) {
+                    requestLogin();
+                    return;
+                  }
+                  setEditingChar(null);
+                  setShowCharModal(true);
+                }}
+                onEditCharacter={(char) => {
+                  setEditingChar(char);
+                  setShowCharModal(true);
+                }}
               />
             ) : activeTab === "modules" ? (
               <ModuleMarketplace
@@ -526,6 +595,10 @@ export const Home: React.FC<HomeProps> = ({
                   <Button
                     icon={Plus}
                     onClick={() => {
+                      if (!isAuthenticated) {
+                        requestLogin();
+                        return;
+                      }
                       setEditingChar(null);
                       setShowCharModal(true);
                     }}
@@ -794,6 +867,110 @@ export const Home: React.FC<HomeProps> = ({
         playerHistory={playerHistory}
         onClose={() => setShowHistoryModal(false)}
       />
+
+      {showSocialDrawer && isAuthenticated && (
+        <div className="fixed inset-0 z-50 flex justify-end">
+          <div
+            className="absolute inset-0 bg-black/50 backdrop-blur-xs"
+            onClick={() => setShowSocialDrawer(false)}
+          />
+          <aside className="relative z-10 flex h-full w-full max-w-2xl flex-col border-l border-dicecho-border/60 bg-dicecho-panel shadow-2xl">
+            <div className="flex items-center justify-between border-b border-dicecho-border/50 px-5 py-3.5">
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setSocialDrawerTab("friends")}
+                  className={cn(
+                    "rounded-lg px-3 py-1.5 text-sm font-semibold transition-colors",
+                    socialDrawerTab === "friends"
+                      ? "bg-dicecho-primary/25 text-white"
+                      : "text-dicecho-muted hover:bg-white/10 hover:text-white"
+                  )}
+                >
+                  好友
+                  {friendRequestCount > 0 && (
+                    <span className="ml-1.5 rounded-full bg-red-500 px-1.5 py-0.5 text-[10px] text-white">
+                      {friendRequestCount}
+                    </span>
+                  )}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSocialDrawerTab("messages")}
+                  className={cn(
+                    "rounded-lg px-3 py-1.5 text-sm font-semibold transition-colors",
+                    socialDrawerTab === "messages"
+                      ? "bg-dicecho-primary/25 text-white"
+                      : "text-dicecho-muted hover:bg-white/10 hover:text-white"
+                  )}
+                >
+                  私信与邀请
+                  {socialBadges.total > 0 && (
+                    <span className="ml-1.5 rounded-full bg-dicecho-primary px-1.5 py-0.5 text-[10px] text-white">
+                      {socialBadges.total}
+                    </span>
+                  )}
+                </button>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowSocialDrawer(false)}
+                className="rounded-lg p-1.5 text-dicecho-muted transition-colors hover:bg-white/10 hover:text-white"
+                aria-label="关闭好友与私信抽屉"
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
+              {socialDrawerTab === "friends" ? (
+                <Friends
+                  currentUser={
+                    currentUserId
+                      ? {
+                          id: currentUserId,
+                          nickname: userNickname,
+                          bio: userBio,
+                          user_code: userCode || undefined,
+                          created_at: userCreatedAt || "",
+                          is_vip: isVip,
+                          avatar_url: userAvatar,
+                        }
+                      : null
+                  }
+                  onOpenDirectMessage={(profile) => {
+                    setSocialDrawerTab("messages");
+                    window.setTimeout(() => {
+                      window.dispatchEvent(
+                        new CustomEvent("runtable:open-direct-message", {
+                          detail: { userId: profile.id },
+                        })
+                      );
+                    }, 0);
+                  }}
+                />
+              ) : (
+                <Messages
+                  currentUserId={currentUserId}
+                  myCharacters={myCharacters}
+                  initialInviteToken={pendingInviteToken}
+                  onLoginRequest={requestLogin}
+                  onJoinRoom={(roomId, charId, password, isRestoring, inv) => {
+                    setShowSocialDrawer(false);
+                    onJoinRoom(roomId, charId, password, isRestoring, inv);
+                  }}
+                  onInviteTokenHandled={() => {
+                    setPendingInviteToken(null);
+                    const url = new URL(window.location.href);
+                    url.searchParams.delete("room_invite");
+                    window.history.replaceState(null, "", url);
+                    void socialBadges.refresh();
+                  }}
+                />
+              )}
+            </div>
+          </aside>
+        </div>
+      )}
 
     </div>
   );

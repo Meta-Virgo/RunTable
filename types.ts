@@ -669,12 +669,17 @@ export interface FogRegion {
 export interface TabletopShape {
   id: string;
   sceneId: string;
-  kind: "rect" | "circle" | "text";
+  kind: "rect" | "circle" | "line" | "text";
   x: number;
   y: number;
   width: number;
   height: number;
   text?: string;
+  cornerRadius?: number;
+  points?: number[];
+  curvature?: number;
+  dashed?: boolean;
+  arrowEnd?: boolean;
   fill: string;
   stroke: string;
   strokeWidth: number;

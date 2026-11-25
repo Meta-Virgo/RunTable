@@ -14,9 +14,10 @@ import type {
   TabletopToken,
 } from "../types";
 import {
-  applyRevealedRect,
+  applyBlueprintFogRect,
   canMoveTabletopToken,
   clampTabletopCoordinate,
+  createEmptyTabletopMap,
   createEmptyTabletopState,
   createInitialTabletopScene,
   createTabletopShape,
@@ -28,7 +29,9 @@ import {
   mergeTabletopTokensFromBootstrap,
   normalizeTabletopState,
   projectTabletopStateForViewer,
+  removeTabletopFogRegionLocally,
   removeTabletopShapeLocally,
+  upsertTabletopFogRegionLocally,
   upsertTabletopShapeLocally,
   updateTabletopMapTileLocally,
   removeTabletopSceneLocally,
@@ -97,6 +100,11 @@ export interface UseTabletopRoomResult {
     width: number;
     height: number;
     text?: string;
+    cornerRadius?: number;
+    points?: number[];
+    curvature?: number;
+    dashed?: boolean;
+    arrowEnd?: boolean;
   }) => Promise<void>;
   updateShape: (shape: TabletopShape) => Promise<void>;
   deleteShape: (shapeId: string) => Promise<void>;
@@ -107,6 +115,8 @@ export interface UseTabletopRoomResult {
   deleteToken: (tokenId: string) => Promise<void>;
   revealRect: (rect: { x: number; y: number; width: number; height: number }) => Promise<void>;
   hideRect: (rect: { x: number; y: number; width: number; height: number }) => Promise<void>;
+  updateFogRegion: (region: FogRegion) => Promise<void>;
+  deleteFogRegion: (regionId: string) => Promise<void>;
   refresh: () => Promise<void>;
 }
 
@@ -560,6 +570,7 @@ export function useTabletopRoom({
     if (!isKeeper) return;
     await applyState((current) => {
       const scene = createInitialTabletopScene(`场景 ${current.scenes.length + 1}`);
+      scene.map = createEmptyTabletopMap(scene.map.config);
       return {
         ...current,
         scenes: [...current.scenes, scene],
@@ -695,6 +706,11 @@ export function useTabletopRoom({
       width: number;
       height: number;
       text?: string;
+      cornerRadius?: number;
+      points?: number[];
+      curvature?: number;
+      dashed?: boolean;
+      arrowEnd?: boolean;
     }) => {
       if (!isKeeper || !activeScene) return;
       const nextShape = createTabletopShape({
@@ -827,29 +843,36 @@ export function useTabletopRoom({
       reveal: boolean
     ) => {
       if (!isKeeper || !activeScene) return;
-      await applyState((current) => {
-        const region: FogRegion = {
-          id:
-            typeof crypto !== "undefined" && "randomUUID" in crypto
-              ? crypto.randomUUID()
-              : `fog-${Date.now()}`,
+      await applyState((current) =>
+        applyBlueprintFogRect({
+          state: current,
           sceneId: activeScene.id,
-          shape: "rect",
-          points: [rect.x, rect.y, rect.width, rect.height],
-          mode: reveal ? "revealed" : "hidden",
-        };
-        return {
-          ...applyRevealedRect({
-            state: current,
-            sceneId: activeScene.id,
-            rect,
-            reveal,
-          }),
-          fogRegions: [...current.fogRegions, region],
-        };
-      });
+          rect,
+          reveal,
+        })
+      );
     },
     [activeScene, applyState, isKeeper]
+  );
+
+  const updateFogRegion = useCallback(
+    async (region: FogRegion) => {
+      if (!isKeeper) return;
+      await applyState((current) =>
+        upsertTabletopFogRegionLocally(current, region)
+      );
+    },
+    [applyState, isKeeper]
+  );
+
+  const deleteFogRegion = useCallback(
+    async (regionId: string) => {
+      if (!isKeeper) return;
+      await applyState((current) =>
+        removeTabletopFogRegionLocally(current, regionId)
+      );
+    },
+    [applyState, isKeeper]
   );
 
   return {
@@ -878,6 +901,8 @@ export function useTabletopRoom({
     deleteToken: removeToken,
     revealRect: (rect) => applyFogRect(rect, true),
     hideRect: (rect) => applyFogRect(rect, false),
+    updateFogRegion,
+    deleteFogRegion,
     refresh: loadBootstrap,
   };
 }

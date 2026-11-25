@@ -7,14 +7,12 @@ import {
   Edit3,
   Filter,
   Loader2,
-  Map,
   Mic,
   MessageSquare,
   RefreshCw,
   Search,
   Shield,
   Sparkles,
-  Users,
 } from "lucide-react";
 import type { ModuleTemplate, ModuleTemplateDetail } from "../../types";
 import { useModuleMarketplace } from "../../hooks/useModuleMarketplace";
@@ -26,6 +24,7 @@ import {
 import { Button, Input, Modal, cn } from "../UI";
 import { SkeletonBlock } from "../Skeleton";
 import { UserModuleUploadDialog } from "./UserModuleUploadDialog";
+import { ModuleKeeperBriefing } from "./ModuleKeeperBriefing";
 
 interface ModuleMarketplaceProps {
   isAuthenticated: boolean;
@@ -505,16 +504,39 @@ const ModuleTemplateDetailModal: React.FC<{
   onCreateRoom,
   onEdit,
 }) => {
-  const characters = template.module_template_characters || [];
-  const scenes = template.module_template_scenes || [];
-  const rosterCharacters = characters.filter(
-    (character) => character.character_type !== "investigator"
-  );
   const [isDetailSpoilerOpen, setIsDetailSpoilerOpen] = React.useState(false);
+  const [isKeeperVerified, setIsKeeperVerified] = React.useState(false);
+  const [showKeeperGate, setShowKeeperGate] = React.useState(false);
+  const [keeperPhraseInput, setKeeperPhraseInput] = React.useState("");
 
   React.useEffect(() => {
     setIsDetailSpoilerOpen(false);
+    setIsKeeperVerified(false);
+    setShowKeeperGate(false);
+    setKeeperPhraseInput("");
   }, [template.id]);
+
+  const isPhraseValid = keeperPhraseInput.trim().toUpperCase() === "我是KP";
+
+  const handleToggleKeeperSection = () => {
+    if (isDetailSpoilerOpen) {
+      setIsDetailSpoilerOpen(false);
+      return;
+    }
+    if (isKeeperVerified) {
+      setIsDetailSpoilerOpen(true);
+      return;
+    }
+    setShowKeeperGate((open) => !open);
+  };
+
+  const handleConfirmKeeperGate = (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!isPhraseValid) return;
+    setIsKeeperVerified(true);
+    setShowKeeperGate(false);
+    setIsDetailSpoilerOpen(true);
+  };
 
   return (
     <Modal
@@ -523,96 +545,178 @@ const ModuleTemplateDetailModal: React.FC<{
       onClose={onClose}
       className="max-w-5xl"
     >
-      <div className="overflow-y-auto p-5 custom-scrollbar md:p-6">
+      <div className="overflow-y-auto p-5 custom-scrollbar md:p-7">
         {isLoading ? (
-          <div className="flex items-center gap-2 rounded-lg border border-dicecho-border/40 bg-dicecho-panel/60 px-4 py-3 text-sm text-dicecho-muted">
+          <div className="mb-4 flex items-center gap-2 rounded-lg border border-dicecho-border/40 bg-dicecho-panel/60 px-4 py-3 text-sm text-dicecho-muted">
             <Loader2 size={16} className="animate-spin" />
             正在加载模组详情
           </div>
         ) : error ? (
-          <div className="flex items-center gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
+          <div className="mb-4 flex items-center gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
             <AlertCircle size={16} />
             {error}
           </div>
         ) : null}
 
-        <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_20rem]">
-          <section className="space-y-5">
-            {template.cover_image_url && (
-              <img
-                src={template.cover_image_url}
-                alt={template.title}
-                className="aspect-[16/8] w-full rounded-lg border border-dicecho-border/40 object-cover"
-              />
-            )}
-            <div>
-              <h4 className="text-sm font-semibold text-dicecho-primary">
-                玩家可见背景
-              </h4>
-              <p className="mt-2 whitespace-pre-wrap text-sm leading-7 text-slate-200">
-                {template.player_facing_premise}
-              </p>
+        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_19rem]">
+          <section className="space-y-6">
+            {/* Editorial Cover Hero with Title & Tags Overlay */}
+            <div className="relative overflow-hidden rounded-xl border border-dicecho-border/50 bg-dicecho-panel shadow-sm">
+              {template.cover_image_url ? (
+                <div className="relative aspect-[16/8] w-full">
+                  <img
+                    src={template.cover_image_url}
+                    alt={template.title}
+                    className="h-full w-full object-cover"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-[#1c2230] via-[#1c2230]/45 to-transparent" />
+                  <div className="absolute inset-x-0 bottom-0 p-5 space-y-2">
+                    <div className="flex flex-wrap items-center gap-2 text-xs">
+                      <span className="rounded bg-dicecho-primary/85 px-2 py-0.5 font-mono font-semibold text-white">
+                        {template.system?.toUpperCase() || "COC 7TH"}
+                      </span>
+                      {template.tone && (
+                        <span className="rounded bg-black/45 px-2 py-0.5 text-slate-200 backdrop-blur-xs">
+                          {template.tone}
+                        </span>
+                      )}
+                      {template.author?.nickname && (
+                        <span className="text-slate-300">
+                          作者：{template.author.nickname}
+                        </span>
+                      )}
+                    </div>
+                    <h3 className="text-2xl font-bold text-white tracking-tight">
+                      {template.title}
+                    </h3>
+                    {template.tags && template.tags.length > 0 && (
+                      <div className="flex flex-wrap gap-1.5 pt-0.5">
+                        {template.tags.map((tag) => (
+                          <span
+                            key={tag}
+                            className="rounded-md border border-white/15 bg-black/35 px-2 py-0.5 text-[11px] text-slate-200 backdrop-blur-xs"
+                          >
+                            {tag}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <div className="p-5 space-y-2.5">
+                  <div className="flex flex-wrap items-center gap-2 text-xs">
+                    <span className="rounded bg-dicecho-primary/25 px-2 py-0.5 font-mono font-semibold text-dicecho-primary">
+                      {template.system?.toUpperCase() || "COC 7TH"}
+                    </span>
+                    {template.tone && (
+                      <span className="text-dicecho-muted">{template.tone}</span>
+                    )}
+                  </div>
+                  <h3 className="text-2xl font-bold text-white">{template.title}</h3>
+                </div>
+              )}
             </div>
-            <DetailSpoilerSection
-              title="KP 内容"
-              icon={Shield}
-              isOpen={isDetailSpoilerOpen}
-              onToggle={() => setIsDetailSpoilerOpen((open) => !open)}
-              tone="warning"
-              collapsedText="玩家可见背景以外的内容默认隐藏，避免提前剧透。"
-            >
-              <div className="space-y-4">
-                <TemplateContentGroup
-                  title="KP 私密准备"
-                  icon={Shield}
-                  empty="这个模板暂未填写 KP 私密准备"
-                  tone="warning"
-                >
-                  {template.keeper_notes ? (
-                    <p className="whitespace-pre-wrap text-sm leading-7 text-amber-50/90">
-                      {template.keeper_notes}
-                    </p>
-                  ) : null}
-                </TemplateContentGroup>
-                <TemplateContentGroup
-                  title="NPC / 怪物"
-                  icon={Users}
-                  empty="这个模板暂未配置 NPC 或怪物"
-                >
-                  {rosterCharacters.map((character) => (
-                    <TemplateListItem
-                      key={character.id}
-                      title={String(
-                        character.payload.name || character.template_character_key
-                      )}
-                      meta={character.character_type === "monster" ? "怪物" : "NPC"}
-                      description={String(
-                        character.payload.info?.notes ||
-                          character.payload.info?.backstory ||
-                          ""
-                      )}
-                    />
-                  ))}
-                </TemplateContentGroup>
-                <TemplateContentGroup
-                  title="预设场景"
-                  icon={Map}
-                  empty="这个模板暂未配置场景"
-                >
-                  {scenes.map((scene) => (
-                    <TemplateListItem
-                      key={scene.id}
-                      title={scene.title}
-                      meta={scene.is_default ? "默认场景" : "备用场景"}
-                      description={scene.description || ""}
-                    />
-                  ))}
-                </TemplateContentGroup>
+
+            {/* Player-Facing Briefing Card */}
+            <div className="rounded-xl border border-dicecho-border/45 bg-dicecho-panel/65 p-5 space-y-3">
+              <div className="flex items-center justify-between">
+                <h4 className="flex items-center gap-2 text-sm font-bold text-white">
+                  <span className="h-4 w-1 rounded-full bg-dicecho-primary" />
+                  玩家可见背景
+                </h4>
+                <span className="text-[11px] font-mono uppercase tracking-wider text-dicecho-muted">
+                  PL SAFE · 无剧透
+                </span>
               </div>
+              <p className="whitespace-pre-wrap text-[14px] leading-[1.85] text-slate-200">
+                {template.player_facing_premise || template.summary}
+              </p>
+              {template.content_warnings && template.content_warnings.length > 0 && (
+                <div className="flex flex-wrap items-center gap-1.5 border-t border-dicecho-border/35 pt-3 text-xs">
+                  <span className="text-dicecho-muted">内容提示：</span>
+                  {template.content_warnings.map((warning) => (
+                    <span
+                      key={warning}
+                      className="rounded border border-rose-500/30 bg-rose-500/10 px-2 py-0.5 text-[11px] text-rose-200"
+                    >
+                      {warning}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Keeper Spoiler Gate + Visual Briefing */}
+            <DetailSpoilerSection
+              title="KP 内容（含场景图、NPC/怪物属性与详细背景）"
+              icon={Shield}
+              isOpen={isDetailSpoilerOpen || showKeeperGate}
+              onToggle={handleToggleKeeperSection}
+              tone="warning"
+              collapsedText="包含模组真相、场景图与怪物属性，需输入「我是KP」确认身份后方可展开。"
+            >
+              {showKeeperGate && !isKeeperVerified ? (
+                <form
+                  onSubmit={handleConfirmKeeperGate}
+                  className="rounded-xl border border-amber-500/35 bg-amber-500/[0.08] p-5 space-y-4 animate-fade-in"
+                >
+                  <div className="flex items-start gap-3">
+                    <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-amber-400/40 bg-amber-500/15 text-amber-300">
+                      <Shield size={18} />
+                    </div>
+                    <div className="space-y-1">
+                      <h5 className="text-sm font-bold text-amber-100">
+                        剧透警告 · 仅限守秘人（KP）查看
+                      </h5>
+                      <p className="text-xs leading-6 text-amber-100/80">
+                        下方包含完整场景地图、NPC 与怪物属性以及模组真相与结局分支。如果你打算作为调查员（PL）游玩本模组，请勿展开，以免影响跑团体验。
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center">
+                    <input
+                      type="text"
+                      value={keeperPhraseInput}
+                      onChange={(event) => setKeeperPhraseInput(event.target.value)}
+                      placeholder="请输入「我是KP」以确认展开"
+                      autoFocus
+                      className="flex-1 rounded-lg border border-amber-500/40 bg-dicecho-bg/85 px-3.5 py-2 text-sm text-white placeholder:text-amber-200/45 focus:border-amber-400 focus:outline-none"
+                    />
+                    <div className="flex items-center gap-2">
+                      <Button
+                        type="submit"
+                        variant="primary"
+                        size="sm"
+                        disabled={!isPhraseValid}
+                      >
+                        确认展开
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          setShowKeeperGate(false);
+                          setKeeperPhraseInput("");
+                        }}
+                      >
+                        取消
+                      </Button>
+                    </div>
+                  </div>
+                </form>
+              ) : isDetailSpoilerOpen && isKeeperVerified ? (
+                <ModuleKeeperBriefing template={template} />
+              ) : null}
             </DetailSpoilerSection>
           </section>
-          <aside className="space-y-3">
-            <div className="rounded-lg border border-dicecho-border/40 bg-dicecho-panel/65 p-4">
+
+          <aside className="space-y-3 lg:sticky lg:top-0 lg:self-start">
+            <div className="rounded-xl border border-dicecho-border/50 bg-dicecho-panel/80 p-4 shadow-sm">
+              <div className="mb-3 text-xs font-semibold uppercase tracking-wider text-dicecho-muted">
+                模组规格
+              </div>
               <div className="grid grid-cols-2 gap-3 text-sm">
                 <ModuleFact
                   label="人数"
@@ -625,6 +729,10 @@ const ModuleTemplateDetailModal: React.FC<{
                 <ModuleFact
                   label="难度"
                   value={getModuleTemplateComplexityLabel(template.complexity)}
+                />
+                <ModuleFact
+                  label="推荐形式"
+                  value={template.default_room_type === "voice" ? "语音团" : "文字团"}
                 />
               </div>
             </div>
@@ -990,72 +1098,6 @@ const DetailSpoilerSection: React.FC<{
       </span>
     </button>
     {isOpen && <div>{children}</div>}
-  </div>
-);
-
-const TemplateContentGroup: React.FC<{
-  title: string;
-  icon: React.ElementType;
-  empty: string;
-  tone?: "default" | "warning";
-  children: React.ReactNode;
-}> = ({ title, icon: Icon, empty, tone = "default", children }) => {
-  const childArray = React.Children.toArray(children).filter(Boolean);
-  return (
-    <div
-      className={cn(
-        "rounded-lg border p-4",
-        tone === "warning"
-          ? "border-amber-500/20 bg-amber-500/8"
-          : "border-dicecho-border/35 bg-dicecho-panel/45"
-      )}
-    >
-      <div
-        className={cn(
-          "flex items-center gap-2 text-sm font-semibold",
-          tone === "warning" ? "text-amber-200" : "text-dicecho-primary"
-        )}
-      >
-        <Icon size={15} />
-        {title}
-      </div>
-      <div className="mt-3 space-y-2">
-        {childArray.length > 0 ? (
-          childArray
-        ) : (
-          <div
-            className={cn(
-              "rounded-lg border px-4 py-3 text-sm",
-              tone === "warning"
-                ? "border-amber-500/15 bg-black/10 text-amber-100/70"
-                : "border-dicecho-border/35 bg-dicecho-panel/45 text-dicecho-muted"
-            )}
-          >
-            {empty}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-};
-
-const TemplateListItem: React.FC<{
-  title: string;
-  meta: string;
-  description: string;
-}> = ({ title, meta, description }) => (
-  <div className="rounded-lg border border-dicecho-border/35 bg-dicecho-panel/55 p-3">
-    <div className="flex items-center justify-between gap-3">
-      <h5 className="font-semibold text-white">{title}</h5>
-      <span className="shrink-0 rounded-md border border-dicecho-border/35 px-2 py-1 text-xs text-dicecho-muted">
-        {meta}
-      </span>
-    </div>
-    {description && (
-      <p className="mt-2 line-clamp-2 text-sm leading-6 text-slate-300">
-        {description}
-      </p>
-    )}
   </div>
 );
 

@@ -17,15 +17,16 @@ export type TabletopViewportSize = {
   height: number;
 };
 
-export type TabletopDraftTool = "rect" | "circle" | "reveal" | "hide";
+export type TabletopDraftTool = "rect" | "circle" | "line" | "reveal" | "hide";
 
 export type TabletopDraftRect = {
-  kind: "rect" | "circle";
+  kind: "rect" | "circle" | "line";
   mode: "shape" | "reveal" | "hide";
   x: number;
   y: number;
   width: number;
   height: number;
+  points?: number[];
 };
 
 export function getTabletopViewportStorageKey(
@@ -159,6 +160,20 @@ export function createTabletopDraftRect(input: {
 }): TabletopDraftRect | null {
   if (!input.start || !input.end) return null;
 
+  if (input.tool === "line") {
+    const dx = input.end.x - input.start.x;
+    const dy = input.end.y - input.start.y;
+    return {
+      kind: "line",
+      mode: "shape",
+      x: input.start.x,
+      y: input.start.y,
+      width: Math.max(1, Math.abs(dx)),
+      height: Math.max(1, Math.abs(dy)),
+      points: [0, 0, dx, dy],
+    };
+  }
+
   const isFogTool = input.tool === "reveal" || input.tool === "hide";
   const kind: "rect" | "circle" = isFogTool
     ? "rect"
@@ -176,6 +191,104 @@ export function createTabletopDraftRect(input: {
     width: Math.abs(input.end.x - input.start.x),
     height: Math.abs(input.end.y - input.start.y),
   };
+}
+
+export function sampleEllipsePoints(
+  cx: number,
+  cy: number,
+  rx: number,
+  ry: number,
+  segments = 64
+): number[] {
+  const safeRx = Math.max(1, rx);
+  const safeRy = Math.max(1, ry);
+  const points: number[] = [];
+  for (let i = 0; i < segments; i += 1) {
+    const angle = (i / segments) * Math.PI * 2;
+    points.push(
+      cx + Math.cos(angle) * safeRx,
+      cy + Math.sin(angle) * safeRy
+    );
+  }
+  return points;
+}
+
+export function getLineCurveControlPoint(
+  x1: number,
+  y1: number,
+  x2: number,
+  y2: number,
+  curvature = 0
+) {
+  const midX = (x1 + x2) / 2;
+  const midY = (y1 + y2) / 2;
+  const dx = x2 - x1;
+  const dy = y2 - y1;
+  const length = Math.hypot(dx, dy) || 1;
+  // Unit normal perpendicular to line
+  const nx = -dy / length;
+  const ny = dx / length;
+  // Quadratic Bezier control point (at 2x curvature so the curve apex at t=0.5 passes through mid + curvature * normal)
+  const cx = midX + nx * curvature * 2;
+  const cy = midY + ny * curvature * 2;
+  const apexX = midX + nx * curvature;
+  const apexY = midY + ny * curvature;
+  return { cx, cy, apexX, apexY, nx, ny };
+}
+
+export function getCurvatureFromCurveMidpoint(
+  x1: number,
+  y1: number,
+  x2: number,
+  y2: number,
+  handleX: number,
+  handleY: number
+): number {
+  const midX = (x1 + x2) / 2;
+  const midY = (y1 + y2) / 2;
+  const dx = x2 - x1;
+  const dy = y2 - y1;
+  const length = Math.hypot(dx, dy) || 1;
+  const nx = -dy / length;
+  const ny = dx / length;
+  const projection = (handleX - midX) * nx + (handleY - midY) * ny;
+  return Math.round(Math.max(-320, Math.min(320, projection)));
+}
+
+export function sampleQuadraticCurvePoints(
+  x1: number,
+  y1: number,
+  cx: number,
+  cy: number,
+  x2: number,
+  y2: number,
+  segments = 28
+): number[] {
+  const points: number[] = [];
+  for (let i = 0; i <= segments; i += 1) {
+    const t = i / segments;
+    const inv = 1 - t;
+    const px = inv * inv * x1 + 2 * inv * t * cx + t * t * x2;
+    const py = inv * inv * y1 + 2 * inv * t * cy + t * t * y2;
+    points.push(px, py);
+  }
+  return points;
+}
+
+export function getArrowHeadPoints(
+  fromX: number,
+  fromY: number,
+  toX: number,
+  toY: number,
+  size = 11
+): number[] {
+  const angle = Math.atan2(toY - fromY, toX - fromX);
+  const spread = Math.PI / 6.5;
+  const lx = toX - size * Math.cos(angle - spread);
+  const ly = toY - size * Math.sin(angle - spread);
+  const rx = toX - size * Math.cos(angle + spread);
+  const ry = toY - size * Math.sin(angle + spread);
+  return [lx, ly, toX, toY, rx, ry];
 }
 
 export function getMapTileAtWorldPoint(input: {

@@ -9,6 +9,10 @@ import {
 
 const MODULE_TABLETOP_ROOM_ID = "module-template";
 
+function stripNumericDriftSuffix(characterId: string) {
+  return characterId.replace(/(?:-\d+)+$/, "");
+}
+
 export function createModuleSceneTabletopState(input: {
   title?: string;
   description?: string | null;
@@ -16,13 +20,35 @@ export function createModuleSceneTabletopState(input: {
   characterIds?: string[];
 }) {
   if (input.state?.scenes?.length) {
-    const characterIds = new Set(input.characterIds || []);
+    const validIds = input.characterIds || [];
+    const exactIdSet = new Set(validIds);
+    const baseIdMap = new Map<string, string>();
+    for (const id of validIds) {
+      const base = stripNumericDriftSuffix(id);
+      if (!baseIdMap.has(base)) {
+        baseIdMap.set(base, id);
+      }
+    }
+
+    const reconciledTokens = exactIdSet.size
+      ? input.state.tokens.flatMap((token) => {
+          if (exactIdSet.has(token.characterId)) {
+            return [token];
+          }
+          const healedId = baseIdMap.get(
+            stripNumericDriftSuffix(token.characterId)
+          );
+          if (healedId) {
+            return [{ ...token, characterId: healedId }];
+          }
+          return [];
+        })
+      : input.state.tokens;
+
     return normalizeTabletopState({
       ...input.state,
       roomId: input.state.roomId || MODULE_TABLETOP_ROOM_ID,
-      tokens: characterIds.size
-        ? input.state.tokens.filter((token) => characterIds.has(token.characterId))
-        : input.state.tokens,
+      tokens: reconciledTokens,
     });
   }
 

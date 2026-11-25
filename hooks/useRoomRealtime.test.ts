@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 import {
   createRealtimeLifecycleGuard,
   createRoomRealtimeAdapter,
+  getRealtimeReconnectDelayMs,
   isKickMessageForUser,
+  mergeFetchedLogs,
 } from "./useRoomRealtime";
 import type { Character, Log, ModuleInfo } from "../types";
 
@@ -184,5 +186,34 @@ describe("room realtime adapter", () => {
     expect(bgMusicUrl).toBe("s:1");
     expect(isMusicPlaying).toBe(true);
     expect(musicTrackIndex).toBe(2);
+  });
+
+  it("merges catch-up logs without duplicating existing messages or losing older history", () => {
+    const older: Log = {
+      ...baseLog,
+      id: "log-0",
+      createdAt: "2026-06-07T23:59:00.000Z",
+      content: "older",
+    };
+    const missed: Log = {
+      ...baseLog,
+      id: "log-2",
+      createdAt: "2026-06-08T00:01:00.000Z",
+      content: "missed while offline",
+    };
+
+    const merged = mergeFetchedLogs([older, baseLog], [baseLog, missed]);
+    expect(merged.map((item) => item.id)).toEqual(["log-0", "log-1", "log-2"]);
+    expect(mergeFetchedLogs([older, baseLog], [baseLog])).toEqual([
+      older,
+      baseLog,
+    ]);
+  });
+
+  it("caps reconnect backoff delays cleanly", () => {
+    expect(getRealtimeReconnectDelayMs(0)).toBe(2000);
+    expect(getRealtimeReconnectDelayMs(1)).toBe(4000);
+    expect(getRealtimeReconnectDelayMs(2)).toBe(8000);
+    expect(getRealtimeReconnectDelayMs(10)).toBe(15000);
   });
 });
